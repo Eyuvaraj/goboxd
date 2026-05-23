@@ -1,0 +1,22 @@
+version: "2"
+
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - gosimple
+    - unused
+    - ineffassign
+    - misspell
+    - gofmt
+
+linters-settings:
+  errcheck:
+    check-type-assertions: false
+
+issues:
+  exclude-rules:
+    - path: "_test.go"
+      linters:
+        - errcheck

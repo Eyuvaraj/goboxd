@@ -28,28 +28,42 @@ goboxd is an HTTP service written in Go that compiles and runs untrusted code in
 
 ## Getting started
 
-### Prerequisites
+**Prerequisite:** Docker with Compose v2. No host Go installation needed.
 
-- Docker with Compose v2
-
-No Go toolchain or system dependencies are required on the host. Everything runs in containers.
-
-### Installation
-
-```sh
-git clone https://github.com/thesouldev/goboxd.git
-cd goboxd
-make build
+```bash
+make build   # build the image (nsjail is compiled from source)
+make run     # start the service on :8080
 ```
 
-### Usage
+Verify it's up:
 
-```sh
-make run          # start the service on :8080
-make test         # run unit tests
-make integration  # run end to end tests
-make lint         # run static analysis
+```bash
+curl http://localhost:8080/healthz
+curl http://localhost:8080/info
 ```
+
+Run a hello-world:
+
+```bash
+curl -s -X POST http://localhost:8080/run \
+  -H 'Content-Type: application/json' \
+  -d '{"language":"py3","source":"print(\"hello\")","tests":[{"stdin":"","expected_stdout":"hello\n"}]}'
+```
+
+### Makefile targets
+
+| Target | What it does |
+|--------|--------------|
+| `make build` | Build the runtime Docker image |
+| `make run` | Start the service on :8080 |
+| `make test` | Run unit tests (no nsjail required) |
+| `make integration` | Run end-to-end tests inside the container |
+| `make lint` | Run golangci-lint |
+| `make load` | Run the load-test benchmark (requires hey or k6) |
+
+## HTTP framework
+
+chi (`github.com/go-chi/chi/v5`). It gives a composable middleware chain without framework overhead and stays close to `net/http`, making handlers straightforward to test.
 
 ## Project structure
 
