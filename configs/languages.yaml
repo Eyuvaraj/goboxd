@@ -134,3 +134,85 @@ languages:
         wall_time_s: 5
         memory_kb: 131072
         max_processes: 64
+
+  - id: ruby
+    name: Ruby
+    source_filename: solution.rb
+    run:
+      cmd: /usr/bin/ruby
+      args: ["{{source}}"]
+      limits:
+        wall_time_s: 9
+        memory_kb: 131072
+        max_processes: 100
+
+  - id: lua
+    name: Lua
+    source_filename: solution.lua
+    run:
+      cmd: /usr/bin/lua5.4
+      args: ["{{source}}"]
+      limits:
+        wall_time_s: 9
+        memory_kb: 65536
+        max_processes: 50
+
+  - id: rust
+    name: Rust
+    source_filename: solution.rs
+    artifact_filename: solution
+    build:
+      cmd: /usr/bin/rustc
+      args: ["{{flags}}", "-o", "{{artifact}}", "{{source}}"]
+      limits:
+        wall_time_s: 30
+        memory_kb: 524288
+        max_processes: 100
+      flag_allowlist:
+        - "-O"
+        - "-g"
+        - "--edition"
+        - "2021"
+        - "2018"
+        - "2015"
+    run:
+      cmd: /solution
+      args: []
+      limits:
+        wall_time_s: 5
+        memory_kb: 262144
+        max_processes: 64
+
+  - id: kotlin
+    name: Kotlin
+    source_filename: solution.kt
+    artifact_filename: solution.jar
+    build:
+      cmd: /usr/bin/kotlinc
+      args: ["{{source}}", "-include-runtime", "-d", "{{artifact}}"]
+      limits:
+        wall_time_s: 60
+        memory_kb: 1048576
+        max_processes: 100
+      flag_allowlist:
+        - "-jvm-target"
+        - "11"
+        - "17"
+    run:
+      cmd: /usr/bin/java
+      args: ["-jar", "{{artifact}}"]
+      limits:
+        wall_time_s: 10
+        memory_kb: 524288
+        max_processes: 100
+
+  - id: ocaml
+    name: OCaml
+    source_filename: solution.ml
+    run:
+      cmd: /usr/bin/ocaml
+      args: ["{{source}}"]
+      limits:
+        wall_time_s: 9
+        memory_kb: 131072
+        max_processes: 100

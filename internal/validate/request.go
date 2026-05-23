@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+
+	"github.com/thesouldev/goboxd/internal/config"
 )
 
 const (
@@ -102,6 +104,30 @@ func TestCount(n, max int) error {
 func StdinSize(s string, max int) error {
 	if len(s) > max {
 		return fmt.Errorf("stdin size %d bytes exceeds maximum of %d bytes", len(s), max)
+	}
+	return nil
+}
+
+// ExpectedSize returns an error if the expected_stdout string exceeds max bytes.
+func ExpectedSize(s string, max int) error {
+	if len(s) > max {
+		return fmt.Errorf("expected_stdout size %d bytes exceeds maximum of %d bytes", len(s), max)
+	}
+	return nil
+}
+
+// Limits validates that client-supplied limit overrides do not exceed the language defaults.
+// Clients may not grant themselves more resources than the server has configured for the language.
+// Zero values in override are ignored (they mean "use the default").
+func Limits(override, langDefault config.LimitsDef) error {
+	if override.WallTimeS > 0 && override.WallTimeS > langDefault.WallTimeS {
+		return fmt.Errorf("wall_time_s %d exceeds language maximum of %d", override.WallTimeS, langDefault.WallTimeS)
+	}
+	if override.MemoryKB > 0 && override.MemoryKB > langDefault.MemoryKB {
+		return fmt.Errorf("memory_kb %d exceeds language maximum of %d", override.MemoryKB, langDefault.MemoryKB)
+	}
+	if override.MaxProcesses > 0 && override.MaxProcesses > langDefault.MaxProcesses {
+		return fmt.Errorf("max_processes %d exceeds language maximum of %d", override.MaxProcesses, langDefault.MaxProcesses)
 	}
 	return nil
 }

@@ -21,13 +21,14 @@ var (
 // HealthHandler returns a HealthzHandler and ReadyzHandler pair.
 type HealthHandler struct {
 	reg        *registry.Registry
+	probes     *registry.ProbeCache
 	nsjailPath string
 	cfg        config.Server
 	counters   *stats.Counters
 }
 
-func NewHealthHandler(reg *registry.Registry, cfg config.Server, counters *stats.Counters) *HealthHandler {
-	return &HealthHandler{reg: reg, nsjailPath: cfg.NsjailPath, cfg: cfg, counters: counters}
+func NewHealthHandler(reg *registry.Registry, probes *registry.ProbeCache, cfg config.Server, counters *stats.Counters) *HealthHandler {
+	return &HealthHandler{reg: reg, probes: probes, nsjailPath: cfg.NsjailPath, cfg: cfg, counters: counters}
 }
 
 // Healthz godoc
@@ -52,21 +53,12 @@ func (h *HealthHandler) Healthz(w http.ResponseWriter, r *http.Request) {
 //	@Failure		503	{object}	ReadyzResponse	"One or more probes failed — service is degraded"
 //	@Router			/readyz [get]
 func (h *HealthHandler) Readyz(w http.ResponseWriter, r *http.Request) {
-	nsjailResult := registry.ProbeNsjail(h.nsjailPath)
-
-	langResults := map[string]registry.ProbeResult{}
-	allOK := nsjailResult.OK
-	for _, lang := range h.reg.All() {
-		res := registry.ProbeLanguage(lang)
-		langResults[lang.ID] = res
-		if !res.OK {
-			allOK = false
-		}
-	}
+	nsjailResult := h.probes.Nsjail()
+	langResults := h.probes.Languages()
 
 	status := "ok"
 	code := http.StatusOK
-	if !allOK {
+	if !h.probes.AllOK() {
 		status = "degraded"
 		code = http.StatusServiceUnavailable
 	}
@@ -87,11 +79,12 @@ func (h *HealthHandler) Readyz(w http.ResponseWriter, r *http.Request) {
 //	@Success		200	{object}	InfoResponse
 //	@Router			/info [get]
 func (h *HealthHandler) Info(w http.ResponseWriter, r *http.Request) {
-	nsjailResult := registry.ProbeNsjail(h.nsjailPath)
+	nsjailResult := h.probes.Nsjail()
+	langProbes := h.probes.Languages()
 
-	langs := make([]map[string]any, 0)
+	langs := make([]map[string]any, 0, h.reg.Len())
 	for _, lang := range h.reg.All() {
-		probe := registry.ProbeLanguage(lang)
+		probe := langProbes[lang.ID]
 		entry := map[string]any{
 			"id":      lang.ID,
 			"name":    lang.Name,

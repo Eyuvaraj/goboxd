@@ -19,12 +19,25 @@ var baseURL = func() string {
 	return "http://localhost:8080"
 }()
 
+type limitsDef struct {
+	WallTimeS    int `json:"wall_time_s,omitempty"`
+	MemoryKB     int `json:"memory_kb,omitempty"`
+	MaxProcesses int `json:"max_processes,omitempty"`
+}
+
+type phaseOverride struct {
+	Limits limitsDef `json:"limits,omitempty"`
+	Flags  []string  `json:"flags,omitempty"`
+}
+
 type runRequest struct {
-	Language         string        `json:"language"`
-	Source           string        `json:"source"`
-	SourceFilename   string        `json:"source_filename,omitempty"`
-	ArtifactFilename string        `json:"artifact_filename,omitempty"`
-	Tests            []testCase    `json:"tests"`
+	Language         string         `json:"language"`
+	Source           string         `json:"source"`
+	SourceFilename   string         `json:"source_filename,omitempty"`
+	ArtifactFilename string         `json:"artifact_filename,omitempty"`
+	Build            *phaseOverride `json:"build,omitempty"`
+	Run              *phaseOverride `json:"run,omitempty"`
+	Tests            []testCase     `json:"tests"`
 }
 
 type testCase struct {
@@ -336,5 +349,287 @@ func TestMultipleTestCases(t *testing.T) {
 			fmt.Printf("  test[%d]: status=%s stdout=%q\n", i, tr.Status, tr.Stdout)
 		}
 		t.Fatalf("expected accepted, got %s", resp.Status)
+	}
+}
+
+func TestWhitespaceMismatch(t *testing.T) {
+	// Program prints "hello\n" but expected has trailing space — whitespace diff, not wrong_output.
+	resp, code := postRun(t, runRequest{
+		Language: "py3",
+		Source:   "print('hello')\n",
+		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello"}},
+	})
+	if code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", code)
+	}
+	if resp.Status != "output_whitespace_mismatch" {
+		t.Fatalf("expected output_whitespace_mismatch, got %s", resp.Status)
+	}
+}
+
+// Bonus language smoke tests — all require the language toolchain to be installed.
+
+func TestRubyHelloWorld(t *testing.T) {
+	resp, code := postRun(t, runRequest{
+		Language: "ruby",
+		Source:   "puts 'hello'\n",
+		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
+	})
+	if code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", code)
+	}
+	if resp.Status != "accepted" {
+		t.Fatalf("expected accepted, got %s", resp.Status)
+	}
+}
+
+func TestLuaHelloWorld(t *testing.T) {
+	resp, code := postRun(t, runRequest{
+		Language: "lua",
+		Source:   `print("hello")` + "\n",
+		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
+	})
+	if code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", code)
+	}
+	if resp.Status != "accepted" {
+		t.Fatalf("expected accepted, got %s", resp.Status)
+	}
+}
+
+func TestRustHelloWorld(t *testing.T) {
+	src := `fn main() { println!("hello"); }` + "\n"
+	resp, code := postRun(t, runRequest{
+		Language: "rust",
+		Source:   src,
+		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
+	})
+	if code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", code)
+	}
+	if resp.Status != "accepted" {
+		t.Fatalf("expected accepted, got %s (build: %s)", resp.Status, resp.Build.Status)
+	}
+}
+
+func TestOCamlHelloWorld(t *testing.T) {
+	src := `print_string "hello\n";;` + "\n"
+	resp, code := postRun(t, runRequest{
+		Language: "ocaml",
+		Source:   src,
+		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
+	})
+	if code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", code)
+	}
+	if resp.Status != "accepted" {
+		t.Fatalf("expected accepted, got %s", resp.Status)
+	}
+}
+
+func TestKotlinHelloWorld(t *testing.T) {
+	src := `fun main() { println("hello") }` + "\n"
+	resp, code := postRun(t, runRequest{
+		Language: "kotlin",
+		Source:   src,
+		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
+	})
+	if code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", code)
+	}
+	if resp.Status != "accepted" {
+		t.Fatalf("expected accepted, got %s (build: %s)", resp.Status, resp.Build.Status)
+	}
+}
+
+// ── Status vocabulary coverage ────────────────────────────────────────────────
+
+func TestTimeExceeded(t *testing.T) {
+	resp, code := postRun(t, runRequest{
+		Language: "py3",
+		Source:   "while True: pass\n",
+		Run:      &phaseOverride{Limits: limitsDef{WallTimeS: 1}},
+		Tests:    []testCase{{Stdin: "", ExpectedStdout: ""}},
+	})
+	if code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", code)
+	}
+	if resp.Status != "time_exceeded" {
+		t.Fatalf("expected time_exceeded, got %s", resp.Status)
+	}
+	if resp.Tests[0].Status != "time_exceeded" {
+		t.Fatalf("expected tests[0].status=time_exceeded, got %s", resp.Tests[0].Status)
+	}
+}
+
+func TestRuntimeError(t *testing.T) {
+	resp, code := postRun(t, runRequest{
+		Language: "py3",
+		Source:   "import sys; sys.exit(1)\n",
+		Tests:    []testCase{{Stdin: "", ExpectedStdout: ""}},
+	})
+	if code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", code)
+	}
+	if resp.Status != "runtime_error" {
+		t.Fatalf("expected runtime_error, got %s", resp.Status)
+	}
+}
+
+func TestMemoryExceeded(t *testing.T) {
+	// Allocate well past the memory cap; exact threshold varies by cgroup config.
+	// Skip in environments where cgroup memory limits aren't enforced.
+	resp, code := postRun(t, runRequest{
+		Language: "py3",
+		Source:   "x = bytearray(512 * 1024 * 1024)\n", // 512 MiB
+		Run:      &phaseOverride{Limits: limitsDef{MemoryKB: 32768}},
+		Tests:    []testCase{{Stdin: "", ExpectedStdout: ""}},
+	})
+	if code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", code)
+	}
+	if resp.Status != "memory_exceeded" && resp.Status != "runtime_error" {
+		// runtime_error is acceptable if the OOM kill arrives as SIGKILL before
+		// nsjail logs the cgroup memory event.
+		t.Skipf("memory limit enforcement not triggered (got %s); skip in this environment", resp.Status)
+	}
+}
+
+func TestSourceTooLarge(t *testing.T) {
+	large := make([]byte, 300*1024) // 300 KiB > 256 KiB limit
+	for i := range large {
+		large[i] = 'x'
+	}
+	body, _ := json.Marshal(map[string]any{
+		"language": "py3",
+		"source":   string(large),
+		"tests":    []testCase{{Stdin: "", ExpectedStdout: ""}},
+	})
+	resp, err := http.Post(baseURL+"/run", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 400 {
+		t.Fatalf("expected 400 for oversized source, got %d", resp.StatusCode)
+	}
+	var er errorResponse
+	json.NewDecoder(resp.Body).Decode(&er)
+	if er.Error.Code != "source_too_large" {
+		t.Fatalf("expected source_too_large, got %s", er.Error.Code)
+	}
+}
+
+func TestExpectedTooLarge(t *testing.T) {
+	large := make([]byte, 70*1024) // 70 KiB > 64 KiB per-test limit
+	for i := range large {
+		large[i] = 'x'
+	}
+	body, _ := json.Marshal(map[string]any{
+		"language": "py3",
+		"source":   "print('hi')\n",
+		"tests":    []map[string]any{{"stdin": "", "expected_stdout": string(large)}},
+	})
+	resp, err := http.Post(baseURL+"/run", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 400 {
+		t.Fatalf("expected 400 for oversized expected_stdout, got %d", resp.StatusCode)
+	}
+	var er errorResponse
+	json.NewDecoder(resp.Body).Decode(&er)
+	if er.Error.Code != "expected_too_large" {
+		t.Fatalf("expected expected_too_large, got %s", er.Error.Code)
+	}
+}
+
+func TestInvalidLimits(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{
+		"language": "py3",
+		"source":   "print('hi')\n",
+		"run": map[string]any{
+			"limits": map[string]any{"wall_time_s": 99999},
+		},
+		"tests": []testCase{{Stdin: "", ExpectedStdout: "hi\n"}},
+	})
+	resp, err := http.Post(baseURL+"/run", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 400 {
+		t.Fatalf("expected 400 for out-of-range limit, got %d", resp.StatusCode)
+	}
+	var er errorResponse
+	json.NewDecoder(resp.Body).Decode(&er)
+	if er.Error.Code != "invalid_limits" {
+		t.Fatalf("expected invalid_limits, got %s", er.Error.Code)
+	}
+}
+
+// ── Health endpoints ──────────────────────────────────────────────────────────
+
+func TestReadyz(t *testing.T) {
+	resp, err := http.Get(baseURL + "/readyz")
+	if err != nil {
+		t.Fatalf("GET /readyz: %v", err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var body struct {
+		Status    string                     `json:"status"`
+		Nsjail    struct{ OK bool }          `json:"nsjail"`
+		Languages map[string]struct{ OK bool } `json:"languages"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode /readyz: %v", err)
+	}
+	if body.Status != "ok" {
+		t.Fatalf("expected status=ok, got %s", body.Status)
+	}
+	if !body.Nsjail.OK {
+		t.Fatal("nsjail probe failed")
+	}
+	for id, lang := range body.Languages {
+		if !lang.OK {
+			t.Errorf("language %s probe failed", id)
+		}
+	}
+}
+
+func TestInfo(t *testing.T) {
+	resp, err := http.Get(baseURL + "/info")
+	if err != nil {
+		t.Fatalf("GET /info: %v", err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var body struct {
+		BuildInfo struct {
+			Version   string `json:"version"`
+			GoVersion string `json:"go_version"`
+		} `json:"build_info"`
+		Languages []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"languages"`
+		Limits struct {
+			MaxSourceBytes    int `json:"max_source_bytes"`
+			MaxTests          int `json:"max_tests"`
+			MaxConcurrentJobs int `json:"max_concurrent_jobs"`
+		} `json:"limits"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode /info: %v", err)
+	}
+	if body.BuildInfo.GoVersion == "" {
+		t.Error("go_version missing from /info")
+	}
+	if len(body.Languages) == 0 {
+		t.Error("no languages in /info")
+	}
+	if body.Limits.MaxSourceBytes == 0 {
+		t.Error("max_source_bytes missing from /info")
 	}
 }

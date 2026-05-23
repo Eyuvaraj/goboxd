@@ -32,13 +32,25 @@ func TestParseRunStatus(t *testing.T) {
 }
 
 func TestParseBuildStatus(t *testing.T) {
+	// Success path.
 	if s := sandbox.ParseBuildStatus([]byte(""), 0); s != validate.BuildStatusOK {
 		t.Errorf("exit 0: got %q", s)
 	}
-	if s := sandbox.ParseBuildStatus([]byte("error: syntax"), 1); s != validate.BuildStatusFailed {
-		t.Errorf("compiler error: got %q", s)
+
+	// Compiler ran and failed — nsjail info lines contain "nsjail" but no "[E][".
+	// This was the regression: the old check matched "nsjail" → internal_error.
+	realNsjailInfoLog := []byte("[I][2026-05-23T12:00:00+0000] nsjail[1234]: PID 5678 terminated, exit code=1\n")
+	if s := sandbox.ParseBuildStatus(realNsjailInfoLog, 1); s != validate.BuildStatusFailed {
+		t.Errorf("compiler error with real nsjail log: got %q, want %q", s, validate.BuildStatusFailed)
 	}
-	if s := sandbox.ParseBuildStatus([]byte("[E][nsjail] some error"), 255); s != validate.BuildStatusInternalError {
-		t.Errorf("nsjail error: got %q", s)
+
+	// nsjail itself failed — log contains "[E][" error-level line.
+	if s := sandbox.ParseBuildStatus([]byte("[E][nsjail.cc:123] execveat failed"), 255); s != validate.BuildStatusInternalError {
+		t.Errorf("nsjail exec error: got %q", s)
+	}
+
+	// Plain compiler stderr (no "[E][") with non-zero exit.
+	if s := sandbox.ParseBuildStatus([]byte("error: syntax error"), 1); s != validate.BuildStatusFailed {
+		t.Errorf("plain compiler error: got %q", s)
 	}
 }

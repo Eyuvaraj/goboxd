@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/thesouldev/goboxd/internal/config"
 	"gopkg.in/yaml.v3"
@@ -11,7 +12,8 @@ import (
 
 // Registry holds all loaded and validated language definitions.
 type Registry struct {
-	langs map[string]*config.LanguageDef
+	langs   map[string]*config.LanguageDef
+	ordered []*config.LanguageDef // insertion order from YAML, used by All()
 }
 
 // Load reads the YAML file at path and returns a Registry.
@@ -34,7 +36,10 @@ func Load(path string) (*Registry, error) {
 		return nil, fmt.Errorf("language file contains no languages")
 	}
 
-	r := &Registry{langs: make(map[string]*config.LanguageDef, len(lf.Languages))}
+	r := &Registry{
+		langs:   make(map[string]*config.LanguageDef, len(lf.Languages)),
+		ordered: make([]*config.LanguageDef, 0, len(lf.Languages)),
+	}
 	for i := range lf.Languages {
 		lang := &lf.Languages[i]
 		if err := validateLang(lang); err != nil {
@@ -44,6 +49,7 @@ func Load(path string) (*Registry, error) {
 			return nil, fmt.Errorf("duplicate language id %q", lang.ID)
 		}
 		r.langs[lang.ID] = lang
+		r.ordered = append(r.ordered, lang)
 	}
 	return r, nil
 }
@@ -53,18 +59,30 @@ func (r *Registry) Get(id string) *config.LanguageDef {
 	return r.langs[id]
 }
 
-// All returns all language definitions in insertion order.
+// All returns all language definitions in YAML insertion order.
 func (r *Registry) All() []*config.LanguageDef {
-	// preserve original slice order
-	out := make([]*config.LanguageDef, 0, len(r.langs))
-	for _, v := range r.langs {
-		out = append(out, v)
-	}
-	return out
+	return r.ordered
 }
 
 // Len returns the number of registered languages.
 func (r *Registry) Len() int { return len(r.langs) }
+
+// MaxJobDuration returns an upper-bound wall time for a single job:
+// the longest build phase plus (maxTests × longest run phase) plus a 30s buffer.
+// Used to set the HTTP server WriteTimeout so valid long-running jobs aren't killed.
+func (r *Registry) MaxJobDuration(maxTests int) time.Duration {
+	var maxBuild, maxRun int
+	for _, lang := range r.langs {
+		if lang.Build != nil && lang.Build.Limits.WallTimeS > maxBuild {
+			maxBuild = lang.Build.Limits.WallTimeS
+		}
+		if lang.Run.Limits.WallTimeS > maxRun {
+			maxRun = lang.Run.Limits.WallTimeS
+		}
+	}
+	total := maxBuild + maxTests*maxRun + 30
+	return time.Duration(total) * time.Second
+}
 
 func validateLang(l *config.LanguageDef) error {
 	if l.ID == "" {

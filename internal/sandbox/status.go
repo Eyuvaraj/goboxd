@@ -34,13 +34,15 @@ func ParseRunStatus(log []byte, exitCode int) string {
 	}
 }
 
-// ParseBuildStatus maps build-phase exit codes and stderr to build status.
-func ParseBuildStatus(stderr []byte, exitCode int) string {
+// ParseBuildStatus maps build-phase nsjail log output and exit code to build status.
+// log is the nsjail diagnostic log from --log_fd 3, not the compiler's stderr.
+// [E][ prefix lines mean nsjail itself failed to exec/mount (internal_error).
+// Any other non-zero exit means the compiler ran and failed (failed).
+func ParseBuildStatus(log []byte, exitCode int) string {
 	switch {
 	case exitCode == 0:
 		return validate.BuildStatusOK
-	case bytes.Contains(stderr, []byte("nsjail")):
-		// nsjail itself failed (not the compiler) — internal error
+	case bytes.Contains(log, []byte("[E][")):
 		return validate.BuildStatusInternalError
 	default:
 		return validate.BuildStatusFailed

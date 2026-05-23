@@ -1,0 +1,84 @@
+package registry
+
+import (
+	"sync"
+	"time"
+)
+
+const probeTTL = 30 * time.Second
+
+// ProbeCache caches readiness probe results so that /readyz and /info do not
+// spawn N child processes on every call. Results are refreshed in the background
+// every probeTTL. The initial probe runs synchronously at startup.
+type ProbeCache struct {
+	mu        sync.RWMutex
+	nsjail    ProbeResult
+	languages map[string]ProbeResult
+	at        time.Time
+
+	reg        *Registry
+	nsjailPath string
+}
+
+// NewProbeCache runs the first probe synchronously and starts the background
+// refresh goroutine. Call this once after the registry is loaded.
+func NewProbeCache(reg *Registry, nsjailPath string) *ProbeCache {
+	pc := &ProbeCache{reg: reg, nsjailPath: nsjailPath}
+	pc.refresh()
+	go pc.loop()
+	return pc
+}
+
+// Nsjail returns the cached nsjail probe result.
+func (pc *ProbeCache) Nsjail() ProbeResult {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+	return pc.nsjail
+}
+
+// Languages returns a copy of the cached language probe results.
+func (pc *ProbeCache) Languages() map[string]ProbeResult {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+	out := make(map[string]ProbeResult, len(pc.languages))
+	for k, v := range pc.languages {
+		out[k] = v
+	}
+	return out
+}
+
+// AllOK returns true when nsjail and every language probe passed.
+func (pc *ProbeCache) AllOK() bool {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+	if !pc.nsjail.OK {
+		return false
+	}
+	for _, r := range pc.languages {
+		if !r.OK {
+			return false
+		}
+	}
+	return true
+}
+
+func (pc *ProbeCache) loop() {
+	ticker := time.NewTicker(probeTTL)
+	defer ticker.Stop()
+	for range ticker.C {
+		pc.refresh()
+	}
+}
+
+func (pc *ProbeCache) refresh() {
+	nsjail := ProbeNsjail(pc.nsjailPath)
+	langs := make(map[string]ProbeResult, pc.reg.Len())
+	for _, lang := range pc.reg.All() {
+		langs[lang.ID] = ProbeLanguage(lang)
+	}
+	pc.mu.Lock()
+	pc.nsjail = nsjail
+	pc.languages = langs
+	pc.at = time.Now()
+	pc.mu.Unlock()
+}

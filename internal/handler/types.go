@@ -60,7 +60,7 @@ type ErrorResponse struct {
 // ErrorDetail carries the machine-readable error code and human-readable message.
 type ErrorDetail struct {
 	// Code is a stable machine-readable identifier.
-	Code    string `json:"code"    enums:"invalid_json,unknown_language,missing_source,source_too_large,missing_source_filename,missing_artifact_filename,invalid_filename,invalid_flag,invalid_test_count,stdin_too_large,internal_error" example:"unknown_language"`
+	Code    string `json:"code"    enums:"invalid_json,unknown_language,missing_source,source_too_large,missing_source_filename,missing_artifact_filename,invalid_filename,invalid_flag,invalid_limits,invalid_test_count,stdin_too_large,expected_too_large,internal_error" example:"unknown_language"`
 	Message string `json:"message" example:"language \"cobol\" is not registered"`
 }
 

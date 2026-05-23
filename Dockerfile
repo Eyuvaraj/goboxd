@@ -2,18 +2,17 @@
 
 ARG GO_VERSION=1.23
 ARG DEBIAN_VERSION=bookworm
-ARG NSJAIL_VERSION=3.4
 
 # ---- Build nsjail 3.4 from source ----
+# nsjail is included as a git submodule at external/nsjail (pinned to tag 3.4).
+# Build it from the checked-out source rather than fetching from the network at build time.
 FROM debian:${DEBIAN_VERSION}-slim AS nsjail-builder
-ARG NSJAIL_VERSION
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        autoconf bison ca-certificates flex g++ gcc git libnl-route-3-dev \
+        autoconf bison ca-certificates flex g++ gcc libnl-route-3-dev \
         libprotobuf-dev libtool make pkg-config protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
-RUN git clone --depth 1 --branch ${NSJAIL_VERSION} \
-        https://github.com/google/nsjail.git /src/nsjail \
-    && make -C /src/nsjail \
+COPY external/nsjail /src/nsjail
+RUN make -C /src/nsjail \
     && install -m 0755 /src/nsjail/nsjail /usr/local/bin/nsjail
 
 # ---- Builder / dev image (Go + linters + nsjail) ----
@@ -41,13 +40,19 @@ RUN CGO_ENABLED=0 go build \
 FROM debian:${DEBIAN_VERSION}-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates libnl-route-3-200 libprotobuf32 \
-        # Language runtimes and compilers
+        # In-scope language runtimes and compilers
         python3 \
         nodejs \
         gcc g++ \
         default-jdk-headless \
         iverilog \
         bash \
+        # Bonus languages
+        ruby \
+        lua5.4 \
+        rustc \
+        ocaml \
+        kotlin \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=nsjail-builder /usr/local/bin/nsjail /usr/local/bin/nsjail
@@ -61,7 +66,12 @@ RUN python3 --version \
     && g++ --version \
     && java -version \
     && iverilog -V \
-    && bash --version
+    && bash --version \
+    && ruby --version \
+    && lua5.4 -e 'print("ok")' \
+    && rustc --version \
+    && ocaml -version \
+    && kotlinc -version
 
 RUN mkdir -p /tmp/goboxd
 

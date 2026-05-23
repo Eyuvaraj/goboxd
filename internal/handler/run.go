@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/thesouldev/goboxd/internal/config"
+	"github.com/thesouldev/goboxd/internal/logctx"
 	"github.com/thesouldev/goboxd/internal/registry"
 	"github.com/thesouldev/goboxd/internal/runner"
 	"github.com/thesouldev/goboxd/internal/validate"
@@ -128,19 +129,35 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"test "+itoa(i)+": "+err.Error())
 			return
 		}
+		if err := validate.ExpectedSize(tc.ExpectedStdout, h.cfg.MaxStdinBytes); err != nil {
+			writeError(w, http.StatusBadRequest, "expected_too_large",
+				"test "+itoa(i)+": "+err.Error())
+			return
+		}
 		tests[i] = runner.TestCase{
 			Stdin:          tc.Stdin,
 			ExpectedStdout: tc.ExpectedStdout,
 		}
 	}
 
-	// --- Merge per-request limits ---
+	// --- Validate and merge per-request limits ---
+	// Clients may not exceed the language's configured defaults (prevents semaphore starvation).
 	var buildLimits, runLimits config.LimitsDef
 	if req.Build != nil {
 		buildLimits = req.Build.Limits
+		if lang.Build != nil {
+			if err := validate.Limits(buildLimits, lang.Build.Limits); err != nil {
+				writeError(w, http.StatusBadRequest, "invalid_limits", "build.limits: "+err.Error())
+				return
+			}
+		}
 	}
 	if req.Run != nil {
 		runLimits = req.Run.Limits
+		if err := validate.Limits(runLimits, lang.Run.Limits); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_limits", "run.limits: "+err.Error())
+			return
+		}
 	}
 
 	// --- Submit job ---
@@ -165,6 +182,21 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
 		return
 	}
+
+	// Write execution fields into context so StructuredLogger can include them.
+	accepted := 0
+	for _, t := range resp.Tests {
+		if t.Status == validate.StatusAccepted {
+			accepted++
+		}
+	}
+	*r = *r.WithContext(logctx.Set(r.Context(), logctx.Fields{
+		Language:        req.Language,
+		ExecStatus:      resp.Status,
+		BuildDurationMs: resp.Build.DurationMs,
+		TestsTotal:      len(resp.Tests),
+		TestsAccepted:   accepted,
+	}))
 
 	// Map runner response to HTTP response types.
 	out := RunResponse{

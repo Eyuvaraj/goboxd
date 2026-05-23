@@ -4,6 +4,8 @@ goboxd is configured entirely through `configs/languages.yaml`. No Go code chang
 
 ## Supported languages
 
+### In-scope (required)
+
 | ID | Name | Type |
 |----|------|------|
 | `py3` | Python 3 | Interpreted |
@@ -13,6 +15,16 @@ goboxd is configured entirely through `configs/languages.yaml`. No Go code chang
 | `cpp` | C++ | Compiled (g++) |
 | `java` | Java | Compiled (javac/java) |
 | `verilog` | Verilog | Compiled (iverilog/vvp) |
+
+### Bonus languages
+
+| ID | Name | Type |
+|----|------|------|
+| `ruby` | Ruby | Interpreted |
+| `lua` | Lua 5.4 | Interpreted |
+| `rust` | Rust | Compiled (rustc) |
+| `kotlin` | Kotlin | Compiled (kotlinc → JVM) |
+| `ocaml` | OCaml | Interpreted (ocaml) |
 
 ## YAML schema
 
@@ -57,38 +69,39 @@ languages:
 
 Templates are expanded per-element in the args array — never through a shell. A `{{flags}}` element is replaced by zero or more individual flag arguments.
 
-## Adding a language (example: Rust)
+## Adding a language (example: Go)
 
-1. **Add install script** `scripts/lang_install/rust.sh`:
+1. **Add install script** `scripts/lang_install/go.sh`:
    ```bash
    #!/usr/bin/env bash
    set -euo pipefail
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-   export PATH="$HOME/.cargo/bin:$PATH"
-   rustc --version
+   apt-get install -y --no-install-recommends golang-go
+   go version
    ```
 
-2. **Add to `Dockerfile`** (in the `runtime` stage `RUN apt-get` block or separately):
+2. **Add to `Dockerfile`** (in the `runtime` stage apt-get block):
    ```dockerfile
-   RUN bash /scripts/lang_install/rust.sh
+   golang-go \
+   ```
+   And a smoke test line:
+   ```dockerfile
+   && go version \
    ```
 
 3. **Add to `configs/languages.yaml`**:
    ```yaml
-   - id: rust
-     name: Rust
-     source_filename: solution.rs
+   - id: go
+     name: Go
+     source_filename: solution.go
      artifact_filename: solution
      build:
-       cmd: /root/.cargo/bin/rustc
-       args: ["{{flags}}", "-o", "{{artifact}}", "{{source}}"]
+       cmd: /usr/bin/go
+       args: ["build", "-o", "{{artifact}}", "{{source}}"]
        limits:
-         wall_time_s: 30
+         wall_time_s: 20
          memory_kb: 524288
          max_processes: 100
-       flag_allowlist:
-         - "-O"
-         - "--edition=*"
+       flag_allowlist: []
      run:
        cmd: /solution
        args: []

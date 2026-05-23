@@ -39,16 +39,25 @@ func main() {
 	}
 	slog.Info("language registry loaded", "count", reg.Len())
 
+	// ProbeCache runs the initial probe synchronously (fails loudly if nsjail or
+	// any language binary is missing) and refreshes in the background every 30s.
+	probes := registry.NewProbeCache(reg, cfg.NsjailPath)
+
 	counters := &stats.Counters{}
 	jobRunner := runner.New(cfg.MaxConcurrentJobs, reg, cfg, counters)
 
-	healthH := handler.NewHealthHandler(reg, cfg, counters)
+	healthH := handler.NewHealthHandler(reg, probes, cfg, counters)
 	runH := handler.NewRunHandler(jobRunner, reg, cfg)
+
+	// Maximum valid body: source + (tests × stdin) + (tests × expected_stdout) + JSON framing.
+	maxBody := int64(cfg.MaxSourceBytes) +
+		int64(cfg.MaxTests)*2*int64(cfg.MaxStdinBytes) +
+		65536
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
-	r.Use(handler.BodyLimit(int64(cfg.MaxSourceBytes) * 4)) // body limit > source limit to account for JSON envelope
+	r.Use(handler.BodyLimit(maxBody))
 	r.Use(handler.StructuredLogger)
 
 	r.Get("/healthz", healthH.Healthz)
@@ -59,11 +68,15 @@ func main() {
 	// Swagger UI — served at /docs/  (e.g. http://localhost:8080/docs/index.html)
 	r.Get("/docs/*", httpSwagger.WrapHandler)
 
+	// WriteTimeout must cover the worst-case job: longest build + MaxTests×longest run + buffer.
+	// Derived from the loaded registry so it stays correct when languages are added.
+	writeTimeout := reg.MaxJobDuration(cfg.MaxTests)
+
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      r,
 		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 120 * time.Second,
+		WriteTimeout: writeTimeout,
 		IdleTimeout:  60 * time.Second,
 	}
 

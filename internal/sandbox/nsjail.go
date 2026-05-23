@@ -134,7 +134,6 @@ func buildArgv(cfg RunConfig) []string {
 		"--user", "65534",
 		"--group", "65534",
 		"--log_fd", "3", // nsjail log → fd 3
-		"--disable_clone_newnet",
 		"--max_cpus", "1",
 		"--rw",      // remount chroot r/w so compilers can write artifacts
 		"--cwd", "/", // explicit working directory inside the jail

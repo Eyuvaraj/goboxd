@@ -200,18 +200,23 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 }
 
 // compareOutput determines the test status by comparing actual to expected stdout.
+// Sandbox-level errors (TLE, OOM, signal) take precedence over output comparison.
 func compareOutput(result sandbox.RunResult, expected string) string {
+	// Surface sandbox failures first: a TLE/OOM/signal masks whether output matched.
+	sandboxStatus := sandbox.ParseRunStatus(result.Log, result.ExitCode)
+	if sandboxStatus != validate.StatusAccepted {
+		return sandboxStatus
+	}
+
 	actual := result.Stdout
 	exp := []byte(expected)
-
 	if bytes.Equal(actual, exp) {
 		return validate.StatusAccepted
 	}
 	if bytes.Equal(bytes.TrimSpace(actual), bytes.TrimSpace(exp)) {
 		return validate.StatusWhitespaceMismatch
 	}
-	// Not a match — check for sandbox-level errors.
-	return sandbox.ParseRunStatus(result.Log, result.ExitCode)
+	return validate.StatusWrongOutput
 }
 
 // buildBindMounts derives the read-only bind mounts needed for a language.
