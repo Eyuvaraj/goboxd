@@ -24,6 +24,19 @@ func NewWorkspace(jailDir string) (*Workspace, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating workspace: %w", err)
 	}
+	// nsjail mounts a procfs at /proc inside the chroot when creating a PID
+	// namespace; the mount point must exist before nsjail starts.
+	if err := os.Mkdir(filepath.Join(dir, "proc"), 0o555); err != nil {
+		_ = os.RemoveAll(dir)
+		return nil, fmt.Errorf("creating proc mount point: %w", err)
+	}
+	// /lib64 is a symlink on modern Linux (e.g. → usr/lib/x86_64-linux-gnu).
+	// nsjail cannot bind-mount symlinks directly (it detects them as dir:false
+	// and fails to create the mount point). Recreate the same symlink inside
+	// the workspace so /lib64/ld-linux-x86-64.so.2 resolves through /lib.
+	if target, err := os.Readlink("/lib64"); err == nil {
+		_ = os.Symlink(target, filepath.Join(dir, "lib64"))
+	}
 	return &Workspace{Dir: dir}, nil
 }
 

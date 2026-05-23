@@ -78,7 +78,7 @@ func (j *Job) compile(ctx context.Context) BuildResult {
 
 	// Write source into workspace.
 	srcPath := j.ws.SourcePath(j.req.SourceFilename)
-	if err := os.WriteFile(srcPath, []byte(j.req.Source), 0o640); err != nil {
+	if err := os.WriteFile(srcPath, []byte(j.req.Source), 0o644); err != nil {
 		return BuildResult{Status: validate.BuildStatusInternalError, Stderr: err.Error()}
 	}
 
@@ -105,7 +105,7 @@ func (j *Job) compile(ctx context.Context) BuildResult {
 		return BuildResult{Status: validate.BuildStatusInternalError, Stderr: fmt.Sprintf("sandbox error: %v", err)}
 	}
 
-	status := sandbox.ParseBuildStatus(result.Stderr, result.ExitCode)
+	status := sandbox.ParseBuildStatus(result.Log, result.ExitCode)
 	return BuildResult{
 		Status:     status,
 		Stdout:     string(result.Stdout),
@@ -128,7 +128,7 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 	// Write source for interpreted languages (compiled ones did it in compile()).
 	if !j.lang.IsCompiled() {
 		srcPath := j.ws.SourcePath(j.req.SourceFilename)
-		if err := os.WriteFile(srcPath, []byte(j.req.Source), 0o640); err != nil {
+		if err := os.WriteFile(srcPath, []byte(j.req.Source), 0o644); err != nil {
 			for i := range results {
 				results[i] = TestResult{Status: validate.StatusInternalError}
 			}
@@ -152,7 +152,7 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 		}
 
 		stdinPath := filepath.Join(testDir, "stdin")
-		if err := os.WriteFile(stdinPath, []byte(tc.Stdin), 0o640); err != nil {
+		if err := os.WriteFile(stdinPath, []byte(tc.Stdin), 0o644); err != nil {
 			results[i] = TestResult{Status: validate.StatusInternalError}
 			continue
 		}
@@ -183,10 +183,16 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 		}
 
 		status := compareOutput(result, tc.ExpectedStdout)
+		// Append the nsjail log to stderr on non-accepted outcomes so callers
+		// can see exactly what nsjail reported (mount errors, exec failures, etc.).
+		stderr := string(result.Stderr)
+		if status != validate.StatusAccepted && len(result.Log) > 0 {
+			stderr += "\n[nsjail]\n" + string(result.Log)
+		}
 		results[i] = TestResult{
 			Status:     status,
 			Stdout:     string(result.Stdout),
-			Stderr:     string(result.Stderr),
+			Stderr:     stderr,
 			DurationMs: result.DurationMs,
 		}
 	}
@@ -205,11 +211,12 @@ func compareOutput(result sandbox.RunResult, expected string) string {
 		return validate.StatusWhitespaceMismatch
 	}
 	// Not a match — check for sandbox-level errors.
-	return sandbox.ParseRunStatus(result.Stderr, result.ExitCode)
+	return sandbox.ParseRunStatus(result.Log, result.ExitCode)
 }
 
-// buildBindMounts derives the bind mounts needed for a language.
-// The compiler/runtime and common system paths are mounted read-only.
+// buildBindMounts derives the read-only bind mounts needed for a language.
+// --rw in buildArgv remounts the chroot root as writable so compilers can
+// write artifacts into the workspace; the bind mounts themselves stay -R.
 func buildBindMounts(lang *config.LanguageDef) []string {
 	dirs := map[string]struct{}{}
 
@@ -217,7 +224,6 @@ func buildBindMounts(lang *config.LanguageDef) []string {
 		if cmd == "" {
 			return
 		}
-		// Mount the binary's directory and likely lib directories.
 		dirs[filepath.Dir(cmd)] = struct{}{}
 	}
 
@@ -226,8 +232,12 @@ func buildBindMounts(lang *config.LanguageDef) []string {
 	}
 	add(lang.Run.Cmd)
 
-	// Standard system paths needed by most programs.
-	for _, d := range []string{"/bin", "/usr/bin", "/lib", "/lib64", "/usr/lib", "/etc/ld.so.cache"} {
+	// Broad mounts so runtimes, dynamic linkers, and device nodes are reachable:
+	//   /usr  — binaries + shared libraries (includes /usr/lib, /usr/bin, etc.)
+	//   /etc  — ld.so.cache, nsswitch.conf, passwd (required by many runtimes)
+	//   /dev  — /dev/null, /dev/urandom, /dev/tty (Python/Java read these at start)
+	//   /var  — some runtimes write lock/log files here
+	for _, d := range []string{"/bin", "/usr", "/lib", "/etc", "/dev", "/var"} {
 		dirs[d] = struct{}{}
 	}
 

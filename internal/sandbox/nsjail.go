@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -35,6 +36,7 @@ type RunConfig struct {
 type RunResult struct {
 	Stdout     []byte
 	Stderr     []byte
+	Log        []byte // nsjail's own diagnostic output (--log_fd 3)
 	ExitCode   int
 	DurationMs int64
 	Truncated  bool
@@ -57,10 +59,31 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	var stderrBuf bytes.Buffer
 	cmd.Stderr = &stderrBuf
 
+	// Open a pipe for nsjail's own log output (--log_fd 3 in buildArgv).
+	// ExtraFiles[0] becomes fd 3 in the child (after stdin/stdout/stderr).
+	logR, logW, err := os.Pipe()
+	if err != nil {
+		return RunResult{}, fmt.Errorf("log pipe: %w", err)
+	}
+	cmd.ExtraFiles = []*os.File{logW}
+
 	start := time.Now()
 	if err := cmd.Start(); err != nil {
+		logW.Close()
+		logR.Close()
 		return RunResult{}, fmt.Errorf("starting nsjail: %w", err)
 	}
+	// Close write end in parent so logR gets EOF when nsjail exits.
+	logW.Close()
+
+	// Drain nsjail log in a goroutine so a large log can't deadlock stdout.
+	var logBuf bytes.Buffer
+	logDone := make(chan struct{})
+	go func() {
+		defer close(logDone)
+		_, _ = io.Copy(&logBuf, logR)
+		logR.Close()
+	}()
 
 	// Read stdout with a hard cap (fixes hole #6: unbounded child output).
 	limited := io.LimitReader(stdoutPipe, cfg.MaxOutputBytes+1)
@@ -74,6 +97,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 		_, _ = io.Copy(io.Discard, stdoutPipe)
 	}
 
+	<-logDone
 	err = cmd.Wait()
 	durationMs := time.Since(start).Milliseconds()
 
@@ -92,6 +116,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	return RunResult{
 		Stdout:     stdout,
 		Stderr:     stderrBuf.Bytes(),
+		Log:        logBuf.Bytes(),
 		ExitCode:   exitCode,
 		DurationMs: durationMs,
 		Truncated:  truncated,
@@ -108,16 +133,35 @@ func buildArgv(cfg RunConfig) []string {
 		"--chroot", cfg.WorkspaceDir,
 		"--user", "65534",
 		"--group", "65534",
-		"--log_fd", "3", // nsjail log → fd 3 (discarded)
+		"--log_fd", "3", // nsjail log → fd 3
 		"--disable_clone_newnet",
 		"--max_cpus", "1",
+		"--rw",      // remount chroot r/w so compilers can write artifacts
+		"--cwd", "/", // explicit working directory inside the jail
+		// File-descriptor cap; Python and javac open many fds at startup.
+		"--rlimit_nofile", "1000",
+		// Minimal environment: programs must not inherit host secrets, but
+		// need a sane TMP and PATH to locate their runtimes and temp space.
+		"--env", "TMP=/",
+		"--env", "TMPDIR=/",
+		"--env", "HOME=/",
+		"--env", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 	)
 
 	if cfg.Limits.WallTimeS > 0 {
 		argv = append(argv, "--time_limit", fmt.Sprintf("%d", cfg.Limits.WallTimeS))
 	}
 	if cfg.Limits.MemoryKB > 0 {
-		argv = append(argv, "--rlimit_as", fmt.Sprintf("%d", cfg.Limits.MemoryKB/1024)) // nsjail uses MB
+		// RLIMIT_AS caps virtual address space, not RSS. Interpreters (Python, JVM)
+		// mmap 150–300 MiB of virtual space at startup even for trivial programs, so
+		// the limit must be significantly larger than memory_kb. Apply a 4× multiplier
+		// with a 512 MiB floor so any interpreter can start while still bounding
+		// runaway allocators.
+		virtMiB := cfg.Limits.MemoryKB * 4 / 1024
+		if virtMiB < 512 {
+			virtMiB = 512
+		}
+		argv = append(argv, "--rlimit_as", fmt.Sprintf("%d", virtMiB))
 	}
 	if cfg.Limits.MaxProcesses > 0 {
 		argv = append(argv, "--rlimit_nproc", fmt.Sprintf("%d", cfg.Limits.MaxProcesses))

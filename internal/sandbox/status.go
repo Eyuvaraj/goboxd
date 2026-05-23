@@ -6,21 +6,26 @@ import (
 	"github.com/thesouldev/goboxd/internal/validate"
 )
 
-// ParseRunStatus interprets nsjail's stderr output to determine the test
-// outcome. nsjail writes status lines like:
-//   [E][...] run time >= time limit
-//   [W][...] prctl(PR_SET_DUMPABLE, 1): Operation not permitted
-//   [I][...] PID 12345 exited with status: 0
-//   [I][...] killed by signal 11
-func ParseRunStatus(stderr []byte, exitCode int) string {
+// ParseRunStatus interprets nsjail's log output to determine the test outcome.
+// nsjail writes status lines like:
+//
+//	[E][...] run time >= time limit
+//	[W][...] prctl(PR_SET_DUMPABLE, 1): Operation not permitted
+//	[I][...] PID 12345 exited with status: 0
+//	[I][...] killed by signal 11
+//
+// Cgroup v2 OOM kills arrive as SIGKILL; nsjail additionally logs the OOM event.
+func ParseRunStatus(log []byte, exitCode int) string {
+	logLow := bytes.ToLower(log)
 	switch {
-	case bytes.Contains(stderr, []byte("run time >= time limit")):
+	case bytes.Contains(log, []byte("run time >= time limit")):
 		return validate.StatusTimeExceeded
-	case bytes.Contains(stderr, []byte("memory limit exceeded")):
+	case bytes.Contains(logLow, []byte("memory limit exceeded")),
+		bytes.Contains(logLow, []byte("out of memory")),
+		bytes.Contains(logLow, []byte("oom kill")),
+		bytes.Contains(logLow, []byte("cgroup memory")):
 		return validate.StatusMemoryExceeded
-	case bytes.Contains(stderr, []byte("out of memory")):
-		return validate.StatusMemoryExceeded
-	case bytes.Contains(stderr, []byte("killed by signal")):
+	case bytes.Contains(log, []byte("killed by signal")):
 		return validate.StatusRuntimeError
 	case exitCode == 0:
 		return validate.StatusAccepted

@@ -108,13 +108,11 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if req.Run != nil {
+	if req.Run != nil && len(lang.Run.FlagAllowlist) > 0 {
 		runFlags = req.Run.Flags
-		if len(runFlags) > 0 {
-			if err := validate.Flags(runFlags, lang.Run.FlagAllowlist); err != nil {
-				writeError(w, http.StatusBadRequest, "invalid_flag", err.Error())
-				return
-			}
+		if err := validate.Flags(runFlags, lang.Run.FlagAllowlist); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_flag", err.Error())
+			return
 		}
 	}
 
