@@ -22,6 +22,25 @@ func NewRunHandler(r *runner.Runner, reg *registry.Registry, cfg config.Server) 
 	return &RunHandler{runner: r, reg: reg, cfg: cfg}
 }
 
+// ServeHTTP godoc
+//
+//	@Summary		Execute code in a sandbox
+//	@Description	Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.
+//	@Description
+//	@Description	**Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the `status` fields of the response body — not as HTTP error codes.
+//	@Description
+//	@Description	**Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The `strategy` field in the language definition controls this.
+//	@Description
+//	@Description	**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.
+//	@Tags			execution
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		RunRequest		true	"Code execution request"
+//	@Success		200		{object}	RunResponse		"Execution completed (check body status fields for pass/fail)"
+//	@Failure		400		{object}	ErrorResponse	"Validation error — see error.code for the specific cause"
+//	@Failure		500		{object}	ErrorResponse	"Internal server error (nsjail fault, disk full, etc.)"
+//	@Failure		503		{string}	string			"Server at capacity or request cancelled by client"
+//	@Router			/run [post]
 func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req RunRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

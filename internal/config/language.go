@@ -2,9 +2,9 @@ package config
 
 // LimitsDef holds resource limits for a build or run phase.
 type LimitsDef struct {
-	WallTimeS   int `yaml:"wall_time_s"`
-	MemoryKB    int `yaml:"memory_kb"`
-	MaxProcesses int `yaml:"max_processes"`
+	WallTimeS    int `yaml:"wall_time_s"   json:"wall_time_s"   example:"10"`
+	MemoryKB     int `yaml:"memory_kb"     json:"memory_kb"     example:"65536"`
+	MaxProcesses int `yaml:"max_processes" json:"max_processes" example:"64"`
 }
 
 // PhaseDef describes either the build or run phase of a language.

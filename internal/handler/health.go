@@ -30,12 +30,27 @@ func NewHealthHandler(reg *registry.Registry, cfg config.Server, counters *stats
 	return &HealthHandler{reg: reg, nsjailPath: cfg.NsjailPath, cfg: cfg, counters: counters}
 }
 
-// Healthz is a cheap liveness check — just confirms the process is up.
+// Healthz godoc
+//
+//	@Summary		Liveness check
+//	@Description	Returns 200 as long as the server process is running. Intended for load-balancer liveness probes.
+//	@Tags			health
+//	@Produce		json
+//	@Success		200	{object}	HealthzResponse
+//	@Router			/healthz [get]
 func (h *HealthHandler) Healthz(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// Readyz checks nsjail and every language binary. Returns 503 if anything is broken.
+// Readyz godoc
+//
+//	@Summary		Readiness check
+//	@Description	Probes nsjail and every registered language binary. Returns 200 when all probes pass; 503 when any probe fails. Use this for load-balancer readiness probes.
+//	@Tags			health
+//	@Produce		json
+//	@Success		200	{object}	ReadyzResponse
+//	@Failure		503	{object}	ReadyzResponse	"One or more probes failed — service is degraded"
+//	@Router			/readyz [get]
 func (h *HealthHandler) Readyz(w http.ResponseWriter, r *http.Request) {
 	nsjailResult := registry.ProbeNsjail(h.nsjailPath)
 
@@ -63,7 +78,14 @@ func (h *HealthHandler) Readyz(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Info returns build metadata, nsjail version, language list, limits, and stats.
+// Info godoc
+//
+//	@Summary		Server info and stats
+//	@Description	Returns build metadata (version, commit, Go version), nsjail info, registered language list with default limits, server-wide enforcement limits, and live runtime statistics (in-flight jobs, totals, disk space).
+//	@Tags			health
+//	@Produce		json
+//	@Success		200	{object}	InfoResponse
+//	@Router			/info [get]
 func (h *HealthHandler) Info(w http.ResponseWriter, r *http.Request) {
 	nsjailResult := registry.ProbeNsjail(h.nsjailPath)
 

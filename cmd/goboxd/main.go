@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	"github.com/thesouldev/goboxd/internal/config"
 	"github.com/thesouldev/goboxd/internal/handler"
@@ -18,6 +19,7 @@ import (
 	"github.com/thesouldev/goboxd/internal/runner"
 	"github.com/thesouldev/goboxd/internal/sandbox"
 	"github.com/thesouldev/goboxd/internal/stats"
+	_ "github.com/thesouldev/goboxd/docs" // generated swagger spec
 )
 
 func main() {
@@ -53,6 +55,9 @@ func main() {
 	r.Get("/readyz", healthH.Readyz)
 	r.Get("/info", healthH.Info)
 	r.Post("/run", runH.ServeHTTP)
+
+	// Swagger UI — served at /docs/  (e.g. http://localhost:8080/docs/index.html)
+	r.Get("/docs/*", httpSwagger.WrapHandler)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

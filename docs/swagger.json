@@ -1,0 +1,514 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "contact": {}
+    },
+    "paths": {
+        "/healthz": {
+            "get": {
+                "description": "Returns 200 as long as the server process is running. Intended for load-balancer liveness probes.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Liveness check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HealthzResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/info": {
+            "get": {
+                "description": "Returns build metadata (version, commit, Go version), nsjail info, registered language list with default limits, server-wide enforcement limits, and live runtime statistics (in-flight jobs, totals, disk space).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Server info and stats",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.InfoResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/readyz": {
+            "get": {
+                "description": "Probes nsjail and every registered language binary. Returns 200 when all probes pass; 503 when any probe fails. Use this for load-balancer readiness probes.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Readiness check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ReadyzResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "One or more probes failed — service is degraded",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ReadyzResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/run": {
+            "post": {
+                "description": "Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.\n\n**Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the `status` fields of the response body — not as HTTP error codes.\n\n**Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The `strategy` field in the language definition controls this.\n\n**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "execution"
+                ],
+                "summary": "Execute code in a sandbox",
+                "parameters": [
+                    {
+                        "description": "Code execution request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.RunRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Execution completed (check body status fields for pass/fail)",
+                        "schema": {
+                            "$ref": "#/definitions/handler.RunResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error — see error.code for the specific cause",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error (nsjail fault, disk full, etc.)",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Server at capacity or request cancelled by client",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "config.LimitsDef": {
+            "type": "object",
+            "properties": {
+                "max_processes": {
+                    "type": "integer",
+                    "example": 64
+                },
+                "memory_kb": {
+                    "type": "integer",
+                    "example": 65536
+                },
+                "wall_time_s": {
+                    "type": "integer",
+                    "example": 10
+                }
+            }
+        },
+        "handler.BuildInfo": {
+            "type": "object",
+            "properties": {
+                "commit": {
+                    "type": "string",
+                    "example": "abc1234"
+                },
+                "go_version": {
+                    "type": "string",
+                    "example": "go1.23.0"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "0.1.0"
+                }
+            }
+        },
+        "handler.BuildResult": {
+            "type": "object",
+            "properties": {
+                "duration_ms": {
+                    "type": "integer",
+                    "example": 412
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "ok",
+                        "failed",
+                        "internal_error"
+                    ],
+                    "example": "ok"
+                },
+                "stderr": {
+                    "type": "string",
+                    "example": ""
+                },
+                "stdout": {
+                    "type": "string",
+                    "example": ""
+                }
+            }
+        },
+        "handler.ErrorDetail": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "Code is a stable machine-readable identifier.",
+                    "type": "string",
+                    "enum": [
+                        "invalid_json",
+                        "unknown_language",
+                        "missing_source",
+                        "source_too_large",
+                        "missing_source_filename",
+                        "missing_artifact_filename",
+                        "invalid_filename",
+                        "invalid_flag",
+                        "invalid_test_count",
+                        "stdin_too_large",
+                        "internal_error"
+                    ],
+                    "example": "unknown_language"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "language \"cobol\" is not registered"
+                }
+            }
+        },
+        "handler.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/handler.ErrorDetail"
+                }
+            }
+        },
+        "handler.HealthzResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "handler.InfoResponse": {
+            "type": "object",
+            "properties": {
+                "build_info": {
+                    "$ref": "#/definitions/handler.BuildInfo"
+                },
+                "languages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.LanguageInfo"
+                    }
+                },
+                "limits": {
+                    "$ref": "#/definitions/handler.ServiceLimits"
+                },
+                "nsjail": {
+                    "$ref": "#/definitions/handler.NsjailInfo"
+                },
+                "stats": {
+                    "$ref": "#/definitions/handler.ServiceStats"
+                }
+            }
+        },
+        "handler.LanguageInfo": {
+            "type": "object",
+            "properties": {
+                "default_run_limits": {
+                    "$ref": "#/definitions/handler.LanguageRunLimits"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "py3"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Python 3"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "Python 3.11.9"
+                }
+            }
+        },
+        "handler.LanguageRunLimits": {
+            "type": "object",
+            "properties": {
+                "max_processes": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "memory_kb": {
+                    "type": "integer",
+                    "example": 102400
+                },
+                "wall_time_s": {
+                    "type": "integer",
+                    "example": 9
+                }
+            }
+        },
+        "handler.NsjailInfo": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "example": "/usr/local/bin/nsjail"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "nsjail version: 3.4"
+                }
+            }
+        },
+        "handler.PhaseOverride": {
+            "type": "object",
+            "properties": {
+                "flags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "-O2"
+                    ]
+                },
+                "limits": {
+                    "$ref": "#/definitions/config.LimitsDef"
+                }
+            }
+        },
+        "handler.ProbeInfo": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": ""
+                },
+                "ok": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "version": {
+                    "type": "string",
+                    "example": "Python 3.11.9"
+                }
+            }
+        },
+        "handler.ReadyzResponse": {
+            "type": "object",
+            "properties": {
+                "languages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/handler.ProbeInfo"
+                    }
+                },
+                "nsjail": {
+                    "$ref": "#/definitions/handler.ProbeInfo"
+                },
+                "status": {
+                    "description": "Status is \"ok\" when all probes pass; \"degraded\" when any probe fails.",
+                    "type": "string",
+                    "enum": [
+                        "ok",
+                        "degraded"
+                    ],
+                    "example": "ok"
+                }
+            }
+        },
+        "handler.RunRequest": {
+            "type": "object",
+            "properties": {
+                "artifact_filename": {
+                    "type": "string",
+                    "example": "Main"
+                },
+                "build": {
+                    "$ref": "#/definitions/handler.PhaseOverride"
+                },
+                "language": {
+                    "type": "string",
+                    "example": "py3"
+                },
+                "run": {
+                    "$ref": "#/definitions/handler.PhaseOverride"
+                },
+                "source": {
+                    "type": "string",
+                    "example": "print(input())"
+                },
+                "source_filename": {
+                    "type": "string",
+                    "example": "Main.java"
+                },
+                "tests": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.TestCase"
+                    }
+                }
+            }
+        },
+        "handler.RunResponse": {
+            "type": "object",
+            "properties": {
+                "build": {
+                    "$ref": "#/definitions/handler.BuildResult"
+                },
+                "status": {
+                    "description": "Status summarises the overall result. \"accepted\" means build succeeded and all tests passed.",
+                    "type": "string",
+                    "enum": [
+                        "accepted",
+                        "build_failed",
+                        "wrong_output",
+                        "output_whitespace_mismatch",
+                        "time_exceeded",
+                        "memory_exceeded",
+                        "runtime_error",
+                        "internal_error"
+                    ],
+                    "example": "accepted"
+                },
+                "tests": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.TestResult"
+                    }
+                }
+            }
+        },
+        "handler.ServiceLimits": {
+            "type": "object",
+            "properties": {
+                "max_concurrent_jobs": {
+                    "type": "integer",
+                    "example": 8
+                },
+                "max_source_bytes": {
+                    "type": "integer",
+                    "example": 262144
+                },
+                "max_tests": {
+                    "type": "integer",
+                    "example": 50
+                }
+            }
+        },
+        "handler.ServiceStats": {
+            "type": "object",
+            "properties": {
+                "disk_free_bytes_jail_dir": {
+                    "type": "integer",
+                    "example": 10737418240
+                },
+                "in_flight_jobs": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "jobs_failed_internal": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "jobs_total": {
+                    "type": "integer",
+                    "example": 1042
+                },
+                "last_internal_error_at": {
+                    "type": "string",
+                    "example": "2024-01-15T10:30:00Z"
+                }
+            }
+        },
+        "handler.TestCase": {
+            "type": "object",
+            "properties": {
+                "expected_stdout": {
+                    "type": "string",
+                    "example": "hello\n"
+                },
+                "stdin": {
+                    "type": "string",
+                    "example": "hello\n"
+                }
+            }
+        },
+        "handler.TestResult": {
+            "type": "object",
+            "properties": {
+                "duration_ms": {
+                    "type": "integer",
+                    "example": 38
+                },
+                "memory_peak_kb": {
+                    "type": "integer",
+                    "example": 1024
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "accepted",
+                        "wrong_output",
+                        "output_whitespace_mismatch",
+                        "time_exceeded",
+                        "memory_exceeded",
+                        "runtime_error",
+                        "not_executed",
+                        "internal_error"
+                    ],
+                    "example": "accepted"
+                },
+                "stderr": {
+                    "type": "string",
+                    "example": ""
+                },
+                "stdout": {
+                    "type": "string",
+                    "example": "hello"
+                }
+            }
+        }
+    }
+}

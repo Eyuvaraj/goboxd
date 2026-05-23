@@ -1,4 +1,4 @@
-.PHONY: build run test integration lint load
+.PHONY: build run test integration lint load swagger
 
 COMPOSE ?= docker compose
 TOOLS   := $(COMPOSE) --profile tools run --rm tools
@@ -26,3 +26,8 @@ lint:
 # Run the load test benchmark script (requires hey or k6 in PATH).
 load:
 	@bash scripts/load_test.sh
+
+# Regenerate Swagger docs from annotations (installs swag CLI if missing).
+swagger:
+	@which swag > /dev/null 2>&1 || go install github.com/swaggo/swag/cmd/swag@latest
+	swag init -g cmd/goboxd/main.go --output docs --parseInternal

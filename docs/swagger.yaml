@@ -1,0 +1,374 @@
+definitions:
+  config.LimitsDef:
+    properties:
+      max_processes:
+        example: 64
+        type: integer
+      memory_kb:
+        example: 65536
+        type: integer
+      wall_time_s:
+        example: 10
+        type: integer
+    type: object
+  handler.BuildInfo:
+    properties:
+      commit:
+        example: abc1234
+        type: string
+      go_version:
+        example: go1.23.0
+        type: string
+      version:
+        example: 0.1.0
+        type: string
+    type: object
+  handler.BuildResult:
+    properties:
+      duration_ms:
+        example: 412
+        type: integer
+      status:
+        enum:
+        - ok
+        - failed
+        - internal_error
+        example: ok
+        type: string
+      stderr:
+        example: ""
+        type: string
+      stdout:
+        example: ""
+        type: string
+    type: object
+  handler.ErrorDetail:
+    properties:
+      code:
+        description: Code is a stable machine-readable identifier.
+        enum:
+        - invalid_json
+        - unknown_language
+        - missing_source
+        - source_too_large
+        - missing_source_filename
+        - missing_artifact_filename
+        - invalid_filename
+        - invalid_flag
+        - invalid_test_count
+        - stdin_too_large
+        - internal_error
+        example: unknown_language
+        type: string
+      message:
+        example: language "cobol" is not registered
+        type: string
+    type: object
+  handler.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/handler.ErrorDetail'
+    type: object
+  handler.HealthzResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
+  handler.InfoResponse:
+    properties:
+      build_info:
+        $ref: '#/definitions/handler.BuildInfo'
+      languages:
+        items:
+          $ref: '#/definitions/handler.LanguageInfo'
+        type: array
+      limits:
+        $ref: '#/definitions/handler.ServiceLimits'
+      nsjail:
+        $ref: '#/definitions/handler.NsjailInfo'
+      stats:
+        $ref: '#/definitions/handler.ServiceStats'
+    type: object
+  handler.LanguageInfo:
+    properties:
+      default_run_limits:
+        $ref: '#/definitions/handler.LanguageRunLimits'
+      id:
+        example: py3
+        type: string
+      name:
+        example: Python 3
+        type: string
+      version:
+        example: Python 3.11.9
+        type: string
+    type: object
+  handler.LanguageRunLimits:
+    properties:
+      max_processes:
+        example: 100
+        type: integer
+      memory_kb:
+        example: 102400
+        type: integer
+      wall_time_s:
+        example: 9
+        type: integer
+    type: object
+  handler.NsjailInfo:
+    properties:
+      path:
+        example: /usr/local/bin/nsjail
+        type: string
+      version:
+        example: 'nsjail version: 3.4'
+        type: string
+    type: object
+  handler.PhaseOverride:
+    properties:
+      flags:
+        example:
+        - -O2
+        items:
+          type: string
+        type: array
+      limits:
+        $ref: '#/definitions/config.LimitsDef'
+    type: object
+  handler.ProbeInfo:
+    properties:
+      error:
+        example: ""
+        type: string
+      ok:
+        example: true
+        type: boolean
+      version:
+        example: Python 3.11.9
+        type: string
+    type: object
+  handler.ReadyzResponse:
+    properties:
+      languages:
+        additionalProperties:
+          $ref: '#/definitions/handler.ProbeInfo'
+        type: object
+      nsjail:
+        $ref: '#/definitions/handler.ProbeInfo'
+      status:
+        description: Status is "ok" when all probes pass; "degraded" when any probe
+          fails.
+        enum:
+        - ok
+        - degraded
+        example: ok
+        type: string
+    type: object
+  handler.RunRequest:
+    properties:
+      artifact_filename:
+        example: Main
+        type: string
+      build:
+        $ref: '#/definitions/handler.PhaseOverride'
+      language:
+        example: py3
+        type: string
+      run:
+        $ref: '#/definitions/handler.PhaseOverride'
+      source:
+        example: print(input())
+        type: string
+      source_filename:
+        example: Main.java
+        type: string
+      tests:
+        items:
+          $ref: '#/definitions/handler.TestCase'
+        type: array
+    type: object
+  handler.RunResponse:
+    properties:
+      build:
+        $ref: '#/definitions/handler.BuildResult'
+      status:
+        description: Status summarises the overall result. "accepted" means build
+          succeeded and all tests passed.
+        enum:
+        - accepted
+        - build_failed
+        - wrong_output
+        - output_whitespace_mismatch
+        - time_exceeded
+        - memory_exceeded
+        - runtime_error
+        - internal_error
+        example: accepted
+        type: string
+      tests:
+        items:
+          $ref: '#/definitions/handler.TestResult'
+        type: array
+    type: object
+  handler.ServiceLimits:
+    properties:
+      max_concurrent_jobs:
+        example: 8
+        type: integer
+      max_source_bytes:
+        example: 262144
+        type: integer
+      max_tests:
+        example: 50
+        type: integer
+    type: object
+  handler.ServiceStats:
+    properties:
+      disk_free_bytes_jail_dir:
+        example: 10737418240
+        type: integer
+      in_flight_jobs:
+        example: 2
+        type: integer
+      jobs_failed_internal:
+        example: 0
+        type: integer
+      jobs_total:
+        example: 1042
+        type: integer
+      last_internal_error_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+    type: object
+  handler.TestCase:
+    properties:
+      expected_stdout:
+        example: |
+          hello
+        type: string
+      stdin:
+        example: |
+          hello
+        type: string
+    type: object
+  handler.TestResult:
+    properties:
+      duration_ms:
+        example: 38
+        type: integer
+      memory_peak_kb:
+        example: 1024
+        type: integer
+      status:
+        enum:
+        - accepted
+        - wrong_output
+        - output_whitespace_mismatch
+        - time_exceeded
+        - memory_exceeded
+        - runtime_error
+        - not_executed
+        - internal_error
+        example: accepted
+        type: string
+      stderr:
+        example: ""
+        type: string
+      stdout:
+        example: hello
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /healthz:
+    get:
+      description: Returns 200 as long as the server process is running. Intended
+        for load-balancer liveness probes.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HealthzResponse'
+      summary: Liveness check
+      tags:
+      - health
+  /info:
+    get:
+      description: Returns build metadata (version, commit, Go version), nsjail info,
+        registered language list with default limits, server-wide enforcement limits,
+        and live runtime statistics (in-flight jobs, totals, disk space).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.InfoResponse'
+      summary: Server info and stats
+      tags:
+      - health
+  /readyz:
+    get:
+      description: Probes nsjail and every registered language binary. Returns 200
+        when all probes pass; 503 when any probe fails. Use this for load-balancer
+        readiness probes.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ReadyzResponse'
+        "503":
+          description: One or more probes failed — service is degraded
+          schema:
+            $ref: '#/definitions/handler.ReadyzResponse'
+      summary: Readiness check
+      tags:
+      - health
+  /run:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.
+
+        **Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the `status` fields of the response body — not as HTTP error codes.
+
+        **Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The `strategy` field in the language definition controls this.
+
+        **Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.
+      parameters:
+      - description: Code execution request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RunRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Execution completed (check body status fields for pass/fail)
+          schema:
+            $ref: '#/definitions/handler.RunResponse'
+        "400":
+          description: Validation error — see error.code for the specific cause
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal server error (nsjail fault, disk full, etc.)
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "503":
+          description: Server at capacity or request cancelled by client
+          schema:
+            type: string
+      summary: Execute code in a sandbox
+      tags:
+      - execution
+swagger: "2.0"
