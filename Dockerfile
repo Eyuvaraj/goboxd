@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG GO_VERSION=1.23
+ARG GO_VERSION=1.25
 ARG DEBIAN_VERSION=bookworm
 
 # ---- Build nsjail 3.6 from source ----
