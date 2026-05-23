@@ -111,7 +111,7 @@ Readiness. Probes nsjail and every language binary. Returns `200` if all pass, `
 ```json
 {
   "status": "degraded",
-  "nsjail": { "ok": true, "version": "nsjail version: 3.4" },
+  "nsjail": { "ok": true, "version": "nsjail version: 3.6" },
   "languages": {
     "py3":  { "ok": true,  "version": "Python 3.11.9" },
     "java": { "ok": false, "error": "java not found at /usr/bin/java: ..." }
@@ -128,7 +128,7 @@ Always `200`. Returns build metadata, nsjail info, language list, server limits,
 ```json
 {
   "build_info": { "version": "0.1.0", "commit": "abc1234", "go_version": "go1.23.0" },
-  "nsjail": { "path": "/usr/local/bin/nsjail", "version": "nsjail version: 3.4" },
+  "nsjail": { "path": "/usr/local/bin/nsjail", "version": "nsjail version: 3.6" },
   "languages": [
     {
       "id": "py3",

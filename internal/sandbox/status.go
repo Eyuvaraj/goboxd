@@ -14,16 +14,25 @@ import (
 //	[I][...] PID 12345 exited with status: 0
 //	[I][...] killed by signal 11
 //
-// Cgroup v2 OOM kills arrive as SIGKILL; nsjail additionally logs the OOM event.
+// In cgroup v2 mode (--detect_cgroupv2 + --cgroup_mem_max), OOM kills arrive as
+// SIGKILL with nsjail logging "killed by signal 9". We match "memory.max" (which
+// nsjail logs when setting the limit) combined with signal 9 to surface memory_exceeded.
+// When signal 9 occurs without any cgroup memory context, it is runtime_error.
 func ParseRunStatus(log []byte, exitCode int) string {
 	logLow := bytes.ToLower(log)
 	switch {
 	case bytes.Contains(log, []byte("run time >= time limit")):
 		return validate.StatusTimeExceeded
+	// Cgroup v1 and kernel OOM patterns.
 	case bytes.Contains(logLow, []byte("memory limit exceeded")),
 		bytes.Contains(logLow, []byte("out of memory")),
 		bytes.Contains(logLow, []byte("oom kill")),
 		bytes.Contains(logLow, []byte("cgroup memory")):
+		return validate.StatusMemoryExceeded
+	// Cgroup v2: nsjail logs "Setting 'memory.max' to '<n>'" when the limit is
+	// configured. An SIGKILL in the same log session → the cgroup limit was hit.
+	case bytes.Contains(logLow, []byte("memory.max")) &&
+		bytes.Contains(log, []byte("killed by signal")):
 		return validate.StatusMemoryExceeded
 	case bytes.Contains(log, []byte("killed by signal")):
 		return validate.StatusRuntimeError

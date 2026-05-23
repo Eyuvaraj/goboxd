@@ -3,8 +3,8 @@
 ARG GO_VERSION=1.23
 ARG DEBIAN_VERSION=bookworm
 
-# ---- Build nsjail 3.4 from source ----
-# nsjail is included as a git submodule at external/nsjail (pinned to tag 3.4).
+# ---- Build nsjail 3.6 from source ----
+# nsjail is included as a git submodule at external/nsjail (pinned to tag 3.6).
 # Build it from the checked-out source rather than fetching from the network at build time.
 FROM debian:${DEBIAN_VERSION}-slim AS nsjail-builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libnl-route-3-200 libprotobuf32 \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=nsjail-builder /usr/local/bin/nsjail /usr/local/bin/nsjail
-RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+RUN go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 WORKDIR /src
 # Copy module files first for layer caching — deps rarely change.
 COPY go.mod go.sum ./

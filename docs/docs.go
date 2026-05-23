@@ -308,7 +308,7 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string",
-                    "example": "nsjail version: 3.4"
+                    "example": "nsjail version: 3.6"
                 }
             }
         },

@@ -58,6 +58,37 @@ Seven deliberate security holes exist in the Python reference (pyjail). All seve
 
 ---
 
+## Additional hardening — Seccomp-bpf syscall filtering
+
+Beyond closing the seven pyjail holes, goboxd adds a Kafel deny-list seccomp policy passed to nsjail via `--seccomp_string`.
+
+**File:** `internal/sandbox/nsjail.go` — `seccompPolicy` constant, applied in `buildArgv()`.
+
+**Approach:** `DEFAULT ALLOW` with a targeted `KILL_PROCESS` list. This is appropriate for a multi-language sandbox because enumerating every syscall needed by Python, Node, JVM, GCC, Rust, OCaml, etc. is fragile. The deny-list instead blocks only calls with no legitimate use in a sandboxed executor.
+
+`KILL_PROCESS` (not `KILL`) is used because `KILL` only terminates the calling thread — in a multi-threaded program, other threads would keep running. `KILL_PROCESS` tears down the whole process group.
+
+| Syscall(s) | Risk blocked |
+|---|---|
+| `ptrace`, `process_vm_readv/writev` | Cross-process memory inspection and writes |
+| `init_module`, `finit_module`, `delete_module` | Kernel module loading |
+| `kexec_load`, `kexec_file_load` | Replacing the running kernel |
+| `reboot` | System restart |
+| `settimeofday`, `adjtimex`, `clock_adjtime` | Host clock manipulation |
+| `mknod`, `mknodat` | Device node creation (chroot bypass) |
+| `chroot`, `pivot_root` | Filesystem-root change — escape nsjail's mount restrictions |
+| `unshare`, `setns` | Namespace manipulation — un-isolate network/PID/mount namespaces |
+| `io_uring_setup/enter/register` | Async I/O with multiple privilege-escalation CVEs; unused by all runtimes |
+| `userfaultfd` | Pause kernel page-fault handling — common in kernel exploit chains |
+| `name_to_handle_at`, `open_by_handle_at` | File-handle syscalls that can cross mount boundaries |
+| `acct` | Process accounting interference |
+| `bpf` | Load eBPF programs into the kernel |
+| `syslog` | Kernel ring-buffer read (information leak) |
+
+`perf_event_open` is **not** denied — the JVM uses it for profiling, and denying it would break Kotlin. Network syscalls (`socket`, `connect`, `bind`) are **not** denied at the seccomp level because nsjail's network namespace isolation already provides that guarantee.
+
+---
+
 ## Hole 7 — Stale jail directories
 
 **Reference:** There is no `defer` or equivalent guaranteed-cleanup around the per-request directory lifecycle. A panic or early return between directory creation and cleanup leaks the directory permanently.

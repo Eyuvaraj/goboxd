@@ -9,7 +9,7 @@ HTTP routing uses [chi](https://github.com/go-chi/chi) because its handlers are 
 Docker with Compose v2 is the only prerequisite. nsjail is compiled from source inside the build stage.
 
 ```
-make build        # build the image (~5 min first time; nsjail 3.4 compiled from source)
+make build        # build the image (~5 min first time; nsjail 3.6 compiled from source)
 make run          # start the service on :8080
 make test         # unit tests (no Docker required)
 make integration  # end-to-end tests (requires make run in another terminal)

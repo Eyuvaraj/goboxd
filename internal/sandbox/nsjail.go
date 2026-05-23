@@ -15,6 +15,87 @@ import (
 
 const truncationMarker = "\n[output truncated]"
 
+// seccompPolicy is a Kafel deny-list passed to nsjail via --seccomp_string.
+// DEFAULT ALLOW keeps all 12 registered language runtimes working without
+// enumerating required syscalls.
+//
+// KILL_PROCESS (not KILL) terminates the entire sandboxed process when a
+// forbidden syscall is made. KILL only kills the calling thread — in a
+// multi-threaded program other threads would keep running.
+//
+// Denied syscalls and their attack surface:
+//
+//   ptrace / process_vm_readv / process_vm_writev
+//     Cross-process memory inspection and writes — sandbox escape primitives.
+//   init_module / finit_module / delete_module
+//     Kernel module loading — arbitrary kernel code execution.
+//   kexec_load / kexec_file_load
+//     Replace the running kernel image.
+//   reboot
+//     Obvious.
+//   settimeofday / adjtimex / clock_adjtime
+//     Clock skew — can affect timeout logic and log timestamps on the host.
+//   mknod / mknodat
+//     Create device nodes; combined with chroot this enables device escapes.
+//   chroot / pivot_root
+//     Change filesystem root — the sandbox already has its root set by nsjail;
+//     a second chroot inside the jail could escape our bind-mount restrictions.
+//   unshare / setns
+//     Manipulate Linux namespaces — could un-isolate the network, PID, or
+//     mount namespace that nsjail established.
+//   io_uring_setup / io_uring_enter / io_uring_register
+//     Async I/O interface with a history of privilege-escalation CVEs; none
+//     of the registered language runtimes require it.
+//   userfaultfd
+//     Pause kernel page-fault handling from userspace — used in many
+//     kernel exploit chains; no legitimate use in a code sandbox.
+//   name_to_handle_at / open_by_handle_at
+//     File-handle syscalls that can bypass directory-traversal checks and
+//     cross mount-point boundaries when combined with a leaked handle.
+//   acct
+//     Enable/disable process accounting — unneeded and can interfere with
+//     host-side resource bookkeeping.
+//   bpf
+//     Load eBPF programs into the kernel — kernel-level arbitrary code.
+//   syslog
+//     Read the kernel ring buffer — information leak.
+//
+// perf_event_open is intentionally NOT denied: the JVM uses it for profiling.
+// Network access is already blocked by nsjail's network namespace isolation,
+// so socket/connect/bind do not need to be denied at the seccomp level.
+const seccompPolicy = `POLICY goboxd_safe {
+    KILL_PROCESS {
+        ptrace,
+        process_vm_readv,
+        process_vm_writev,
+        init_module,
+        finit_module,
+        delete_module,
+        kexec_load,
+        kexec_file_load,
+        reboot,
+        settimeofday,
+        adjtimex,
+        clock_adjtime,
+        mknod,
+        mknodat,
+        chroot,
+        pivot_root,
+        unshare,
+        setns,
+        io_uring_setup,
+        io_uring_enter,
+        io_uring_register,
+        userfaultfd,
+        name_to_handle_at,
+        open_by_handle_at,
+        acct,
+        bpf,
+        syslog
+    }
+}
+USE goboxd_safe DEFAULT ALLOW`
+
 // RunConfig describes one nsjail invocation.
 type RunConfig struct {
 	NsjailPath    string
@@ -124,7 +205,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 }
 
 // buildArgv constructs the nsjail command-line as a pure []string.
-// No shell is involved at any point.
+// No shell is involved at any point. Targets nsjail 3.6+.
 func buildArgv(cfg RunConfig) []string {
 	argv := []string{cfg.NsjailPath}
 
@@ -135,12 +216,17 @@ func buildArgv(cfg RunConfig) []string {
 		"--group", "65534",
 		"--log_fd", "3", // nsjail log → fd 3
 		"--max_cpus", "1",
-		"--rw",      // remount chroot r/w so compilers can write artifacts
-		"--cwd", "/", // explicit working directory inside the jail
+		"--rw",       // remount chroot r/w so compilers can write artifacts
+		"--cwd", "/", // working directory inside the jail
+		// Use cgroup v2 when available (host must mount /sys/fs/cgroup as cgroup2;
+		// docker-compose sets cgroupns: host for this).
+		"--detect_cgroupv2",
+		// Use new Linux mount API (fsopen/fsmount) when the kernel supports it;
+		// falls back to legacy mount(2) automatically on older kernels.
+		"--experimental_mnt", "auto",
 		// File-descriptor cap; Python and javac open many fds at startup.
 		"--rlimit_nofile", "1000",
-		// Minimal environment: programs must not inherit host secrets, but
-		// need a sane TMP and PATH to locate their runtimes and temp space.
+		// Minimal environment: no host secrets leak in; runtimes find their paths.
 		"--env", "TMP=/",
 		"--env", "TMPDIR=/",
 		"--env", "HOME=/",
@@ -149,13 +235,19 @@ func buildArgv(cfg RunConfig) []string {
 
 	if cfg.Limits.WallTimeS > 0 {
 		argv = append(argv, "--time_limit", fmt.Sprintf("%d", cfg.Limits.WallTimeS))
+		// CPU time cap: secondary guard alongside wall-clock --time_limit.
+		// Prevents a compute-bound process from burning CPU when the system is
+		// under load (where wall time can expire without proportional CPU use).
+		argv = append(argv, "--rlimit_cpu", fmt.Sprintf("%d", cfg.Limits.WallTimeS))
 	}
 	if cfg.Limits.MemoryKB > 0 {
-		// RLIMIT_AS caps virtual address space, not RSS. Interpreters (Python, JVM)
-		// mmap 150–300 MiB of virtual space at startup even for trivial programs, so
-		// the limit must be significantly larger than memory_kb. Apply a 4× multiplier
-		// with a 512 MiB floor so any interpreter can start while still bounding
-		// runaway allocators.
+		// cgroup memory.max enforces RSS; this is the primary limit and makes
+		// memory_exceeded detection reliable (nsjail logs the OOM event).
+		cgroupMemBytes := int64(cfg.Limits.MemoryKB) * 1024
+		argv = append(argv, "--cgroup_mem_max", fmt.Sprintf("%d", cgroupMemBytes))
+		// RLIMIT_AS caps virtual address space separately from RSS. Interpreters
+		// (Python, JVM) mmap 150–300 MiB of virtual space at startup, so the
+		// limit is set at 4× memory_kb with a 512 MiB floor.
 		virtMiB := cfg.Limits.MemoryKB * 4 / 1024
 		if virtMiB < 512 {
 			virtMiB = 512
@@ -163,10 +255,12 @@ func buildArgv(cfg RunConfig) []string {
 		argv = append(argv, "--rlimit_as", fmt.Sprintf("%d", virtMiB))
 	}
 	if cfg.Limits.MaxProcesses > 0 {
+		// cgroup pids.max is the hard limit; rlimit_nproc is the per-user fallback.
+		argv = append(argv, "--cgroup_pids_max", fmt.Sprintf("%d", cfg.Limits.MaxProcesses))
 		argv = append(argv, "--rlimit_nproc", fmt.Sprintf("%d", cfg.Limits.MaxProcesses))
 	}
 
-	// File size cap: 100 MB per created file (safety net).
+	// File size cap: 100 MB per created file (safety net against runaway writes).
 	argv = append(argv, "--rlimit_fsize", "100")
 
 	for _, bm := range cfg.BindMounts {
@@ -177,6 +271,8 @@ func buildArgv(cfg RunConfig) []string {
 			argv = append(argv, "-R", bm)
 		}
 	}
+
+	argv = append(argv, "--seccomp_string", seccompPolicy)
 
 	argv = append(argv, "--")
 	argv = append(argv, cfg.Cmd)

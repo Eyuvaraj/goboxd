@@ -15,9 +15,12 @@ func TestParseRunStatus(t *testing.T) {
 		want     string
 	}{
 		{"time exceeded", "run time >= time limit", 1, validate.StatusTimeExceeded},
-		{"memory exceeded", "memory limit exceeded", 1, validate.StatusMemoryExceeded},
+		{"memory exceeded cgroup v1", "memory limit exceeded", 1, validate.StatusMemoryExceeded},
 		{"oom", "out of memory", 137, validate.StatusMemoryExceeded},
-		{"signal", "killed by signal 11", 139, validate.StatusRuntimeError},
+		{"signal segfault", "killed by signal 11", 139, validate.StatusRuntimeError},
+		// Cgroup v2: nsjail logs "Setting 'memory.max' to '<n>'" then SIGKILL.
+		{"cgroupv2 oom", "[I] Setting 'memory.max' to '104857600'\n[I] killed by signal 9", 9, validate.StatusMemoryExceeded},
+		{"signal 9 no cgroup", "killed by signal 9", 9, validate.StatusRuntimeError},
 		{"exit zero", "exited with status: 0", 0, validate.StatusAccepted},
 		{"exit nonzero", "exited with status: 1", 1, validate.StatusRuntimeError},
 	}

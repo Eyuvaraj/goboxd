@@ -96,7 +96,7 @@ type BuildInfo struct {
 // NsjailInfo holds nsjail path and version for GET /info.
 type NsjailInfo struct {
 	Path    string `json:"path"    example:"/usr/local/bin/nsjail"`
-	Version string `json:"version" example:"nsjail version: 3.4"`
+	Version string `json:"version" example:"nsjail version: 3.6"`
 }
 
 // LanguageRunLimits holds the default run-phase limits for one language in GET /info.
