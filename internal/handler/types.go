@@ -101,7 +101,7 @@ type NsjailInfo struct {
 
 // LanguageRunLimits holds the default run-phase limits for one language in GET /info.
 type LanguageRunLimits struct {
-	WallTimeS    int `json:"wall_time_s"   example:"9"`
+	WallTimeS    int `json:"wall_time_s"   example:"10"`
 	MemoryKB     int `json:"memory_kb"     example:"102400"`
 	MaxProcesses int `json:"max_processes" example:"100"`
 }

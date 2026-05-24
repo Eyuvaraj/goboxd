@@ -83,7 +83,7 @@ const docTemplate = `{
         },
         "/run": {
             "post": {
-                "description": "Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.\n\n**Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the ` + "`" + `status` + "`" + ` fields of the response body — not as HTTP error codes.\n\n**Filename requirements:** Some languages (e.g. Java) require ` + "`" + `source_filename` + "`" + ` and ` + "`" + `artifact_filename` + "`" + ` to match the public class name. The ` + "`" + `strategy` + "`" + ` field in the language definition controls this.\n\n**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 ` + "`" + `invalid_flag` + "`" + `.",
+                "description": "Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.\n\n**Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the ` + "`" + `status` + "`" + ` fields of the response body — not as HTTP error codes.\n\n**Filename requirements:** Some languages (e.g. Java) require ` + "`" + `source_filename` + "`" + ` and ` + "`" + `artifact_filename` + "`" + ` to match the public class name. The ` + "`" + `strategy` + "`" + ` field in the language definition controls this.\n\n**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 ` + "`" + `invalid_flag` + "`" + `.\n\n**Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 ` + "`" + `invalid_limits` + "`" + `.",
                 "consumes": [
                     "application/json"
                 ],
@@ -210,8 +210,10 @@ const docTemplate = `{
                         "missing_artifact_filename",
                         "invalid_filename",
                         "invalid_flag",
+                        "invalid_limits",
                         "invalid_test_count",
                         "stdin_too_large",
+                        "expected_too_large",
                         "internal_error"
                     ],
                     "example": "unknown_language"
@@ -295,7 +297,7 @@ const docTemplate = `{
                 },
                 "wall_time_s": {
                     "type": "integer",
-                    "example": 9
+                    "example": 10
                 }
             }
         },

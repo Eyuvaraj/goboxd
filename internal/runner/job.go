@@ -222,22 +222,16 @@ func compareOutput(result sandbox.RunResult, expected string) string {
 // buildBindMounts derives the read-only bind mounts needed for a language.
 // --rw in buildArgv remounts the chroot root as writable so compilers can
 // write artifacts into the workspace; the bind mounts themselves stay -R.
+//
+// Overlap rule: never include a path whose parent is already in the set.
+// nsjail bind-mounts each path individually and then remounts it read-only.
+// If both /usr/bin and /usr are passed, /usr is mounted on top of the
+// /usr/bin bind mount inside the jail, and the subsequent MS_RDONLY remount
+// of /usr/bin fails with EINVAL because the kernel sees a different mount ID.
 func buildBindMounts(lang *config.LanguageDef) []string {
 	dirs := map[string]struct{}{}
 
-	add := func(cmd string) {
-		if cmd == "" {
-			return
-		}
-		dirs[filepath.Dir(cmd)] = struct{}{}
-	}
-
-	if lang.Build != nil {
-		add(lang.Build.Cmd)
-	}
-	add(lang.Run.Cmd)
-
-	// Broad mounts so runtimes, dynamic linkers, and device nodes are reachable:
+	// Broad mounts cover all standard toolchain locations.
 	//   /usr  — binaries + shared libraries (includes /usr/lib, /usr/bin, etc.)
 	//   /etc  — ld.so.cache, nsswitch.conf, passwd (required by many runtimes)
 	//   /dev  — /dev/null, /dev/urandom, /dev/tty (Python/Java read these at start)
@@ -245,6 +239,26 @@ func buildBindMounts(lang *config.LanguageDef) []string {
 	for _, d := range []string{"/bin", "/usr", "/lib", "/etc", "/dev", "/var"} {
 		dirs[d] = struct{}{}
 	}
+
+	// addIfNotCovered adds d only when no existing entry is a parent of d.
+	// This prevents redundant sub-mounts that trigger the EINVAL remount bug.
+	addIfNotCovered := func(cmd string) {
+		if cmd == "" {
+			return
+		}
+		d := filepath.Dir(cmd)
+		for existing := range dirs {
+			if d == existing || strings.HasPrefix(d, existing+"/") {
+				return // already covered by a parent mount
+			}
+		}
+		dirs[d] = struct{}{}
+	}
+
+	if lang.Build != nil {
+		addIfNotCovered(lang.Build.Cmd)
+	}
+	addIfNotCovered(lang.Run.Cmd)
 
 	mounts := make([]string, 0, len(dirs))
 	for d := range dirs {

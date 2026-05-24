@@ -6,7 +6,7 @@ languages:
       cmd: /usr/bin/python3
       args: ["{{source}}"]
       limits:
-        wall_time_s: 9
+        wall_time_s: 10
         memory_kb: 102400
         max_processes: 100
 
@@ -17,7 +17,7 @@ languages:
       cmd: /bin/bash
       args: ["{{source}}"]
       limits:
-        wall_time_s: 9
+        wall_time_s: 10
         memory_kb: 102400
         max_processes: 50
 
@@ -28,7 +28,7 @@ languages:
       cmd: /usr/bin/node
       args: ["{{source}}"]
       limits:
-        wall_time_s: 9
+        wall_time_s: 10
         memory_kb: 262144
         max_processes: 100
 
@@ -142,7 +142,7 @@ languages:
       cmd: /usr/bin/ruby
       args: ["{{source}}"]
       limits:
-        wall_time_s: 9
+        wall_time_s: 10
         memory_kb: 131072
         max_processes: 100
 
@@ -153,7 +153,7 @@ languages:
       cmd: /usr/bin/lua5.4
       args: ["{{source}}"]
       limits:
-        wall_time_s: 9
+        wall_time_s: 10
         memory_kb: 65536
         max_processes: 50
 
@@ -213,6 +213,6 @@ languages:
       cmd: /usr/bin/ocaml
       args: ["{{source}}"]
       limits:
-        wall_time_s: 9
+        wall_time_s: 10
         memory_kb: 131072
         max_processes: 100

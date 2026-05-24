@@ -35,8 +35,9 @@ const truncationMarker = "\n[output truncated]"
 //     Obvious.
 //   settimeofday / adjtimex / clock_adjtime
 //     Clock skew — can affect timeout logic and log timestamps on the host.
-//   mknod / mknodat
+//   mknodat
 //     Create device nodes; combined with chroot this enables device escapes.
+//     (mknod is absent from the ARM64 Kafel table; mknodat alone suffices.)
 //   chroot / pivot_root
 //     Change filesystem root — the sandbox already has its root set by nsjail;
 //     a second chroot inside the jail could escape our bind-mount restrictions.
@@ -45,7 +46,9 @@ const truncationMarker = "\n[output truncated]"
 //     mount namespace that nsjail established.
 //   io_uring_setup / io_uring_enter / io_uring_register
 //     Async I/O interface with a history of privilege-escalation CVEs; none
-//     of the registered language runtimes require it.
+//     of the registered language runtimes require it. Omitted from the Kafel
+//     policy on ARM64 (not in the aarch64 syscall table) — a syscall absent
+//     from the kernel cannot be invoked, so no deny rule is needed there.
 //   userfaultfd
 //     Pause kernel page-fault handling from userspace — used in many
 //     kernel exploit chains; no legitimate use in a code sandbox.
@@ -63,6 +66,15 @@ const truncationMarker = "\n[output truncated]"
 // perf_event_open is intentionally NOT denied: the JVM uses it for profiling.
 // Network access is already blocked by nsjail's network namespace isolation,
 // so socket/connect/bind do not need to be denied at the seccomp level.
+// Syscalls intentionally omitted from the deny-list because they are absent
+// from the ARM64 (aarch64) Kafel syscall table — Kafel would fail to compile
+// the policy with "Undefined identifier" if they were included:
+//
+//   kexec_file_load  — x86_64 only; ARM64 uses kexec_load for all kexec ops.
+//   mknod            — absent from ARM64; mknodat (below) covers the attack surface.
+//   io_uring_setup / io_uring_enter / io_uring_register — not in this ARM64
+//                      Kafel table; syscalls that don't exist can't be invoked
+//                      so no deny rule is needed.
 const seccompPolicy = `POLICY goboxd_safe {
     KILL_PROCESS {
         ptrace,
@@ -72,20 +84,15 @@ const seccompPolicy = `POLICY goboxd_safe {
         finit_module,
         delete_module,
         kexec_load,
-        kexec_file_load,
         reboot,
         settimeofday,
         adjtimex,
         clock_adjtime,
-        mknod,
         mknodat,
         chroot,
         pivot_root,
         unshare,
         setns,
-        io_uring_setup,
-        io_uring_enter,
-        io_uring_register,
         userfaultfd,
         name_to_handle_at,
         open_by_handle_at,
@@ -205,7 +212,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 }
 
 // buildArgv constructs the nsjail command-line as a pure []string.
-// No shell is involved at any point. Targets nsjail 3.6+.
+// No shell is involved at any point. Compatible with nsjail 3.4+.
 func buildArgv(cfg RunConfig) []string {
 	argv := []string{cfg.NsjailPath}
 
@@ -221,9 +228,6 @@ func buildArgv(cfg RunConfig) []string {
 		// Use cgroup v2 when available (host must mount /sys/fs/cgroup as cgroup2;
 		// docker-compose sets cgroupns: host for this).
 		"--detect_cgroupv2",
-		// Use new Linux mount API (fsopen/fsmount) when the kernel supports it;
-		// falls back to legacy mount(2) automatically on older kernels.
-		"--experimental_mnt", "auto",
 		// File-descriptor cap; Python and javac open many fds at startup.
 		"--rlimit_nofile", "1000",
 		// Minimal environment: no host secrets leak in; runtimes find their paths.

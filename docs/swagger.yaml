@@ -55,8 +55,10 @@ definitions:
         - missing_artifact_filename
         - invalid_filename
         - invalid_flag
+        - invalid_limits
         - invalid_test_count
         - stdin_too_large
+        - expected_too_large
         - internal_error
         example: unknown_language
         type: string
@@ -113,7 +115,7 @@ definitions:
         example: 102400
         type: integer
       wall_time_s:
-        example: 9
+        example: 10
         type: integer
     type: object
   handler.NsjailInfo:
@@ -342,6 +344,8 @@ paths:
         **Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The `strategy` field in the language definition controls this.
 
         **Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.
+
+        **Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 `invalid_limits`.
       parameters:
       - description: Code execution request
         in: body

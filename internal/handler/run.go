@@ -33,6 +33,8 @@ func NewRunHandler(r *runner.Runner, reg *registry.Registry, cfg config.Server) 
 //	@Description	**Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The `strategy` field in the language definition controls this.
 //	@Description
 //	@Description	**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.
+//	@Description
+//	@Description	**Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 `invalid_limits`.
 //	@Tags			execution
 //	@Accept			json
 //	@Produce		json

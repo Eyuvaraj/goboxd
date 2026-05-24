@@ -91,8 +91,10 @@ Top-level `accepted` requires `build.status == ok` and every test `accepted`. Ot
 | `missing_artifact_filename` | Required by language, not provided |
 | `invalid_filename` | Filename fails safety check |
 | `invalid_flag` | Flag not in language allowlist |
+| `invalid_limits` | Limit override exceeds language-configured maximum |
 | `invalid_test_count` | 0 tests or exceeds 50 |
 | `stdin_too_large` | Test stdin exceeds 64 KiB |
+| `expected_too_large` | Test `expected_stdout` exceeds 64 KiB |
 
 `5xx` is reserved for server failures (nsjail missing, disk full). Never returned because user code crashed.
 
@@ -134,7 +136,7 @@ Always `200`. Returns build metadata, nsjail info, language list, server limits,
       "id": "py3",
       "name": "Python 3",
       "version": "Python 3.11.9",
-      "default_run_limits": { "wall_time_s": 9, "memory_kb": 102400, "max_processes": 100 }
+      "default_run_limits": { "wall_time_s": 10, "memory_kb": 102400, "max_processes": 100 }
     }
   ],
   "limits": {
