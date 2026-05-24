@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/thesouldev/goboxd/internal/config"
 	"github.com/thesouldev/goboxd/internal/logctx"
@@ -128,12 +129,12 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for i, tc := range req.Tests {
 		if err := validate.StdinSize(tc.Stdin, h.cfg.MaxStdinBytes); err != nil {
 			writeError(w, http.StatusBadRequest, "stdin_too_large",
-				"test "+itoa(i)+": "+err.Error())
+				"test "+strconv.Itoa(i)+": "+err.Error())
 			return
 		}
 		if err := validate.ExpectedSize(tc.ExpectedStdout, h.cfg.MaxStdinBytes); err != nil {
 			writeError(w, http.StatusBadRequest, "expected_too_large",
-				"test "+itoa(i)+": "+err.Error())
+				"test "+strconv.Itoa(i)+": "+err.Error())
 			return
 		}
 		tests[i] = runner.TestCase{
@@ -231,15 +232,3 @@ func writeError(w http.ResponseWriter, code int, errCode, msg string) {
 }
 
 func strQ(s string) string { return `"` + s + `"` }
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	digits := []byte{}
-	for n > 0 {
-		digits = append([]byte{byte('0' + n%10)}, digits...)
-		n /= 10
-	}
-	return string(digits)
-}

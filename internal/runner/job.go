@@ -267,14 +267,3 @@ func buildBindMounts(lang *config.LanguageDef) []string {
 	return mounts
 }
 
-// stripPath returns the final component of a path for use as the run command
-// when the cwd is the workspace.
-func stripPath(cmd string) string {
-	if strings.HasPrefix(cmd, "./") {
-		return cmd
-	}
-	return cmd
-}
-
-// silence unused
-var _ = stripPath

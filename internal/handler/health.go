@@ -122,10 +122,11 @@ func (h *HealthHandler) Info(w http.ResponseWriter, r *http.Request) {
 			"max_concurrent_jobs": h.cfg.MaxConcurrentJobs,
 		},
 		"stats": map[string]any{
-			"in_flight_jobs":          h.counters.InFlight(),
-			"jobs_total":              h.counters.JobsTotal(),
-			"jobs_failed_internal":    h.counters.JobsFailed(),
-			"last_internal_error_at":  errAtStr,
+			"in_flight_jobs":           h.counters.InFlight(),
+			"queue_size":               h.counters.QueueSize(),
+			"jobs_total":               h.counters.JobsTotal(),
+			"jobs_failed_internal":     h.counters.JobsFailed(),
+			"last_internal_error_at":   errAtStr,
 			"disk_free_bytes_jail_dir": stats.DiskFreeBytes(h.cfg.JailDir),
 		},
 	})

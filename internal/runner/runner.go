@@ -8,6 +8,7 @@ import (
 	"github.com/thesouldev/goboxd/internal/registry"
 	"github.com/thesouldev/goboxd/internal/sandbox"
 	"github.com/thesouldev/goboxd/internal/stats"
+	"github.com/thesouldev/goboxd/internal/validate"
 )
 
 // Response is the full response returned by Runner.Submit.
@@ -53,14 +54,19 @@ func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 		return Response{}, fmt.Errorf("unknown language: %s", req.Language)
 	}
 
+	// Count as queued while waiting for a semaphore slot.
+	r.counters.IncQueued()
+
 	// Block until a slot is available (fixes bounded concurrency requirement).
 	select {
 	case <-r.sem:
 		// got a slot
 	case <-ctx.Done():
+		r.counters.DecQueued()
 		return Response{}, ctx.Err()
 	}
 
+	r.counters.DecQueued()
 	r.counters.IncInFlight()
 	r.counters.IncTotal()
 	defer func() {
@@ -80,9 +86,24 @@ func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 	buildResult := job.compile(ctx)
 	testResults := job.runTests(ctx, buildResult.Status)
 
-	return Response{
+	resp := Response{
 		Status: TopLevelStatus(buildResult.Status, testResults),
 		Build:  buildResult,
 		Tests:  testResults,
-	}, nil
+	}
+
+	// Count job-level internal errors (sandbox failure, disk error, etc.)
+	// beyond the workspace-creation failure already counted above.
+	if resp.Build.Status == validate.BuildStatusInternalError {
+		r.counters.IncFailed()
+	} else {
+		for _, t := range resp.Tests {
+			if t.Status == validate.StatusInternalError {
+				r.counters.IncFailed()
+				break
+			}
+		}
+	}
+
+	return resp, nil
 }

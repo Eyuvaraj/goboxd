@@ -106,7 +106,15 @@ func waitHealthy(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	waitHealthy(nil) // noop: just use t from tests
+	// Wait for the service to accept requests before running any test.
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, err := http.Get(baseURL + "/healthz")
+		if err == nil && resp.StatusCode == 200 {
+			break
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
 	os.Exit(m.Run())
 }
 

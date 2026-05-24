@@ -124,6 +124,7 @@ type ServiceLimits struct {
 // ServiceStats holds runtime counters for GET /info.
 type ServiceStats struct {
 	InFlightJobs           int64   `json:"in_flight_jobs"           example:"2"`
+	QueueSize              int64   `json:"queue_size"               example:"0"`
 	JobsTotal              int64   `json:"jobs_total"               example:"1042"`
 	JobsFailedInternal     int64   `json:"jobs_failed_internal"     example:"0"`
 	LastInternalErrorAt    *string `json:"last_internal_error_at"   example:"2024-01-15T10:30:00Z"`
