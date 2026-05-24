@@ -17,40 +17,40 @@ func makeTests(statuses ...string) []runner.TestResult {
 
 func TestTopLevelStatus(t *testing.T) {
 	tests := []struct {
-		name        string
-		buildStatus string
+		name         string
+		buildStatus  string
 		testStatuses []string
-		want        string
+		want         string
 	}{
 		{
-			name:        "build failed → build_failed",
-			buildStatus: validate.BuildStatusFailed,
+			name:         "build failed → build_failed",
+			buildStatus:  validate.BuildStatusFailed,
 			testStatuses: []string{validate.StatusNotExecuted},
-			want:        validate.StatusBuildFailed,
+			want:         validate.StatusBuildFailed,
 		},
 		{
-			name:        "all accepted",
-			buildStatus: validate.BuildStatusOK,
+			name:         "all accepted",
+			buildStatus:  validate.BuildStatusOK,
 			testStatuses: []string{validate.StatusAccepted, validate.StatusAccepted},
-			want:        validate.StatusAccepted,
+			want:         validate.StatusAccepted,
 		},
 		{
-			name:        "first non-accepted wins",
-			buildStatus: validate.BuildStatusOK,
+			name:         "first non-accepted wins",
+			buildStatus:  validate.BuildStatusOK,
 			testStatuses: []string{validate.StatusAccepted, validate.StatusWrongOutput, validate.StatusTimeExceeded},
-			want:        validate.StatusWrongOutput,
+			want:         validate.StatusWrongOutput,
 		},
 		{
-			name:        "single time exceeded",
-			buildStatus: validate.BuildStatusOK,
+			name:         "single time exceeded",
+			buildStatus:  validate.BuildStatusOK,
 			testStatuses: []string{validate.StatusTimeExceeded},
-			want:        validate.StatusTimeExceeded,
+			want:         validate.StatusTimeExceeded,
 		},
 		{
-			name:        "whitespace mismatch",
-			buildStatus: validate.BuildStatusOK,
+			name:         "whitespace mismatch",
+			buildStatus:  validate.BuildStatusOK,
 			testStatuses: []string{validate.StatusWhitespaceMismatch},
-			want:        validate.StatusWhitespaceMismatch,
+			want:         validate.StatusWhitespaceMismatch,
 		},
 	}
 

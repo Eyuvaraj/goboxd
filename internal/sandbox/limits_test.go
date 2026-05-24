@@ -40,23 +40,23 @@ func TestExpandArgs(t *testing.T) {
 		want     []string
 	}{
 		{
-			name:     "flags expanded in place",
-			tmpl:     []string{"{{flags}}", "-o", "{{artifact}}", "{{source}}"},
-			source:   "a.c", artifact: "a",
+			name:   "flags expanded in place",
+			tmpl:   []string{"{{flags}}", "-o", "{{artifact}}", "{{source}}"},
+			source: "a.c", artifact: "a",
 			flags: []string{"-O2", "-Wall"},
 			want:  []string{"-O2", "-Wall", "-o", "a", "a.c"},
 		},
 		{
-			name:     "no flags",
-			tmpl:     []string{"{{flags}}", "{{source}}"},
-			source:   "sol.py", artifact: "",
+			name:   "no flags",
+			tmpl:   []string{"{{flags}}", "{{source}}"},
+			source: "sol.py", artifact: "",
 			flags: nil,
 			want:  []string{"sol.py"},
 		},
 		{
-			name:     "inline substitution",
-			tmpl:     []string{"./{{artifact}}"},
-			source:   "", artifact: "solution",
+			name:   "inline substitution",
+			tmpl:   []string{"./{{artifact}}"},
+			source: "", artifact: "solution",
 			flags: nil,
 			want:  []string{"./solution"},
 		},

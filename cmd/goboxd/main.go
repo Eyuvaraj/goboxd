@@ -13,13 +13,13 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
+	_ "github.com/thesouldev/goboxd/docs" // generated swagger spec
 	"github.com/thesouldev/goboxd/internal/config"
 	"github.com/thesouldev/goboxd/internal/handler"
 	"github.com/thesouldev/goboxd/internal/registry"
 	"github.com/thesouldev/goboxd/internal/runner"
 	"github.com/thesouldev/goboxd/internal/sandbox"
 	"github.com/thesouldev/goboxd/internal/stats"
-	_ "github.com/thesouldev/goboxd/docs" // generated swagger spec
 )
 
 func main() {

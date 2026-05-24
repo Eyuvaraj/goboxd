@@ -9,11 +9,11 @@ type key struct{}
 
 // Fields holds the execution-level fields a handler wants logged.
 type Fields struct {
-	Language       string
-	ExecStatus     string
+	Language        string
+	ExecStatus      string
 	BuildDurationMs int64
-	TestsTotal     int
-	TestsAccepted  int
+	TestsTotal      int
+	TestsAccepted   int
 }
 
 // Set stores fields in ctx.

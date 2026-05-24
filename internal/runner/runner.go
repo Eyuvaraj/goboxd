@@ -13,8 +13,8 @@ import (
 
 // Response is the full response returned by Runner.Submit.
 type Response struct {
-	Status string      `json:"status"`
-	Build  BuildResult `json:"build"`
+	Status string       `json:"status"`
+	Build  BuildResult  `json:"build"`
 	Tests  []TestResult `json:"tests"`
 }
 
@@ -34,8 +34,8 @@ func New(maxConcurrent int, reg *registry.Registry, cfg config.Server, counters 
 		sem <- struct{}{}
 	}
 	return &Runner{
-		sem:      sem,
-		reg:      reg,
+		sem: sem,
+		reg: reg,
 		jobCfg: JobConfig{
 			NsjailPath:     cfg.NsjailPath,
 			MaxOutputBytes: int64(cfg.MaxOutputBytes),

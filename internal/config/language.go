@@ -9,10 +9,10 @@ type LimitsDef struct {
 
 // PhaseDef describes either the build or run phase of a language.
 type PhaseDef struct {
-	Cmd          string    `yaml:"cmd"`
-	Args         []string  `yaml:"args"`
-	Limits       LimitsDef `yaml:"limits"`
-	FlagAllowlist []string `yaml:"flag_allowlist"`
+	Cmd           string    `yaml:"cmd"`
+	Args          []string  `yaml:"args"`
+	Limits        LimitsDef `yaml:"limits"`
+	FlagAllowlist []string  `yaml:"flag_allowlist"`
 }
 
 // LanguageDef is the YAML schema for a single language entry.

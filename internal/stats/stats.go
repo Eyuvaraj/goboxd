@@ -15,16 +15,19 @@ type Counters struct {
 	lastInternalErrAt  atomic.Int64 // unix nano; 0 means never
 }
 
-func (c *Counters) IncTotal()            { c.jobsTotal.Add(1) }
-func (c *Counters) IncFailed()           { c.jobsFailedInternal.Add(1); c.lastInternalErrAt.Store(time.Now().UnixNano()) }
-func (c *Counters) IncInFlight()         { c.inFlight.Add(1) }
-func (c *Counters) DecInFlight()         { c.inFlight.Add(-1) }
-func (c *Counters) IncQueued()           { c.queueSize.Add(1) }
-func (c *Counters) DecQueued()           { c.queueSize.Add(-1) }
-func (c *Counters) JobsTotal() int64     { return c.jobsTotal.Load() }
-func (c *Counters) JobsFailed() int64    { return c.jobsFailedInternal.Load() }
-func (c *Counters) InFlight() int64      { return c.inFlight.Load() }
-func (c *Counters) QueueSize() int64     { return c.queueSize.Load() }
+func (c *Counters) IncTotal() { c.jobsTotal.Add(1) }
+func (c *Counters) IncFailed() {
+	c.jobsFailedInternal.Add(1)
+	c.lastInternalErrAt.Store(time.Now().UnixNano())
+}
+func (c *Counters) IncInFlight()      { c.inFlight.Add(1) }
+func (c *Counters) DecInFlight()      { c.inFlight.Add(-1) }
+func (c *Counters) IncQueued()        { c.queueSize.Add(1) }
+func (c *Counters) DecQueued()        { c.queueSize.Add(-1) }
+func (c *Counters) JobsTotal() int64  { return c.jobsTotal.Load() }
+func (c *Counters) JobsFailed() int64 { return c.jobsFailedInternal.Load() }
+func (c *Counters) InFlight() int64   { return c.inFlight.Load() }
+func (c *Counters) QueueSize() int64  { return c.queueSize.Load() }
 
 // LastInternalErrorAt returns the timestamp of the last internal error, or zero time.
 func (c *Counters) LastInternalErrorAt() time.Time {

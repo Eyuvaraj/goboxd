@@ -25,43 +25,43 @@ const truncationMarker = "\n[output truncated]"
 //
 // Denied syscalls and their attack surface:
 //
-//   ptrace / process_vm_readv / process_vm_writev
-//     Cross-process memory inspection and writes — sandbox escape primitives.
-//   init_module / finit_module / delete_module
-//     Kernel module loading — arbitrary kernel code execution.
-//   kexec_load / kexec_file_load
-//     Replace the running kernel image.
-//   reboot
-//     Obvious.
-//   settimeofday / adjtimex / clock_adjtime
-//     Clock skew — can affect timeout logic and log timestamps on the host.
-//   mknodat
-//     Create device nodes; combined with chroot this enables device escapes.
-//     (mknod is absent from the ARM64 Kafel table; mknodat alone suffices.)
-//   chroot / pivot_root
-//     Change filesystem root — the sandbox already has its root set by nsjail;
-//     a second chroot inside the jail could escape our bind-mount restrictions.
-//   unshare / setns
-//     Manipulate Linux namespaces — could un-isolate the network, PID, or
-//     mount namespace that nsjail established.
-//   io_uring_setup / io_uring_enter / io_uring_register
-//     Async I/O interface with a history of privilege-escalation CVEs; none
-//     of the registered language runtimes require it. Omitted from the Kafel
-//     policy on ARM64 (not in the aarch64 syscall table) — a syscall absent
-//     from the kernel cannot be invoked, so no deny rule is needed there.
-//   userfaultfd
-//     Pause kernel page-fault handling from userspace — used in many
-//     kernel exploit chains; no legitimate use in a code sandbox.
-//   name_to_handle_at / open_by_handle_at
-//     File-handle syscalls that can bypass directory-traversal checks and
-//     cross mount-point boundaries when combined with a leaked handle.
-//   acct
-//     Enable/disable process accounting — unneeded and can interfere with
-//     host-side resource bookkeeping.
-//   bpf
-//     Load eBPF programs into the kernel — kernel-level arbitrary code.
-//   syslog
-//     Read the kernel ring buffer — information leak.
+//	ptrace / process_vm_readv / process_vm_writev
+//	  Cross-process memory inspection and writes — sandbox escape primitives.
+//	init_module / finit_module / delete_module
+//	  Kernel module loading — arbitrary kernel code execution.
+//	kexec_load / kexec_file_load
+//	  Replace the running kernel image.
+//	reboot
+//	  Obvious.
+//	settimeofday / adjtimex / clock_adjtime
+//	  Clock skew — can affect timeout logic and log timestamps on the host.
+//	mknodat
+//	  Create device nodes; combined with chroot this enables device escapes.
+//	  (mknod is absent from the ARM64 Kafel table; mknodat alone suffices.)
+//	chroot / pivot_root
+//	  Change filesystem root — the sandbox already has its root set by nsjail;
+//	  a second chroot inside the jail could escape our bind-mount restrictions.
+//	unshare / setns
+//	  Manipulate Linux namespaces — could un-isolate the network, PID, or
+//	  mount namespace that nsjail established.
+//	io_uring_setup / io_uring_enter / io_uring_register
+//	  Async I/O interface with a history of privilege-escalation CVEs; none
+//	  of the registered language runtimes require it. Omitted from the Kafel
+//	  policy on ARM64 (not in the aarch64 syscall table) — a syscall absent
+//	  from the kernel cannot be invoked, so no deny rule is needed there.
+//	userfaultfd
+//	  Pause kernel page-fault handling from userspace — used in many
+//	  kernel exploit chains; no legitimate use in a code sandbox.
+//	name_to_handle_at / open_by_handle_at
+//	  File-handle syscalls that can bypass directory-traversal checks and
+//	  cross mount-point boundaries when combined with a leaked handle.
+//	acct
+//	  Enable/disable process accounting — unneeded and can interfere with
+//	  host-side resource bookkeeping.
+//	bpf
+//	  Load eBPF programs into the kernel — kernel-level arbitrary code.
+//	syslog
+//	  Read the kernel ring buffer — information leak.
 //
 // perf_event_open is intentionally NOT denied: the JVM uses it for profiling.
 // Network access is already blocked by nsjail's network namespace isolation,
@@ -70,11 +70,11 @@ const truncationMarker = "\n[output truncated]"
 // from the ARM64 (aarch64) Kafel syscall table — Kafel would fail to compile
 // the policy with "Undefined identifier" if they were included:
 //
-//   kexec_file_load  — x86_64 only; ARM64 uses kexec_load for all kexec ops.
-//   mknod            — absent from ARM64; mknodat (below) covers the attack surface.
-//   io_uring_setup / io_uring_enter / io_uring_register — not in this ARM64
-//                      Kafel table; syscalls that don't exist can't be invoked
-//                      so no deny rule is needed.
+//	kexec_file_load  — x86_64 only; ARM64 uses kexec_load for all kexec ops.
+//	mknod            — absent from ARM64; mknodat (below) covers the attack surface.
+//	io_uring_setup / io_uring_enter / io_uring_register — not in this ARM64
+//	                   Kafel table; syscalls that don't exist can't be invoked
+//	                   so no deny rule is needed.
 const seccompPolicy = `POLICY goboxd_safe {
     KILL_PROCESS {
         ptrace,
@@ -105,19 +105,19 @@ USE goboxd_safe DEFAULT ALLOW`
 
 // RunConfig describes one nsjail invocation.
 type RunConfig struct {
-	NsjailPath    string
-	WorkspaceDir  string
-	Limits        config.LimitsDef
+	NsjailPath   string
+	WorkspaceDir string
+	Limits       config.LimitsDef
 	// Cmd is the program to run inside the sandbox (e.g. "/usr/bin/python3").
-	Cmd           string
+	Cmd string
 	// Args are the arguments passed to Cmd after template expansion.
-	Args          []string
+	Args []string
 	// Stdin is fed to the sandboxed process.
-	Stdin         io.Reader
+	Stdin io.Reader
 	// MaxOutputBytes caps captured stdout.
 	MaxOutputBytes int64
 	// BindMounts are additional read-only bind mounts: "host:container".
-	BindMounts    []string
+	BindMounts []string
 }
 
 // RunResult holds the captured output of one nsjail invocation.
@@ -157,12 +157,12 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 
 	start := time.Now()
 	if err := cmd.Start(); err != nil {
-		logW.Close()
-		logR.Close()
+		_ = logW.Close()
+		_ = logR.Close()
 		return RunResult{}, fmt.Errorf("starting nsjail: %w", err)
 	}
 	// Close write end in parent so logR gets EOF when nsjail exits.
-	logW.Close()
+	_ = logW.Close()
 
 	// Drain nsjail log in a goroutine so a large log can't deadlock stdout.
 	var logBuf bytes.Buffer
@@ -170,7 +170,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	go func() {
 		defer close(logDone)
 		_, _ = io.Copy(&logBuf, logR)
-		logR.Close()
+		_ = logR.Close()
 	}()
 
 	// Read stdout with a hard cap (fixes hole #6: unbounded child output).

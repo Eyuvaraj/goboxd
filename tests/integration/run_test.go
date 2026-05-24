@@ -318,7 +318,7 @@ func TestPathTraversalFilename(t *testing.T) {
 func TestDisallowedFlag(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{
 		"language": "cpp",
-		"source":   `#include <iostream>
+		"source": `#include <iostream>
 int main(){std::cout<<"hi";}`,
 		"build": map[string]any{
 			"flags": []string{"-fplugin=evil.so"},
@@ -585,8 +585,8 @@ func TestReadyz(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 	var body struct {
-		Status    string                     `json:"status"`
-		Nsjail    struct{ OK bool }          `json:"nsjail"`
+		Status    string                       `json:"status"`
+		Nsjail    struct{ OK bool }            `json:"nsjail"`
 		Languages map[string]struct{ OK bool } `json:"languages"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {

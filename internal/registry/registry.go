@@ -99,4 +99,3 @@ func validateLang(l *config.LanguageDef) error {
 	}
 	return nil
 }
-

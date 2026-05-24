@@ -11,19 +11,19 @@ import (
 )
 
 const (
-	MaxFilenameLen = 64
-	MaxSourceBytes = 256 * 1024       // 256 KiB
-	MaxStdinBytes  = 64 * 1024        // 64 KiB
-	MaxExpectedBytes = 64 * 1024      // 64 KiB
-	MaxTests       = 50
-	MaxOutputBytes = 256 * 1024       // 256 KiB captured stdout/stderr per run
+	MaxFilenameLen   = 64
+	MaxSourceBytes   = 256 * 1024 // 256 KiB
+	MaxStdinBytes    = 64 * 1024  // 64 KiB
+	MaxExpectedBytes = 64 * 1024  // 64 KiB
+	MaxTests         = 50
+	MaxOutputBytes   = 256 * 1024 // 256 KiB captured stdout/stderr per run
 )
 
-var ErrFilenameEmpty     = errors.New("filename must not be empty")
-var ErrFilenameAbsolute  = errors.New("filename must not be an absolute path")
+var ErrFilenameEmpty = errors.New("filename must not be empty")
+var ErrFilenameAbsolute = errors.New("filename must not be an absolute path")
 var ErrFilenameSeparator = errors.New("filename must be a single path component with no separators")
 var ErrFilenameLeadingDot = errors.New("filename must not start with a dot")
-var ErrFilenameTooLong   = errors.New("filename exceeds maximum length")
+var ErrFilenameTooLong = errors.New("filename exceeds maximum length")
 var ErrFilenameInvalidChar = errors.New("filename contains invalid characters")
 
 // Filename validates that s is safe to use as a filename inside a sandbox

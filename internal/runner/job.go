@@ -32,15 +32,15 @@ type TestResult struct {
 
 // JobRequest is the validated, parsed input to a job.
 type JobRequest struct {
-	Language       string
-	Source         string
-	SourceFilename string
+	Language         string
+	Source           string
+	SourceFilename   string
 	ArtifactFilename string
-	BuildFlags     []string
-	RunFlags       []string
-	BuildLimits    config.LimitsDef
-	RunLimits      config.LimitsDef
-	Tests          []TestCase
+	BuildFlags       []string
+	RunFlags         []string
+	BuildLimits      config.LimitsDef
+	RunLimits        config.LimitsDef
+	Tests            []TestCase
 }
 
 // TestCase is one stdin/expected_stdout pair.
@@ -51,10 +51,10 @@ type TestCase struct {
 
 // Job orchestrates one code execution: build (optional) + all tests.
 type Job struct {
-	req        JobRequest
-	lang       *config.LanguageDef
-	ws         *sandbox.Workspace
-	cfg        JobConfig
+	req  JobRequest
+	lang *config.LanguageDef
+	ws   *sandbox.Workspace
+	cfg  JobConfig
 }
 
 // JobConfig holds server-level settings needed by the job.
@@ -175,7 +175,7 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 		}
 
 		result, runErr := sandbox.Run(ctx, rcfg)
-		f.Close()
+		_ = f.Close()
 
 		if runErr != nil {
 			results[i] = TestResult{Status: validate.StatusInternalError}
@@ -266,4 +266,3 @@ func buildBindMounts(lang *config.LanguageDef) []string {
 	}
 	return mounts
 }
-
