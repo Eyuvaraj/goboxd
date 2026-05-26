@@ -420,6 +420,24 @@ func TestRustHelloWorld(t *testing.T) {
 	}
 }
 
+func TestGoHelloWorld(t *testing.T) {
+	src := `package main
+import "fmt"
+func main() { fmt.Println("hello") }
+`
+	resp, code := postRun(t, runRequest{
+		Language: "go",
+		Source:   src,
+		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
+	})
+	if code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", code)
+	}
+	if resp.Status != "accepted" {
+		t.Fatalf("expected accepted, got %s (build: %s)", resp.Status, resp.Build.Status)
+	}
+}
+
 func TestOCamlHelloWorld(t *testing.T) {
 	src := `print_string "hello\n";;` + "\n"
 	resp, code := postRun(t, runRequest{

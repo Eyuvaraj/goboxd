@@ -118,6 +118,8 @@ type RunConfig struct {
 	MaxOutputBytes int64
 	// BindMounts are additional read-only bind mounts: "host:container".
 	BindMounts []string
+	// Env is a list of extra "KEY=VALUE" environment variables for this invocation.
+	Env []string
 }
 
 // RunResult holds the captured output of one nsjail invocation.
@@ -236,6 +238,11 @@ func buildArgv(cfg RunConfig) []string {
 		"--env", "HOME=/",
 		"--env", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 	)
+
+	// Per-language extra env vars (e.g. GO111MODULE=off for Go).
+	for _, e := range cfg.Env {
+		argv = append(argv, "--env", e)
+	}
 
 	if cfg.Limits.WallTimeS > 0 {
 		argv = append(argv, "--time_limit", fmt.Sprintf("%d", cfg.Limits.WallTimeS))

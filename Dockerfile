@@ -53,6 +53,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         rustc \
         ocaml \
         kotlin \
+        golang-go \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=nsjail-builder /usr/local/bin/nsjail /usr/local/bin/nsjail
@@ -71,7 +72,8 @@ RUN python3 --version \
     && lua5.4 -e 'print("ok")' \
     && rustc --version \
     && ocaml -version \
-    && kotlinc -version
+    && kotlinc -version \
+    && go version
 
 RUN mkdir -p /tmp/goboxd
 

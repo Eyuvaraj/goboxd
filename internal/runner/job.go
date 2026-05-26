@@ -98,6 +98,7 @@ func (j *Job) compile(ctx context.Context) BuildResult {
 		Args:           expandedArgs,
 		MaxOutputBytes: j.cfg.MaxOutputBytes,
 		BindMounts:     buildBindMounts(j.lang),
+		Env:            j.lang.Env,
 	}
 
 	result, err := sandbox.Run(ctx, rcfg)
@@ -172,6 +173,7 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 			Stdin:          f,
 			MaxOutputBytes: j.cfg.MaxOutputBytes,
 			BindMounts:     buildBindMounts(j.lang),
+			Env:            j.lang.Env,
 		}
 
 		result, runErr := sandbox.Run(ctx, rcfg)

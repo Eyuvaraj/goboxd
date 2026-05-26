@@ -30,6 +30,11 @@ type LanguageDef struct {
 	ArtifactFilename         string `yaml:"artifact_filename"`
 	ArtifactFilenameStrategy string `yaml:"artifact_filename_strategy"` // "" or "from_request"
 
+	// Env is a list of extra "KEY=VALUE" environment variables injected into
+	// every nsjail invocation for this language (build and run phases).
+	// Use this for language-specific tunables (e.g. GO111MODULE=off for Go).
+	Env []string `yaml:"env"`
+
 	Build *PhaseDef `yaml:"build"` // nil for interpreted languages
 	Run   PhaseDef  `yaml:"run"`
 }

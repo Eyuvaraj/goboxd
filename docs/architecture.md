@@ -105,15 +105,24 @@ goboxd always calls nsjail as a pure `[]string` argv through `os/exec`. A repres
   --chroot /tmp/goboxd/goboxd-1234567890
   --user 65534 --group 65534
   --log_fd 3
-  --disable_clone_newnet
   --max_cpus 1
+  --rw                           # chroot is writable so compilers can write artifacts
+  --cwd /                        # working directory inside the jail
+  --detect_cgroupv2              # use cgroup v2 memory/pid limits when available
+  --rlimit_nofile 1000
+  --env TMP=/ --env TMPDIR=/ --env HOME=/
+  --env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
   --time_limit 10
-  --rlimit_as 512         (memory_kb / 1024)
+  --rlimit_cpu 10
+  --cgroup_mem_max 536870912     # memory_kb * 1024
+  --rlimit_as 512                # max(4 × memory_kb / 1024, 512) MiB virtual space
+  --cgroup_pids_max 100
   --rlimit_nproc 100
   --rlimit_fsize 100
-  -R /usr/bin -R /lib -R /lib64 -R /usr/lib
+  -R /bin -R /usr -R /lib -R /etc -R /dev -R /var
+  --seccomp_string 'POLICY goboxd_safe { KILL_PROCESS { ptrace, bpf, ... } } USE goboxd_safe DEFAULT ALLOW'
   --
   /usr/bin/g++ -O2 -o solution solution.cpp
 ```
 
-No shell, no string interpolation into a shell command, no `exec.Command("sh", "-c", ...)`.
+No shell, no string interpolation into a shell command, no `exec.Command("sh", "-c", ...")`.

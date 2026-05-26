@@ -25,6 +25,7 @@ goboxd is configured entirely through `configs/languages.yaml`. No Go code chang
 | `rust` | Rust | Compiled (rustc) |
 | `kotlin` | Kotlin | Compiled (kotlinc → JVM) |
 | `ocaml` | OCaml | Interpreted (ocaml) |
+| `go` | Go | Compiled (go build) |
 
 ## YAML schema
 
@@ -69,48 +70,61 @@ languages:
 
 Templates are expanded per-element in the args array — never through a shell. A `{{flags}}` element is replaced by zero or more individual flag arguments.
 
-## Adding a language (example: Go)
+## Adding a language (example: PHP)
 
-1. **Add install script** `scripts/lang_install/go.sh`:
+1. **Add install script** `scripts/lang_install/php.sh`:
    ```bash
    #!/usr/bin/env bash
    set -euo pipefail
-   apt-get install -y --no-install-recommends golang-go
-   go version
+   apt-get install -y --no-install-recommends php-cli
+   php --version
    ```
 
 2. **Add to `Dockerfile`** (in the `runtime` stage apt-get block):
    ```dockerfile
-   golang-go \
+   php-cli \
    ```
    And a smoke test line:
    ```dockerfile
-   && go version \
+   && php --version \
    ```
 
 3. **Add to `configs/languages.yaml`**:
    ```yaml
-   - id: go
-     name: Go
-     source_filename: solution.go
-     artifact_filename: solution
-     build:
-       cmd: /usr/bin/go
-       args: ["build", "-o", "{{artifact}}", "{{source}}"]
-       limits:
-         wall_time_s: 20
-         memory_kb: 524288
-         max_processes: 100
-       flag_allowlist: []
+   - id: php
+     name: PHP
+     source_filename: solution.php
      run:
-       cmd: /solution
-       args: []
+       cmd: /usr/bin/php
+       args: ["{{source}}"]
        limits:
-         wall_time_s: 5
-         memory_kb: 262144
-         max_processes: 64
+         wall_time_s: 10
+         memory_kb: 131072
+         max_processes: 50
    ```
 
 4. **Rebuild the image.** `/readyz` and `/info` reflect the new language automatically.
 
-**Time estimate: under 30 minutes. No Go code change.**
+**Time estimate: under 15 minutes. No Go code change.**
+
+## The `env` field
+
+Some languages require specific environment variables to work inside the sandbox (e.g. Go needs `GO111MODULE=off` to compile without a module file). Add them at the language level:
+
+```yaml
+- id: go
+  name: Go
+  source_filename: solution.go
+  artifact_filename: solution
+  env:
+    - GO111MODULE=off
+    - CGO_ENABLED=0
+    - GOPATH=/
+    - GOCACHE=/.cache/go-build
+  build:
+    cmd: /usr/bin/go
+    args: ["build", "-o", "{{artifact}}", "{{source}}"]
+    ...
+```
+
+These are injected as `--env KEY=VALUE` arguments to every nsjail invocation for that language. The standard sandbox env (`HOME`, `PATH`, `TMP`) is always present; `env` entries are appended after it.
