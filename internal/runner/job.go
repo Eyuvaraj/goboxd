@@ -192,10 +192,11 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 			stderr += "\n[nsjail]\n" + string(result.Log)
 		}
 		results[i] = TestResult{
-			Status:     status,
-			Stdout:     string(result.Stdout),
-			Stderr:     stderr,
-			DurationMs: result.DurationMs,
+			Status:       status,
+			Stdout:       string(result.Stdout),
+			Stderr:       stderr,
+			DurationMs:   result.DurationMs,
+			MemoryPeakKB: result.MemoryPeakKB,
 		}
 	}
 	return results

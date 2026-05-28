@@ -34,7 +34,7 @@ The container must run with `--privileged` (already set in docker-compose.yml) f
 | `GET`  | `/info`    | Build info, language list, limits, live stats |
 | `POST` | `/run`     | Execute source code against test cases |
 
-HTTP 200 is returned for all structurally valid requests. Execution outcomes are in the response body. Only 400 (validation), 500 (server fault), and 503 (cancelled) are HTTP-level errors. See [docs/api.md](docs/api.md) for the full schema.
+HTTP 200 is returned for all structurally valid requests. Execution outcomes are in the response body. Only 400 (validation), 500 (server fault), and 503 (cancelled) are HTTP-level errors. See [docs/swagger.yaml](docs/swagger.yaml) for the full schema.
 
 ## Languages
 
@@ -59,9 +59,9 @@ Adding a language is one YAML block in `configs/languages.yaml` plus a toolchain
 
 ## Docs
 
-- [docs/api.md](docs/api.md) — full API contract and error codes
+- [docs/swagger.yaml](docs/swagger.yaml) — full API contract and error codes (Swagger/OpenAPI)
 - [docs/architecture.md](docs/architecture.md) — package layout, request lifecycle, concurrency model
-- [docs/security.md](docs/security.md) — seven security holes and where each is fixed
+- [docs/security.md](docs/security.md) — seven security holes, their fixes, and seccomp hardening
 - [docs/languages.md](docs/languages.md) — language registry schema
 - [docs/benchmarks.md](docs/benchmarks.md) — load-test results
 

@@ -16,6 +16,7 @@ import (
 	_ "github.com/thesouldev/goboxd/docs" // generated swagger spec
 	"github.com/thesouldev/goboxd/internal/config"
 	"github.com/thesouldev/goboxd/internal/handler"
+	"github.com/thesouldev/goboxd/internal/playground"
 	"github.com/thesouldev/goboxd/internal/registry"
 	"github.com/thesouldev/goboxd/internal/runner"
 	"github.com/thesouldev/goboxd/internal/sandbox"
@@ -64,6 +65,10 @@ func main() {
 	r.Get("/readyz", healthH.Readyz)
 	r.Get("/info", healthH.Info)
 	r.Post("/run", runH.ServeHTTP)
+
+	// Playground SPA
+	r.Handle("/", http.RedirectHandler("/playground/", http.StatusFound))
+	r.Mount("/playground/", http.StripPrefix("/playground/", playground.Handler()))
 
 	// Swagger UI — served at /docs/  (e.g. http://localhost:8080/docs/index.html)
 	r.Get("/docs/*", httpSwagger.WrapHandler)

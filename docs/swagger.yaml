@@ -242,6 +242,9 @@ definitions:
       last_internal_error_at:
         example: "2024-01-15T10:30:00Z"
         type: string
+      queue_size:
+        example: 0
+        type: integer
     type: object
   handler.TestCase:
     properties:

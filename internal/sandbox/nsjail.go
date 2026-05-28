@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -139,21 +140,32 @@ type RunConfig struct {
 	BindMounts []string
 	// Env is a list of extra "KEY=VALUE" environment variables for this invocation.
 	Env []string
+	// CgroupParent is the cgroup v2 directory name for this job.
+	CgroupParent string
 }
 
 // RunResult holds the captured output of one nsjail invocation.
 type RunResult struct {
-	Stdout     []byte
-	Stderr     []byte
-	Log        []byte // nsjail's own diagnostic output (--log_fd 3)
-	ExitCode   int
-	DurationMs int64
-	Truncated  bool
+	Stdout       []byte
+	Stderr       []byte
+	Log          []byte // nsjail's own diagnostic output (--log_fd 3)
+	ExitCode     int
+	DurationMs   int64
+	Truncated    bool
+	MemoryPeakKB int64
 }
 
 // Run executes cmd inside an nsjail sandbox and returns the result.
 // It never uses a shell — argv is built as a pure []string.
 func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
+	// Generate a unique cgroup parent for this run to track memory peak.
+	cfg.CgroupParent = fmt.Sprintf("goboxd-%d", time.Now().UnixNano())
+
+	// Create the cgroup directory so nsjail can use it and we can read it later.
+	cgroupPath := filepath.Join("/sys/fs/cgroup", cfg.CgroupParent)
+	_ = os.Mkdir(cgroupPath, 0o755)
+	defer func() { _ = os.Remove(cgroupPath) }()
+
 	argv := buildArgv(cfg)
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 
@@ -222,13 +234,23 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 		stdout = append(stdout, []byte(truncationMarker)...)
 	}
 
+	// Read peak memory from cgroup v2
+	var peakKB int64
+	if peakBytes, err := os.ReadFile(filepath.Join(cgroupPath, "memory.peak")); err == nil {
+		var peak int64
+		if _, err := fmt.Sscanf(string(bytes.TrimSpace(peakBytes)), "%d", &peak); err == nil {
+			peakKB = peak / 1024
+		}
+	}
+
 	return RunResult{
-		Stdout:     stdout,
-		Stderr:     stderrBuf.Bytes(),
-		Log:        logBuf.Bytes(),
-		ExitCode:   exitCode,
-		DurationMs: durationMs,
-		Truncated:  truncated,
+		Stdout:       stdout,
+		Stderr:       stderrBuf.Bytes(),
+		Log:          logBuf.Bytes(),
+		ExitCode:     exitCode,
+		DurationMs:   durationMs,
+		Truncated:    truncated,
+		MemoryPeakKB: peakKB,
 	}, nil
 }
 
@@ -252,6 +274,8 @@ func buildArgv(cfg RunConfig) []string {
 		// Use cgroup v2 when available (host must mount /sys/fs/cgroup as cgroup2;
 		// docker-compose sets cgroupns: host for this).
 		"--detect_cgroupv2",
+		"--cgroupv2_mount", "/sys/fs/cgroup",
+		"--cgroup_mem_parent", cfg.CgroupParent,
 		// File-descriptor cap; Python and javac open many fds at startup.
 		"--rlimit_nofile", "1000",
 		// Core dumps disabled: saves disk space and prevents source-code leakage

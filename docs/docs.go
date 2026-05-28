@@ -472,6 +472,10 @@ const docTemplate = `{
                 "last_internal_error_at": {
                     "type": "string",
                     "example": "2024-01-15T10:30:00Z"
+                },
+                "queue_size": {
+                    "type": "integer",
+                    "example": 0
                 }
             }
         },

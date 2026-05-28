@@ -1,128 +1,154 @@
 # Architecture
 
-goboxd is a small HTTP service that accepts untrusted source code, compiles or interprets it inside an nsjail sandbox, and returns per-test execution results.
+`goboxd` is a lightweight HTTP service that securely accepts untrusted source code, compiles or interprets it inside an `nsjail` sandbox, and returns per-test execution results.
 
-## Request lifecycle
+---
 
-```
-POST /run
-  │
-  ├─ middleware stack
-  │    ├─ RequestID         generate / propagate X-Request-Id
-  │    ├─ Recoverer         catch panics, log, return 500
-  │    ├─ BodyLimit         http.MaxBytesReader — 413 before any parsing
-  │    └─ StructuredLogger  one JSON log line per request when done
-  │
-  ├─ handler/run.go
-  │    ├─ decode JSON body (400 on bad JSON)
-  │    ├─ validate language (400 unknown)
-  │    ├─ validate source size (400 too large)
-  │    ├─ validate filenames (400 traversal / bad chars)
-  │    ├─ validate flags against per-language allowlist (400 disallowed)
-  │    └─ validate test count and stdin sizes (400)
-  │
-  ├─ runner.Submit(ctx, req)
-  │    ├─ acquire semaphore slot (blocks if at max_concurrent_jobs)
-  │    ├─ sandbox.NewWorkspace() — os.MkdirTemp, atomic
-  │    ├─ defer ws.Cleanup()
-  │    │
-  │    ├─ job.compile(ctx)
-  │    │    ├─ (interpreted: return {status:"ok"} immediately)
-  │    │    ├─ os.WriteFile(source)
-  │    │    ├─ sandbox.Run() — nsjail argv as []string, no shell
-  │    │    └─ parse exit code + stderr → build.status
-  │    │
-  │    └─ job.runTests(ctx, buildStatus)
-  │         ├─ (build failed: all tests → not_executed)
-  │         ├─ for each test:
-  │         │    ├─ os.WriteFile(stdin)
-  │         │    ├─ sandbox.Run() — io.LimitReader on stdout
-  │         │    └─ compare stdout → accepted / whitespace_mismatch / wrong_output / ...
-  │         └─ release semaphore slot
-  │
-  └─ aggregate top-level status → JSON 200
-```
+## Request Lifecycle
 
-## Package layout
+The diagram below illustrates the journey of a single `POST /run` request through the system.
 
-```
-cmd/goboxd/         entry point — wire config, registry, runner, router
-internal/
-  config/           ServerConfig (env vars), LanguageDef YAML schema
-  registry/         load + validate YAML, language lookup, readiness probes
-  validate/         filename rules, flag allowlist, size limits, status constants
-  sandbox/          nsjail argv builder, workspace (tempdir), output capping
-  runner/           bounded semaphore, job lifecycle, status aggregation
-  handler/          HTTP handlers (/run, /healthz, /readyz, /info), middleware
-  stats/            atomic counters for /info
-configs/
-  languages.yaml    all language definitions — no Go change to add a language
-tests/integration/  end-to-end tests (build tag: integration)
-scripts/
-  lang_install/     per-language toolchain install scripts
-  load_test.sh      hey / k6 benchmark
-docs/               api, languages, security, benchmarks, architecture
+```mermaid
+flowchart TD
+    Req[POST /run] --> MW[Middleware Stack]
+    
+    subgraph Middleware Stack
+        MW_RID[RequestID: Generate/Propagate]
+        MW_Rec[Recoverer: Catch panics]
+        MW_Body[BodyLimit: MaxBytesReader]
+        MW_Log[StructuredLogger: JSON log line]
+        
+        MW_RID --> MW_Rec --> MW_Body --> MW_Log
+    end
+    
+    MW --> Handler[handler/run.go]
+    
+    subgraph Handler Validation
+        H_Parse[Decode JSON body]
+        H_Lang[Validate language]
+        H_Size[Validate sizes]
+        H_Files[Validate filenames]
+        H_Flags[Validate flags]
+        
+        H_Parse --> H_Lang --> H_Size --> H_Files --> H_Flags
+    end
+    
+    Handler --> Runner[runner.Submit]
+    
+    subgraph Runner Execution
+        R_Sem[Acquire semaphore slot]
+        R_WS[sandbox.NewWorkspace: MkdirTemp]
+        R_Def[Defer ws.Cleanup]
+        
+        R_Sem --> R_WS --> R_Def
+        
+        R_Def --> R_Comp[job.compile]
+        R_Comp -.-> |Interpreted| R_Ok[Return OK]
+        R_Comp --> R_CompRun[sandbox.Run: Build]
+        
+        R_CompRun --> R_Test[job.runTests]
+        R_Test --> R_TestRun[sandbox.Run: Test]
+        
+        R_TestRun --> R_Rel[Release semaphore slot]
+    end
+    
+    Runner --> Resp[Aggregate status -> JSON 200]
 ```
 
-## Concurrency model
+---
 
-A single buffered channel of `struct{}` (capacity = `MAX_CONCURRENT_JOBS`, default `runtime.NumCPU()`) acts as the semaphore. `runner.Submit()` blocks on a channel receive until a slot is available, then returns the slot when the job finishes. This means:
+## Package Layout
 
-- Requests queue rather than fail when the service is at capacity.
-- The in-flight count stays bounded regardless of request rate.
-- Each slot corresponds to exactly one live nsjail process (for compiled languages) or one set of nsjail test processes.
+The project follows a standard Go directory structure, separating the entry point, internal packages, and external configurations.
 
-Per-test execution is sequential within a job. Parallel test execution was considered but rejected: sequential is safer (deterministic file layout, no race on workspace files), and the limiting factor is nsjail process startup, not Go goroutines.
+- **`cmd/goboxd/`**: The main entry point. Wires the configuration, registry, runner, and router.
+- **`internal/`**: Core application logic.
+  - `config/`: Configuration schemas (e.g., Environment variables, `LanguageDef`).
+  - `registry/`: YAML loading, language lookup, and readiness probes.
+  - `validate/`: Validation logic for filenames, flags, and size limits.
+  - `sandbox/`: `nsjail` integration, temporary workspaces, and output capping.
+  - `runner/`: Concurrency semaphore, job lifecycle management, and status aggregation.
+  - `handler/`: HTTP handlers (`/run`, `/healthz`, `/readyz`, `/info`) and middleware.
+  - `stats/`: Atomic counters for server statistics.
+- **`configs/`**: Contains `languages.yaml`, defining all supported languages.
+- **`tests/integration/`**: End-to-end integration tests (requires `integration` build tag).
+- **`scripts/`**: Helper scripts.
+  - `lang_install/`: Scripts to install toolchains inside the Docker image.
+  - `load_test.sh`: Load testing scripts (`hey` / `k6`).
+- **`docs/`**: Documentation files (architecture, security, API, etc.).
 
-## Adding a language
+---
 
-1. Add one entry to `configs/languages.yaml` (see `docs/languages.md` for the schema).
-2. Add `scripts/lang_install/<language>.sh` to install the toolchain in the Docker image.
-3. Add the toolchain install call to `Dockerfile` (or the install script to the `RUN` block).
-4. Rebuild the image. `/readyz` and `/info` will reflect the new language automatically.
+## Concurrency Model
 
-No Go code change is required unless the language needs custom argument expansion logic beyond `{{source}}`, `{{artifact}}`, and `{{flags}}`.
+`goboxd` employs a bounded concurrency model using a buffered channel semaphore. 
 
-## Security model
+- **Capacity**: Defined by `MAX_CONCURRENT_JOBS` (defaults to `runtime.NumCPU()`).
+- **Behavior**: `runner.Submit()` blocks until a slot is available. 
+- **Benefits**:
+  - Requests queue instead of failing when the service reaches capacity.
+  - The number of in-flight `nsjail` processes remains strictly bounded.
+  - Prevents host exhaustion.
 
-See `docs/security.md` for the full breakdown of the seven holes from the reference and where each is fixed. The short summary:
+> **Note on Test Execution:** Per-test execution is sequential within a job. Parallel test execution was considered but rejected because sequential execution guarantees a deterministic file layout, avoids workspace race conditions, and `nsjail` process startup (not goroutines) is the primary bottleneck.
 
-| Layer | What is protected |
-|-------|-------------------|
-| HTTP middleware | request body size (hole #4 partial) |
-| handler/run.go | filename validation (#1), flag allowlist (#3), source/stdin sizes (#4) |
-| sandbox/workspace.go | atomic tempdir (#5), pure-Go cleanup (#2), startup orphan sweep (#7) |
-| sandbox/nsjail.go | output cap (#6), pure argv slice — no shell (#2) |
-| runner/runner.go | deferred cleanup on every exit path (#7) |
+---
 
-## nsjail invocation
+## Adding a New Language
 
-goboxd always calls nsjail as a pure `[]string` argv through `os/exec`. A representative build invocation for C++:
+Adding a language requires **no Go code changes**, provided the language fits the existing templates (`{{source}}`, `{{artifact}}`, `{{flags}}`).
 
-```
-/usr/local/bin/nsjail
-  --mode o
-  --chroot /tmp/goboxd/goboxd-1234567890
-  --user 65534 --group 65534
-  --log_fd 3
-  --max_cpus 1
-  --rw                           # chroot is writable so compilers can write artifacts
-  --cwd /                        # working directory inside the jail
-  --detect_cgroupv2              # use cgroup v2 memory/pid limits when available
-  --rlimit_nofile 1000
-  --env TMP=/ --env TMPDIR=/ --env HOME=/
-  --env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-  --time_limit 10
-  --rlimit_cpu 10
-  --cgroup_mem_max 536870912     # memory_kb * 1024
-  --rlimit_as 512                # max(4 × memory_kb / 1024, 512) MiB virtual space
-  --cgroup_pids_max 100
-  --rlimit_nproc 100
-  --rlimit_fsize 100
-  -R /bin -R /usr -R /lib -R /etc -R /dev -R /var
-  --seccomp_string 'POLICY goboxd_safe { KILL_PROCESS { ptrace, bpf, ... } } USE goboxd_safe DEFAULT ALLOW'
-  --
+1. **Define**: Add an entry to `configs/languages.yaml` (see [Languages Documentation](languages.md)).
+2. **Script**: Create `scripts/lang_install/<language>.sh` to install the toolchain.
+3. **Dockerfile**: Include the install script in the `Dockerfile`.
+4. **Deploy**: Rebuild the Docker image. `/readyz` and `/info` will automatically detect and reflect the new language.
+
+---
+
+## Security Model
+
+The sandbox was designed specifically to address seven known vulnerabilities from older systems. For a detailed breakdown, see the [Security Documentation](security.md) and [Loopholes Documentation](loopholes.md).
+
+| Layer | Protections Applied |
+|-------|---------------------|
+| **HTTP Middleware** | Request body size limits. |
+| **Handler (`run.go`)** | Filename validation, strict flag allowlisting, source/stdin size checks. |
+| **Workspace (`workspace.go`)**| Atomic temporary directories, pure-Go cleanup, startup orphan sweeps. |
+| **Sandbox (`nsjail.go`)** | Output capping, pure `[]string` argument arrays (no shell interpretation), seccomp policies. |
+| **Runner (`runner.go`)** | Guaranteed deferred cleanup on every exit path. |
+
+---
+
+## `nsjail` Invocation
+
+`goboxd` invokes `nsjail` as a pure `[]string` slice via `os/exec`, completely bypassing the shell. 
+
+Below is a representative invocation for compiling C++:
+
+```bash
+/usr/local/bin/nsjail \
+  --mode o \
+  --chroot /tmp/goboxd/goboxd-1234567890 \
+  --user 65534 --group 65534 \
+  --log_fd 3 \
+  --max_cpus 1 \
+  --rw \
+  --cwd / \
+  --detect_cgroupv2 \
+  --rlimit_nofile 1000 \
+  --env TMP=/ --env TMPDIR=/ --env HOME=/ \
+  --env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  --time_limit 10 \
+  --rlimit_cpu 10 \
+  --cgroup_mem_max 536870912 \
+  --rlimit_as 512 \
+  --cgroup_pids_max 100 \
+  --rlimit_nproc 100 \
+  --rlimit_fsize 100 \
+  -R /bin -R /usr -R /lib -R /etc -R /dev -R /var \
+  --seccomp_string 'POLICY goboxd_safe { KILL_PROCESS { ptrace, bpf, ... } } USE goboxd_safe DEFAULT ALLOW' \
+  -- \
   /usr/bin/g++ -O2 -o solution solution.cpp
 ```
 
-No shell, no string interpolation into a shell command, no `exec.Command("sh", "-c", ...")`.
+> **Key Takeaway**: There is no shell interpolation (`sh -c`) anywhere in the execution pipeline, eliminating shell injection vulnerabilities.

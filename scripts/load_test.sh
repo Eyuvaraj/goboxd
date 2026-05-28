@@ -5,6 +5,19 @@
 
 set -euo pipefail
 
+# Add Go binary path to PATH if hey/k6 is not immediately available
+if ! command -v hey &>/dev/null && ! command -v k6 &>/dev/null; then
+  if command -v go &>/dev/null; then
+    GOPATH_BIN="$(go env GOPATH)/bin"
+    if [ -d "$GOPATH_BIN" ]; then
+      export PATH="$GOPATH_BIN:$PATH"
+    fi
+  fi
+  if [ -d "$HOME/go/bin" ]; then
+    export PATH="$HOME/go/bin:$PATH"
+  fi
+fi
+
 HOST="${1:-http://localhost:8080}"
 ENDPOINT="${HOST}/run"
 

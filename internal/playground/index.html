@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>goboxd - Premium Sandbox</title>
+  
+  <!-- Modern Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 15% 50%, #1e293b, #0f172a);
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+      
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      
+      --accent-1: #3b82f6;
+      --accent-2: #8b5cf6;
+      
+      --radius-lg: 16px;
+      --radius-md: 8px;
+      
+      --font-sans: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Navbar */
+    .navbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.25rem 2rem;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--glass-border);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .brand-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(to right, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-meta {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      padding-left: 1.5rem;
+      border-left: 1px solid var(--glass-border);
+    }
+    
+    .brand-meta a {
+      color: #60a5fa;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .brand-meta a:hover {
+      color: #93c5fd;
+    }
+
+    .stats-pill {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      padding: 0.5rem 1rem;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    
+    .stats-pill span {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+    }
+
+    /* Main Layout */
+    .workspace {
+      flex: 1;
+      display: flex;
+      gap: 1.5rem;
+      padding: 1.5rem;
+      overflow: hidden;
+    }
+
+    .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--glass-shadow);
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+    .panel:hover {
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--glass-border);
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    .panel-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Form Elements */
+    select {
+      appearance: none;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--glass-border);
+      color: var(--text-main);
+      padding: 0.5rem 2.5rem 0.5rem 1rem;
+      border-radius: var(--radius-md);
+      font-family: var(--font-sans);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.75rem center;
+    }
+    select:hover, select:focus {
+      border-color: rgba(255, 255, 255, 0.2);
+      background-color: rgba(0, 0, 0, 0.3);
+    }
+
+    button.btn-primary {
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      color: white;
+      border: none;
+      padding: 0.6rem 1.5rem;
+      border-radius: var(--radius-md);
+      font-family: var(--font-sans);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    }
+    button.btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+    }
+    button.btn-primary:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+    button.btn-primary:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      filter: grayscale(0.5);
+    }
+
+    /* Editor Area */
+    .editor-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: #e2e8f0;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      padding: 1.5rem;
+      resize: none;
+      outline: none;
+    }
+    textarea::placeholder {
+      color: rgba(148, 163, 184, 0.3);
+    }
+
+    /* Right Panel specific */
+    .io-grid {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: 1px;
+      background: var(--glass-border);
+      height: 40%;
+      min-height: 200px;
+    }
+
+    .io-box {
+      background: rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .io-header {
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--glass-border);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .io-box textarea {
+      padding: 1rem;
+      font-size: 0.85rem;
+    }
+
+    .terminal-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: rgba(0, 0, 0, 0.3);
+      border-top: 1px solid var(--glass-border);
+    }
+    
+    .terminal-output {
+      flex: 1;
+      padding: 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #a78bfa;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Status Badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.75rem;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      opacity: 0;
+      transform: translateY(-5px);
+      transition: all 0.3s ease;
+    }
+    .status-badge.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .badge-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-error { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-pending { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  </style>
+  <link rel="icon" href="/favicon.svg">
+</head>
+<body>
+  
+  <nav class="navbar">
+    <div class="brand">
+      <h1 class="brand-title">goboxd</h1>
+      <div class="brand-meta">
+        by Team <a href="https://github.com/Eyuvaraj/goboxd" target="_blank">Eyuvaraj</a>
+      </div>
+    </div>
+    
+    <div class="stats-pill" id="statsBar">
+      <span title="System Status"><div class="status-dot"></div> <span id="sysStatus">Connecting...</span></span>
+      <span style="opacity:0.3">|</span>
+      <span title="Jobs In Flight / Max Jobs">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <span id="sysJobs">0</span> / <span id="sysMaxJobs">-</span>
+      </span>
+      <span style="opacity:0.3">|</span>
+      <span title="Total Jobs Processed">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span id="sysTotal">0</span>
+      </span>
+      <span style="opacity:0.3">|</span>
+      <span title="Build Version" id="sysVersion">v-</span>
+    </div>
+    
+    <div>
+      <button class="btn-primary" id="runBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        Run Code
+      </button>
+    </div>
+  </nav>
+
+  <div class="workspace">
+    
+    <!-- Code Editor Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Source Code</div>
+        <select id="language"></select>
+      </div>
+      <div class="editor-container">
+        <textarea id="source" spellcheck="false" placeholder="Write your code here..."></textarea>
+      </div>
+    </div>
+
+    <!-- I/O and Output Panel -->
+    <div class="panel">
+      
+      <div class="io-grid">
+        <div class="io-box">
+          <div class="io-header">Standard Input (stdin)</div>
+          <textarea id="stdin" spellcheck="false" placeholder="Input string to pass to the program..."></textarea>
+        </div>
+        <div class="io-box">
+          <div class="io-header">Expected Output 
+            <span style="font-weight: 400; opacity: 0.5;">(Optional)</span>
+          </div>
+          <textarea id="expected" spellcheck="false" placeholder="Leave blank if you don't want to assert output..."></textarea>
+        </div>
+      </div>
+
+      <div class="terminal-container">
+        <div class="panel-header">
+          <div class="panel-title">Execution Terminal</div>
+          <div id="statusBadge" class="status-badge"></div>
+        </div>
+        <div id="output" class="terminal-output" style="color: rgba(255,255,255,0.4);">Ready. Select a language and hit 'Run Code'.</div>
+      </div>
+      
+    </div>
+  </div>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+    const api = { info: '/info', run: '/run' };
+
+    const templates = {
+      py3: "print('Hello from goboxd!')\n# print(input())",
+      bash: "echo 'Hello from goboxd!'",
+      js: "console.log('Hello from goboxd!');",
+      c: "#include <stdio.h>\n\nint main() {\n    printf(\"Hello from goboxd!\\n\");\n    return 0;\n}",
+      cpp: "#include <iostream>\n\nint main() {\n    std::cout << \"Hello from goboxd!\\n\";\n    return 0;\n}",
+      go: "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"Hello from goboxd!\")\n}"
+    };
+
+    function setTemplate() {
+      const lang = el('language').value;
+      el('source').value = templates[lang] || "";
+    }
+
+    async function fetchSystemInfo() {
+      try {
+        const res = await fetch(api.info);
+        if (!res.ok) throw new Error("Fetch failed");
+        const data = await res.json();
+        
+        const select = el('language');
+        if (select.children.length === 0) {
+          data.languages.forEach(lang => {
+            const opt = document.createElement('option');
+            opt.value = lang.id;
+            opt.textContent = `${lang.name} (${lang.version})`;
+            select.appendChild(opt);
+          });
+          setTemplate();
+          select.addEventListener('change', setTemplate);
+        }
+
+        el('sysStatus').textContent = "Online";
+        el('sysStatus').style.color = "inherit";
+        document.querySelector('.status-dot').style.background = "#10b981";
+        document.querySelector('.status-dot').style.boxShadow = "0 0 10px rgba(16, 185, 129, 0.5)";
+        
+        el('sysJobs').textContent = data.stats.in_flight_jobs;
+        el('sysMaxJobs').textContent = data.limits.max_concurrent_jobs;
+        el('sysTotal').textContent = data.stats.jobs_total;
+        el('sysVersion').textContent = data.build_info.version;
+        
+      } catch (err) {
+        el('sysStatus').textContent = "Offline";
+        el('sysStatus').style.color = "#f87171";
+        document.querySelector('.status-dot').style.background = "#f87171";
+        document.querySelector('.status-dot').style.boxShadow = "0 0 10px rgba(239, 68, 68, 0.5)";
+      }
+    }
+
+    setInterval(fetchSystemInfo, 5000);
+    fetchSystemInfo();
+
+    el('runBtn').addEventListener('click', async () => {
+      const btn = el('runBtn');
+      const output = el('output');
+      const badge = el('statusBadge');
+      
+      btn.disabled = true;
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Running...`;
+      
+      // Setup spin animation for button icon dynamically
+      if(!document.getElementById('spinStyle')) {
+        const style = document.createElement('style');
+        style.id = 'spinStyle';
+        style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } } .spin { animation: spin 1s linear infinite; }`;
+        document.head.appendChild(style);
+      }
+      
+      badge.className = 'status-badge badge-pending show';
+      badge.textContent = 'EXECUTING';
+      output.style.color = 'rgba(255,255,255,0.6)';
+      output.textContent = 'Compiling and running in sandbox...';
+
+      const payload = {
+        language: el('language').value,
+        source: el('source').value,
+        tests: [{
+          stdin: el('stdin').value,
+          expected_stdout: el('expected').value
+        }]
+      };
+
+      try {
+        const start = performance.now();
+        const res = await fetch(api.run, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const ms = (performance.now() - start).toFixed(0);
+        const data = await res.json();
+        
+        output.style.color = '#f8fafc'; // reset text color for output
+
+        if (!res.ok) {
+          badge.className = 'status-badge badge-error show';
+          badge.textContent = 'API ERROR';
+          output.style.color = '#f87171';
+          output.textContent = JSON.stringify(data, null, 2);
+          return;
+        }
+
+        const isAccepted = data.status === 'accepted';
+        badge.className = `status-badge show ${isAccepted ? 'badge-success' : 'badge-error'}`;
+        badge.textContent = data.status.replace(/_/g, ' ').toUpperCase();
+
+        let outText = `⚡ Execution Time: ${ms}ms\n\n`;
+        
+        if (data.build && data.build.status !== 'ok') {
+          outText += `[BUILD FAILED in ${data.build.duration_ms}ms]\n\n${data.build.stderr || data.build.stdout}\n`;
+          output.style.color = '#f87171';
+        } else if (data.tests && data.tests.length > 0) {
+          const test = data.tests[0];
+          outText += `[TEST: ${test.status.toUpperCase()} | Mem: ${test.memory_peak_kb} KB | Time: ${test.duration_ms}ms]\n\n`;
+          
+          if (test.stdout) outText += `--- STDOUT ---\n${test.stdout}\n\n`;
+          if (test.stderr) outText += `--- STDERR ---\n${test.stderr}\n`;
+          
+          if (test.status !== 'accepted') output.style.color = '#fca5a5';
+          else output.style.color = '#a78bfa';
+        }
+
+        output.textContent = outText || "[No output returned from program]";
+        fetchSystemInfo();
+
+      } catch (err) {
+        badge.className = 'status-badge badge-error show';
+        badge.textContent = 'NETWORK ERROR';
+        output.style.color = '#f87171';
+        output.textContent = err.toString();
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run Code`;
+      }
+    });
+  </script>
+</body>
+</html>

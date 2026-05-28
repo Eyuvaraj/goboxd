@@ -1,98 +1,123 @@
-# Security
+# Security Overview
 
-Seven deliberate security holes exist in the Python reference (pyjail). All seven are closed in goboxd.
+`goboxd` operates in a highly adversarial environment where executing untrusted code is the primary feature. The architecture is explicitly designed to address vulnerabilities common in naive sandboxing implementations. 
 
-## Hole 1 — Path traversal via filename
-
-**Reference:** `code_manager.py:117–119` assigns the client-supplied `filename` directly to the language config with no validation. Values like `../../etc/passwd` or absolute paths escape the jail directory on the host.
-
-**Fix:** `internal/validate/request.go` — `validate.Filename()` rejects: empty, absolute paths, strings containing `/` or `\`, strings where `filepath.Base(s) != s`, leading dot, non-printable or non-ASCII characters, and strings longer than 64 characters.
-
-**Enforced at:** `internal/handler/run.go` — filenames from client are passed through `validate.Filename()` before use. Paths are always joined to the workspace directory with `filepath.Join(ws.Dir, filename)`.
+The original Python reference implementation (`pyjail`) deliberately included seven critical security loopholes for educational purposes. `goboxd` closes all of them.
 
 ---
 
-## Hole 2 — Shell-style directory commands
+## 1. Path Traversal via Filename
 
-**Reference:** `code_manager.py:103, 135, 193` creates and deletes per-request directories by formatting shell commands (`os.system(f"mkdir -p {self.root_directory}/proc")`, `os.system(f"rm -rf {self.root_directory}")`). Any special character in a path component can become a shell injection.
+**The Risk:** 
+If client-supplied filenames are not validated, a user could provide a path like `../../etc/passwd` to escape the sandboxed workspace and interact with host system files.
 
-**Fix:** `internal/sandbox/workspace.go` — `NewWorkspace()` uses `os.MkdirTemp()`, `Workspace.TestDir()` uses `os.MkdirAll()`, and `Workspace.Cleanup()` uses `os.RemoveAll()`. Zero shell invocations anywhere in the codebase for filesystem operations.
+**The Fix:** 
+The `validate.Filename()` function (in `internal/validate/request.go`) strictly enforces path safety. It explicitly rejects:
+- Empty strings
+- Absolute paths
+- Strings containing directory separators (`/` or `\`)
+- Strings where `filepath.Base(s) != s`
+- Leading dots (`.`)
+- Non-printable or non-ASCII characters
+- Strings exceeding 64 characters
 
----
-
-## Hole 3 — Compiler-flag injection
-
-**Reference:** `code_runner.py:168–172` joins client-supplied `extra_args` into the compiler argv with no filtering. Flags like `-fplugin=evil.so`, `-x c`, `-B/tmp`, `--specs=/tmp/bad`, `-Wl,-rpath,/tmp`, `@responsefile` give compile-time code execution.
-
-**Fix:** `internal/validate/request.go` — `validate.Flags()` checks every flag against a per-language `flag_allowlist` from `configs/languages.yaml`. Entries ending in `*` are treated as prefix matches (e.g. `-std=*` allows `-std=c++17`). Any flag not in the list is rejected with HTTP 400 `{"error":{"code":"invalid_flag",...}}`.
-
-**Enforced at:** `internal/handler/run.go` — build and run flags are validated before the job is submitted.
-
----
-
-## Hole 4 — No request size limits
-
-**Reference:** `server.py:45–52` — no `max_length` on the `message` argument. Source, testcase stdin, expected output, and evaluation script are all unbounded.
-
-**Fix (four layers):**
-1. **HTTP body:** `internal/handler/middleware.go` — `BodyLimit()` wraps `r.Body` with `http.MaxBytesReader(w, r.Body, maxBodyBytes)`. Oversized requests are rejected before any handler runs.
-2. **Source:** `internal/handler/run.go` — `validate.SourceSize()` checks `len(source) <= cfg.MaxSourceBytes` (default 256 KiB).
-3. **Stdin per test:** `validate.StdinSize()` checks each test's stdin.
-4. **Captured output:** `internal/sandbox/nsjail.go` — `Run()` wraps the child stdout pipe with `io.LimitReader(stdoutPipe, maxOutputBytes+1)`. If the limit is exceeded, output is truncated and `\n[output truncated]` is appended.
+**Enforcement Location:** `internal/handler/run.go` processes all filenames through this validator before appending them to the workspace root via `filepath.Join(ws.Dir, filename)`.
 
 ---
 
-## Hole 5 — UID collisions under load
+## 2. Shell-style Directory Commands
 
-**Reference:** `code_manager.py:74–76` picks a UID from a 30 000-wide range and retries only three times on collision. Under concurrent load, two requests can share the same directory, causing one to overwrite the other's source or stdin.
+**The Risk:** 
+Using shell commands (e.g., `os.system("rm -rf " + dir)`) to manipulate directories introduces shell injection if the directory path contains special characters.
 
-**Fix:** `internal/sandbox/workspace.go` — `NewWorkspace()` calls `os.MkdirTemp(jailDir, "goboxd-*")`. The OS kernel guarantees uniqueness atomically — no UID scheme, no collision possible regardless of concurrency.
-
----
-
-## Hole 6 — Unbounded child output
-
-**Reference:** `code_runner.py:301` reads the full child stdout into memory (`out, err = self.run_command(args)`). A program printing gigabytes of output can OOM the host process.
-
-**Fix:** `internal/sandbox/nsjail.go` — `Run()` reads stdout through `io.LimitReader(stdoutPipe, cfg.MaxOutputBytes+1)`. If more than `MaxOutputBytes` (default 256 KiB) are produced, reading stops and the captured output is truncated with a `\n[output truncated]` marker. The remaining pipe is drained to `io.Discard` so the child is not blocked.
+**The Fix:** 
+`goboxd` does not invoke the shell for any file operations. `NewWorkspace()` uses `os.MkdirTemp()`, `Workspace.TestDir()` uses `os.MkdirAll()`, and `Workspace.Cleanup()` relies on `os.RemoveAll()`. The absence of shell evaluation entirely neutralizes injection risks.
 
 ---
 
-## Additional hardening — Seccomp-bpf syscall filtering
+## 3. Compiler-Flag Injection
 
-Beyond closing the seven pyjail holes, goboxd adds a Kafel deny-list seccomp policy passed to nsjail via `--seccomp_string`.
+**The Risk:** 
+Permitting unvalidated compiler flags grants attackers compile-time code execution capabilities via malicious flags like `-fplugin=evil.so`, `-B/tmp`, `--specs=/tmp/bad`, or `@responsefile`.
 
-**File:** `internal/sandbox/nsjail.go` — `seccompPolicy` constant, applied in `buildArgv()`.
-
-**Approach:** `DEFAULT ALLOW` with a targeted `KILL_PROCESS` list. This is appropriate for a multi-language sandbox because enumerating every syscall needed by Python, Node, JVM, GCC, Rust, OCaml, etc. is fragile. The deny-list instead blocks only calls with no legitimate use in a sandboxed executor.
-
-`KILL_PROCESS` (not `KILL`) is used because `KILL` only terminates the calling thread — in a multi-threaded program, other threads would keep running. `KILL_PROCESS` tears down the whole process group.
-
-| Syscall(s) | Risk blocked |
-|---|---|
-| `ptrace`, `process_vm_readv/writev` | Cross-process memory inspection and writes |
-| `init_module`, `finit_module`, `delete_module` | Kernel module loading |
-| `kexec_load`, `kexec_file_load` | Replacing the running kernel |
-| `reboot` | System restart |
-| `settimeofday`, `adjtimex`, `clock_adjtime` | Host clock manipulation |
-| `mknod`, `mknodat` | Device node creation (chroot bypass) |
-| `chroot`, `pivot_root` | Filesystem-root change — escape nsjail's mount restrictions |
-| `unshare`, `setns` | Namespace manipulation — un-isolate network/PID/mount namespaces |
-| `io_uring_setup/enter/register` | Async I/O with multiple privilege-escalation CVEs; unused by all runtimes |
-| `userfaultfd` | Pause kernel page-fault handling — common in kernel exploit chains |
-| `name_to_handle_at`, `open_by_handle_at` | File-handle syscalls that can cross mount boundaries |
-| `acct` | Process accounting interference |
-| `bpf` | Load eBPF programs into the kernel |
-| `syslog` | Kernel ring-buffer read (information leak) |
-
-`perf_event_open` is **not** denied — the JVM uses it for profiling, and denying it would break Kotlin. Network syscalls (`socket`, `connect`, `bind`) are **not** denied at the seccomp level because nsjail's network namespace isolation already provides that guarantee.
+**The Fix:** 
+The `validate.Flags()` function validates every user-provided flag against a strict, per-language `flag_allowlist` defined in `configs/languages.yaml`. 
+- Prefix matching is supported (e.g., `-std=*` permits `-std=c++17`).
+- Any non-allowlisted flag results in an HTTP 400 Bad Request error.
 
 ---
 
-## Hole 7 — Stale jail directories
+## 4. Unbounded Request Sizes
 
-**Reference:** There is no `defer` or equivalent guaranteed-cleanup around the per-request directory lifecycle. A panic or early return between directory creation and cleanup leaks the directory permanently.
+**The Risk:** 
+Unbounded request payloads allow attackers to exhaust server memory and disk space.
 
-**Fix (two mechanisms):**
-1. **Deferred cleanup:** `internal/runner/runner.go` — `defer ws.Cleanup()` is set immediately after `sandbox.NewWorkspace()` returns. In Go, `defer` runs on every exit path including panics caught by `middleware.Recoverer`.
-2. **Startup sweep:** `internal/sandbox/workspace.go` — `SweepOrphans(jailDir, maxAge)` is called once in `cmd/goboxd/main.go` before the server starts. It removes any `goboxd-*` directories in `JailDir` whose modification time is older than `OrphanMaxAge` (default 30 minutes). This handles directories left over from a prior unclean shutdown.
+**The Fix (Four Layers):**
+1. **HTTP Body Limit:** `internal/handler/middleware.go` applies `http.MaxBytesReader` to terminate oversized requests before parsing begins.
+2. **Source Code Limit:** `internal/handler/run.go` enforces a maximum source file size (default 256 KiB).
+3. **Stdin Limit:** `validate.StdinSize()` limits individual test case inputs.
+4. **Output Capture Limit:** `internal/sandbox/nsjail.go` uses `io.LimitReader` to safely cap child process output. 
+
+---
+
+## 5. UID Collisions Under Load
+
+**The Risk:** 
+Relying on random UID generation for temporary directories creates collisions under concurrent load, leading to race conditions where one request overwrites another's workspace.
+
+**The Fix:** 
+`NewWorkspace()` uses `os.MkdirTemp(jailDir, "goboxd-*")`, delegating collision-free atomic directory creation directly to the OS kernel.
+
+---
+
+## 6. Unbounded Child Output Memory Exhaustion
+
+**The Risk:** 
+Buffering an unbounded process output directly into memory can trigger a host-side Out-Of-Memory (OOM) error if a script prints gigabytes of data.
+
+**The Fix:** 
+`nsjail.Run()` wraps the `stdout` pipe with an `io.LimitReader`. When the output limit (default 256 KiB) is reached, reading halts, the captured output is marked with `\n[output truncated]`, and the remainder of the pipe is drained to `io.Discard` so the process doesn't block.
+
+---
+
+## 7. Stale Jail Directories
+
+**The Risk:** 
+Failing to guarantee workspace cleanup on early returns or panics results in disk space exhaustion over time due to stale directories.
+
+**The Fix (Two Mechanisms):**
+1. **Deferred Cleanup:** `internal/runner/runner.go` immediately defers `ws.Cleanup()` after workspace creation, ensuring it runs on every exit path (including caught panics).
+2. **Startup Sweep:** On startup, `cmd/goboxd/main.go` invokes `SweepOrphans()` to clean out any legacy directories left over from prior unexpected terminations.
+
+---
+
+## Advanced Hardening: Seccomp-BPF Syscall Filtering
+
+Beyond architectural fixes, `goboxd` enhances `nsjail` with a custom Kafel seccomp policy via the `--seccomp_string` argument. 
+
+Instead of a fragile allowlist, `goboxd` utilizes a **targeted deny-list (`KILL_PROCESS`)**. This is vital for a multi-language sandbox, as enumerating every legitimate syscall across Node, JVM, GCC, Python, and Rust is impractical. 
+
+> **Note:** We use `KILL_PROCESS` (not `KILL`) to tear down the entire process group, preventing multi-threaded programs from surviving a restricted syscall.
+
+### Restricted Syscalls
+
+| Syscall(s) | Risk Mitigated |
+|------------|----------------|
+| `ptrace`, `process_vm_readv/writev` | Cross-process memory inspection and modification. |
+| `init_module`, `finit_module`, `delete_module` | Kernel module loading. |
+| `kexec_load`, `kexec_file_load` | Replacing the running kernel. |
+| `reboot` | Unauthorized system restarts. |
+| `settimeofday`, `adjtimex`, `clock_adjtime` | Host clock manipulation. |
+| `mknod`, `mknodat` | Device node creation (chroot bypass). |
+| `chroot`, `pivot_root` | Escaping `nsjail` mount restrictions. |
+| `unshare`, `setns` | Un-isolating network, PID, or mount namespaces. |
+| `io_uring_setup/enter/register` | Async I/O (frequent source of privilege escalation CVEs). |
+| `userfaultfd` | Kernel page-fault manipulation (common in exploit chains). |
+| `name_to_handle_at`, `open_by_handle_at` | Crossing mount boundaries via file handles. |
+| `acct` | Process accounting interference. |
+| `bpf` | Loading eBPF programs into the kernel. |
+| `syslog` | Reading the kernel ring-buffer (information leak). |
+
+**Permitted exceptions:**
+- `perf_event_open`: Not denied because the JVM (e.g., Kotlin) requires it for profiling.
+- Network syscalls (`socket`, `connect`, `bind`): Blocked at the `nsjail` network namespace level rather than via seccomp.
