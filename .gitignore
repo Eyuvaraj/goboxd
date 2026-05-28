@@ -39,8 +39,11 @@ go.work.sum
 .LSOverride
 
 # Claude Code session data
-.claude/
+.claude
+memory/
 
 # Build output
 /goboxd
 /out/
+
+COMPETITION.md

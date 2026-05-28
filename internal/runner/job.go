@@ -215,7 +215,10 @@ func compareOutput(result sandbox.RunResult, expected string) string {
 	if bytes.Equal(actual, exp) {
 		return validate.StatusAccepted
 	}
-	if bytes.Equal(bytes.TrimSpace(actual), bytes.TrimSpace(exp)) {
+	// Per spec: whitespace mismatch fires when outputs match after stripping trailing
+	// whitespace only (not leading). This catches the common print-adds-newline case
+	// without masking leading-whitespace differences (which are wrong_output).
+	if bytes.Equal(bytes.TrimRight(actual, " \t\r\n"), bytes.TrimRight(exp, " \t\r\n")) {
 		return validate.StatusWhitespaceMismatch
 	}
 	return validate.StatusWrongOutput
@@ -260,7 +263,13 @@ func buildBindMounts(lang *config.LanguageDef) []string {
 	if lang.Build != nil {
 		addIfNotCovered(lang.Build.Cmd)
 	}
-	addIfNotCovered(lang.Run.Cmd)
+	// For compiled languages, Run.Cmd is a per-job artifact path (e.g. /solution)
+	// that lives inside the chroot workspace, not on the host filesystem.
+	// Its filepath.Dir is "/", and bind-mounting "/" into the chroot causes an
+	// nsjail [E][ error (cannot mount the root over itself). Skip it.
+	if !lang.IsCompiled() {
+		addIfNotCovered(lang.Run.Cmd)
+	}
 
 	mounts := make([]string, 0, len(dirs))
 	for d := range dirs {

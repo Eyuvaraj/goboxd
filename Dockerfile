@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 ARG GO_VERSION=1.26
 ARG DEBIAN_VERSION=bookworm
 
@@ -40,6 +38,7 @@ RUN CGO_ENABLED=0 go build \
 FROM debian:${DEBIAN_VERSION}-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates libnl-route-3-200 libprotobuf32 \
+        wget \
         # In-scope language runtimes and compilers
         python3 \
         nodejs \

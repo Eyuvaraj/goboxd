@@ -9,6 +9,12 @@ services:
       - "8080:8080"
     privileged: true
     cgroup: host
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
 
   tools:
     build:
@@ -20,3 +26,8 @@ services:
     working_dir: /src
     profiles: ["tools"]
     entrypoint: []
+    environment:
+      - GOBOXD_URL=http://goboxd:8080
+    depends_on:
+      goboxd:
+        condition: service_healthy

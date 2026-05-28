@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -13,14 +14,19 @@ import (
 	"github.com/thesouldev/goboxd/internal/validate"
 )
 
+// Submitter abstracts runner.Runner.Submit to allow dependency injection in tests.
+type Submitter interface {
+	Submit(ctx context.Context, req runner.JobRequest) (runner.Response, error)
+}
+
 // RunHandler handles POST /run.
 type RunHandler struct {
-	runner *runner.Runner
+	runner Submitter
 	reg    *registry.Registry
 	cfg    config.Server
 }
 
-func NewRunHandler(r *runner.Runner, reg *registry.Registry, cfg config.Server) *RunHandler {
+func NewRunHandler(r Submitter, reg *registry.Registry, cfg config.Server) *RunHandler {
 	return &RunHandler{runner: r, reg: reg, cfg: cfg}
 }
 

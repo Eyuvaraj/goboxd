@@ -16,7 +16,7 @@ import (
 const truncationMarker = "\n[output truncated]"
 
 // seccompPolicy is a Kafel deny-list passed to nsjail via --seccomp_string.
-// DEFAULT ALLOW keeps all 12 registered language runtimes working without
+// DEFAULT ALLOW keeps all 13 registered language runtimes working without
 // enumerating required syscalls.
 //
 // KILL_PROCESS (not KILL) terminates the entire sandboxed process when a
@@ -62,6 +62,19 @@ const truncationMarker = "\n[output truncated]"
 //	  Load eBPF programs into the kernel — kernel-level arbitrary code.
 //	syslog
 //	  Read the kernel ring buffer — information leak.
+//	add_key / request_key / keyctl
+//	  Kernel keyring operations — do not require elevated privileges; can be
+//	  used to persist data across sandbox invocations via the session keyring.
+//	fanotify_init
+//	  Filesystem access notification — leaks path information about files
+//	  accessed inside the jail; requires CAP_SYS_ADMIN on newer kernels but
+//	  deny regardless for defence in depth.
+//	capset
+//	  Modify the process capability set — defence in depth against privilege
+//	  re-escalation if a bug ever leaves capabilities in the bounding set.
+//	mount
+//	  Mount filesystems — defence in depth; normally blocked by the lack of
+//	  CAP_SYS_ADMIN, but an explicit deny prevents any user-namespace tricks.
 //
 // perf_event_open is intentionally NOT denied: the JVM uses it for profiling.
 // Network access is already blocked by nsjail's network namespace isolation,
@@ -98,7 +111,13 @@ const seccompPolicy = `POLICY goboxd_safe {
         open_by_handle_at,
         acct,
         bpf,
-        syslog
+        syslog,
+        add_key,
+        request_key,
+        keyctl,
+        fanotify_init,
+        capset,
+        mount
     }
 }
 USE goboxd_safe DEFAULT ALLOW`
@@ -227,11 +246,21 @@ func buildArgv(cfg RunConfig) []string {
 		"--max_cpus", "1",
 		"--rw",       // remount chroot r/w so compilers can write artifacts
 		"--cwd", "/", // working directory inside the jail
+		// Consistent UTS hostname inside the jail; prevents host hostname leaking
+		// via gethostname(2) in user code.
+		"--hostname", "goboxd",
 		// Use cgroup v2 when available (host must mount /sys/fs/cgroup as cgroup2;
 		// docker-compose sets cgroupns: host for this).
 		"--detect_cgroupv2",
 		// File-descriptor cap; Python and javac open many fds at startup.
 		"--rlimit_nofile", "1000",
+		// Core dumps disabled: saves disk space and prevents source-code leakage
+		// via coredumpctl on the host.
+		"--rlimit_core", "0",
+		// Hard stack ceiling (8 MiB = Linux default). Without this, the jail
+		// inherits the host's rlimit which is sometimes set to unlimited in
+		// container environments, allowing stack-based memory exhaustion.
+		"--rlimit_stack", "8",
 		// Minimal environment: no host secrets leak in; runtimes find their paths.
 		"--env", "TMP=/",
 		"--env", "TMPDIR=/",
@@ -256,12 +285,17 @@ func buildArgv(cfg RunConfig) []string {
 		// memory_exceeded detection reliable (nsjail logs the OOM event).
 		cgroupMemBytes := int64(cfg.Limits.MemoryKB) * 1024
 		argv = append(argv, "--cgroup_mem_max", fmt.Sprintf("%d", cgroupMemBytes))
+		// Disable swap entirely so the process OOMs at exactly memory.max rather
+		// than silently spilling into swap and making the limit unpredictable.
+		argv = append(argv, "--cgroup_mem_swap_max", "0")
 		// RLIMIT_AS caps virtual address space separately from RSS. Interpreters
-		// (Python, JVM) mmap 150–300 MiB of virtual space at startup, so the
-		// limit is set at 4× memory_kb with a 512 MiB floor.
+		// (Python, JVM) mmap large amounts of virtual space at startup:
+		// the JVM on ARM64 pre-allocates ~1 GiB for compressed class space alone.
+		// The floor is set to 4096 MiB so JVM-based runtimes (Java, Kotlin) can
+		// start reliably. The cgroup memory.max above is the real RSS guard.
 		virtMiB := cfg.Limits.MemoryKB * 4 / 1024
-		if virtMiB < 512 {
-			virtMiB = 512
+		if virtMiB < 4096 {
+			virtMiB = 4096
 		}
 		argv = append(argv, "--rlimit_as", fmt.Sprintf("%d", virtMiB))
 	}
