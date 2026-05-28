@@ -3,541 +3,966 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>goboxd - Premium Sandbox</title>
-  
-  <!-- Modern Fonts -->
+  <title>goboxd — playground</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
   <style>
     :root {
-      --bg-gradient: radial-gradient(circle at 15% 50%, #1e293b, #0f172a);
-      --glass-bg: rgba(255, 255, 255, 0.03);
-      --glass-border: rgba(255, 255, 255, 0.08);
-      --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-      
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      
-      --accent-1: #3b82f6;
-      --accent-2: #8b5cf6;
-      
-      --radius-lg: 16px;
-      --radius-md: 8px;
-      
-      --font-sans: 'Inter', sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --bg:      #090909;
+      --s1:      #0e0e0e;
+      --s2:      #141414;
+      --s3:      #1b1b1b;
+      --b1:      #1f1f1f;
+      --b2:      #2b2b2b;
+      --t1:      #e4e4e7;
+      --t2:      #6b6b74;
+      --t3:      #3a3a42;
+      --green:   #22c55e;
+      --red:     #f87171;
+      --yellow:  #fbbf24;
+      --blue:    #60a5fa;
+      --mono:    'JetBrains Mono', Consolas, 'Courier New', monospace;
+      --ui:      'Inter', system-ui, -apple-system, sans-serif;
     }
 
-    * { 
-      box-sizing: border-box; 
-      margin: 0; 
-      padding: 0; 
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
 
-    body {
-      font-family: var(--font-sans);
-      background: var(--bg-gradient);
-      color: var(--text-main);
-      height: 100vh;
+    html, body {
+      height: 100%;
       overflow: hidden;
+      background: var(--bg);
+      color: var(--t1);
+      font-family: var(--ui);
+      font-size: 13px;
+      line-height: 1;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ─── App Shell ─────────────────────────────────────── */
+    .app {
       display: flex;
       flex-direction: column;
-      -webkit-font-smoothing: antialiased;
+      height: 100vh;
+      height: 100dvh;
     }
 
-    /* Navbar */
-    .navbar {
+    /* ─── Top Bar ────────────────────────────────────────── */
+    .topbar {
+      height: 44px;
+      min-height: 44px;
+      background: var(--s1);
+      border-bottom: 1px solid var(--b1);
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 1.25rem 2rem;
-      background: rgba(15, 23, 42, 0.4);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--glass-border);
-      z-index: 10;
+      padding: 0 16px;
+      gap: 12px;
+      z-index: 20;
+      flex-shrink: 0;
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 1.5rem;
+      gap: 0;
+      flex-shrink: 0;
+      margin-right: 4px;
     }
 
-    .brand-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      background: linear-gradient(to right, #60a5fa, #a78bfa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      letter-spacing: -0.02em;
-    }
-
-    .brand-meta {
-      font-size: 0.875rem;
-      color: var(--text-muted);
-      font-weight: 500;
-      padding-left: 1.5rem;
-      border-left: 1px solid var(--glass-border);
-    }
-    
-    .brand-meta a {
-      color: #60a5fa;
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-    .brand-meta a:hover {
-      color: #93c5fd;
-    }
-
-    .stats-pill {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      background: var(--glass-bg);
-      border: 1px solid var(--glass-border);
-      padding: 0.5rem 1rem;
-      border-radius: 99px;
-      font-size: 0.8rem;
-      font-weight: 500;
-      color: var(--text-muted);
-    }
-    
-    .stats-pill span {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #10b981;
-      box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
-    }
-
-    /* Main Layout */
-    .workspace {
-      flex: 1;
-      display: flex;
-      gap: 1.5rem;
-      padding: 1.5rem;
-      overflow: hidden;
-    }
-
-    .panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: var(--glass-bg);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--glass-shadow);
-      overflow: hidden;
-      transition: border-color 0.3s;
-    }
-    .panel:hover {
-      border-color: rgba(255, 255, 255, 0.15);
-    }
-
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 1.5rem;
-      border-bottom: 1px solid var(--glass-border);
-      background: rgba(0, 0, 0, 0.1);
-    }
-
-    .panel-title {
-      font-size: 0.85rem;
+    .brand__name {
+      font-family: var(--mono);
       font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
+      font-size: 15px;
+      color: var(--t1);
+      letter-spacing: -0.04em;
+    }
+
+    .brand__slash {
+      font-family: var(--mono);
+      font-size: 15px;
+      color: var(--b2);
+      margin: 0 5px;
+    }
+
+    .brand__sub {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--t3);
       letter-spacing: 0.05em;
+      text-transform: uppercase;
     }
 
-    /* Form Elements */
-    select {
-      appearance: none;
-      background: rgba(0, 0, 0, 0.2);
-      border: 1px solid var(--glass-border);
-      color: var(--text-main);
-      padding: 0.5rem 2.5rem 0.5rem 1rem;
-      border-radius: var(--radius-md);
-      font-family: var(--font-sans);
-      font-size: 0.875rem;
-      font-weight: 500;
-      cursor: pointer;
+    .topbar__divider {
+      width: 1px;
+      height: 20px;
+      background: var(--b1);
+      flex-shrink: 0;
+    }
+
+    /* Language select */
+    .lang-select {
+      background: var(--bg);
+      border: 1px solid var(--b2);
+      color: var(--t1);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 5px 28px 5px 10px;
       outline: none;
-      transition: all 0.2s;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b6b74' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
-      background-position: right 0.75rem center;
-    }
-    select:hover, select:focus {
-      border-color: rgba(255, 255, 255, 0.2);
-      background-color: rgba(0, 0, 0, 0.3);
+      background-position: right 9px center;
+      transition: border-color 0.1s;
+      min-width: 130px;
+      flex-shrink: 0;
     }
 
-    button.btn-primary {
-      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
-      color: white;
-      border: none;
-      padding: 0.6rem 1.5rem;
-      border-radius: var(--radius-md);
-      font-family: var(--font-sans);
-      font-size: 0.875rem;
+    .lang-select:hover, .lang-select:focus {
+      border-color: var(--t2);
+    }
+
+    .file-chip {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--t2);
+      padding: 3px 8px;
+      border: 1px solid var(--b1);
+      background: var(--s2);
+      flex-shrink: 0;
+    }
+
+    .topbar__spacer { flex: 1; }
+
+    /* Team badge */
+    .team-badge {
+      font-family: var(--mono);
+      font-size: 10px;
       font-weight: 600;
-      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--blue);
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      padding: 3px 8px;
+      flex-shrink: 0;
+    }
+
+    /* GitHub link */
+    .gh-link {
+      color: var(--t2);
+      text-decoration: none;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
-    }
-    button.btn-primary:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
-    }
-    button.btn-primary:active:not(:disabled) {
-      transform: translateY(1px);
-    }
-    button.btn-primary:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-      filter: grayscale(0.5);
+      padding: 4px;
+      transition: color 0.1s;
+      flex-shrink: 0;
     }
 
-    /* Editor Area */
-    .editor-container {
+    .gh-link:hover { color: var(--t1); }
+
+    /* Run button */
+    .run-btn {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--green);
+      color: #050f06;
+      border: none;
+      padding: 6px 16px;
+      font-family: var(--ui);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.1s, opacity 0.1s;
+      flex-shrink: 0;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+
+    .run-btn:hover:not(:disabled) { background: #4ade80; }
+    .run-btn:active:not(:disabled) { opacity: 0.8; }
+
+    .run-btn:disabled {
+      background: var(--s3);
+      color: var(--t3);
+      border: 1px solid var(--b1);
+      cursor: not-allowed;
+    }
+
+    .run-btn .kbd {
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 400;
+      opacity: 0.55;
+      letter-spacing: 0;
+    }
+
+    /* ─── Workspace ─────────────────────────────────────── */
+    .workspace {
+      display: flex;
       flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ─── Editor Pane ───────────────────────────────────── */
+    .editor-pane {
       display: flex;
       flex-direction: column;
-      position: relative;
+      width: 56%;
+      flex-shrink: 0;
+      border-right: 1px solid var(--b1);
+      min-width: 0;
+      overflow: hidden;
     }
 
-    textarea {
+    /* ─── Side Pane ─────────────────────────────────────── */
+    .side-pane {
+      display: flex;
+      flex-direction: column;
       flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    /* ─── Generic Pane Header ───────────────────────────── */
+    .pane-hdr {
+      height: 32px;
+      min-height: 32px;
+      background: var(--s2);
+      border-bottom: 1px solid var(--b1);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--t2);
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .hdr-dot {
+      width: 5px;
+      height: 5px;
+      background: var(--b2);
+      flex-shrink: 0;
+    }
+
+    .hdr-dot--green  { background: var(--green); }
+    .hdr-dot--blue   { background: var(--blue); }
+    .hdr-dot--yellow { background: var(--yellow); }
+
+    .hdr-title {
+      color: var(--t1);
+      font-size: 11px;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hdr-meta {
+      color: var(--t3);
+      font-size: 10px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    /* ─── Editor Body ───────────────────────────────────── */
+    .editor-body {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    #monaco-container {
+      position: absolute;
+      inset: 0;
+    }
+
+    #source-fallback {
+      position: absolute;
+      inset: 0;
       width: 100%;
-      background: transparent;
+      height: 100%;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.65;
+      padding: 14px 16px;
       border: none;
-      color: #e2e8f0;
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-      line-height: 1.6;
-      padding: 1.5rem;
       resize: none;
       outline: none;
-    }
-    textarea::placeholder {
-      color: rgba(148, 163, 184, 0.3);
+      tab-size: 4;
     }
 
-    /* Right Panel specific */
-    .io-grid {
+    #source-fallback::placeholder { color: #3e3e3e; }
+
+    /* ─── Inputs Row (stdin + expected) ─────────────────── */
+    .inputs-row {
       display: grid;
-      grid-template-rows: 1fr 1fr;
-      gap: 1px;
-      background: var(--glass-border);
-      height: 40%;
-      min-height: 200px;
+      grid-template-columns: 1fr 1fr;
+      height: 190px;
+      min-height: 190px;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--b1);
+      overflow: hidden;
     }
 
-    .io-box {
-      background: rgba(0, 0, 0, 0.15);
+    .input-cell {
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
     }
 
-    .io-header {
-      padding: 0.5rem 1rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      border-bottom: 1px solid var(--glass-border);
-      display: flex;
-      justify-content: space-between;
+    .input-cell + .input-cell {
+      border-left: 1px solid var(--b1);
     }
 
-    .io-box textarea {
-      padding: 1rem;
-      font-size: 0.85rem;
+    .input-textarea {
+      flex: 1;
+      background: var(--bg);
+      color: var(--t1);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.65;
+      padding: 10px 12px;
+      border: none;
+      resize: none;
+      outline: none;
+      width: 100%;
+      min-height: 0;
     }
 
-    .terminal-container {
+    .input-textarea::placeholder { color: var(--t3); }
+
+    /* ─── Terminal Pane ─────────────────────────────────── */
+    .terminal-pane {
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: rgba(0, 0, 0, 0.3);
-      border-top: 1px solid var(--glass-border);
-    }
-    
-    .terminal-output {
-      flex: 1;
-      padding: 1.5rem;
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      color: #a78bfa;
-      overflow-y: auto;
-      white-space: pre-wrap;
+      overflow: hidden;
+      min-height: 0;
     }
 
-    /* Status Badge */
-    .status-badge {
-      display: inline-flex;
+    .terminal-hdr {
+      height: 32px;
+      min-height: 32px;
+      background: var(--s2);
+      border-bottom: 1px solid var(--b1);
+      display: flex;
       align-items: center;
-      padding: 0.25rem 0.75rem;
-      border-radius: 99px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      opacity: 0;
-      transform: translateY(-5px);
-      transition: all 0.3s ease;
+      padding: 0 12px;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--t2);
+      user-select: none;
+      flex-shrink: 0;
     }
-    .status-badge.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .badge-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .badge-error { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-    .badge-pending { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
 
-    /* Custom Scrollbar */
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+    .status-badge {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 2px 7px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      flex-shrink: 0;
     }
-    ::-webkit-scrollbar-track {
-      background: transparent;
+
+    .status-badge.show { opacity: 1; }
+
+    .badge--ok      { background: rgba(34,197,94,0.1);  color: var(--green);  border: 1px solid rgba(34,197,94,0.2); }
+    .badge--fail    { background: rgba(248,113,113,0.1); color: var(--red);    border: 1px solid rgba(248,113,113,0.2); }
+    .badge--running { background: rgba(96,165,250,0.1);  color: var(--blue);   border: 1px solid rgba(96,165,250,0.2); }
+
+    .terminal-body {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 14px 16px;
+      background: var(--bg);
+      min-height: 0;
     }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
+
+    /* ─── Output Rendering ──────────────────────────────── */
+    .out-idle {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--t3);
     }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.2);
+
+    .out-wrap {
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
     }
+
+    .out-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .out-verdict {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 3px 9px;
+    }
+
+    .verdict--ok   { background: rgba(34,197,94,0.12);  color: var(--green); }
+    .verdict--fail { background: rgba(248,113,113,0.12); color: var(--red); }
+    .verdict--warn { background: rgba(251,191,36,0.12);  color: var(--yellow); }
+
+    .out-stats {
+      display: flex;
+      gap: 16px;
+      color: var(--t2);
+      font-size: 11px;
+      flex-wrap: wrap;
+    }
+
+    .out-stats .kv {
+      display: flex;
+      gap: 5px;
+    }
+
+    .out-stats .k { color: var(--t3); }
+
+    .out-block {
+      margin-top: 14px;
+    }
+
+    .out-block-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--t3);
+      margin-bottom: 6px;
+    }
+
+    .out-pre {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      padding: 10px 12px;
+      color: var(--t1);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-all;
+      overflow-x: auto;
+    }
+
+    .out-pre--err { color: var(--red); }
+    .out-pre--dim { color: var(--t3); }
+
+    .out-divider {
+      height: 1px;
+      background: var(--b1);
+      margin: 16px 0;
+    }
+
+    /* ─── Status Bar ────────────────────────────────────── */
+    .statusbar {
+      height: 24px;
+      min-height: 24px;
+      background: var(--s1);
+      border-top: 1px solid var(--b1);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--t2);
+      user-select: none;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .sb-dot {
+      width: 5px;
+      height: 5px;
+      background: var(--t3);
+      flex-shrink: 0;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .sb-dot.online  { background: var(--green); box-shadow: 0 0 5px rgba(34,197,94,0.5); }
+    .sb-dot.offline { background: var(--red);   box-shadow: 0 0 5px rgba(248,113,113,0.5); }
+
+    .sb-sep { color: var(--b2); }
+    .sb-spacer { flex: 1; }
+
+    /* ─── Scrollbars ────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--b2); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--t3); }
+
+    /* ─── Animations ────────────────────────────────────── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.65s linear infinite; display: inline-block; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+    .blink { animation: blink 1s ease infinite; }
   </style>
+
   <link rel="icon" href="/favicon.svg">
 </head>
+
 <body>
-  
-  <nav class="navbar">
-    <div class="brand">
-      <h1 class="brand-title">goboxd</h1>
-      <div class="brand-meta">
-        by Team <a href="https://github.com/Eyuvaraj/goboxd" target="_blank">Eyuvaraj</a>
+  <div class="app">
+
+    <!-- ── Top Bar ── -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand__name">goboxd</span>
+        <span class="brand__slash">/</span>
+        <span class="brand__sub">playground</span>
       </div>
-    </div>
-    
-    <div class="stats-pill" id="statsBar">
-      <span title="System Status"><div class="status-dot"></div> <span id="sysStatus">Connecting...</span></span>
-      <span style="opacity:0.3">|</span>
-      <span title="Jobs In Flight / Max Jobs">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        <span id="sysJobs">0</span> / <span id="sysMaxJobs">-</span>
-      </span>
-      <span style="opacity:0.3">|</span>
-      <span title="Total Jobs Processed">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span id="sysTotal">0</span>
-      </span>
-      <span style="opacity:0.3">|</span>
-      <span title="Build Version" id="sysVersion">v-</span>
-    </div>
-    
-    <div>
-      <button class="btn-primary" id="runBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-        Run Code
+
+      <div class="topbar__divider"></div>
+
+      <select id="language" class="lang-select"></select>
+
+      <span id="fileChip" class="file-chip">main.py</span>
+
+      <div class="topbar__spacer"></div>
+
+      <span class="team-badge">Alpha</span>
+
+      <a href="https://github.com/Eyuvaraj/goboxd" target="_blank" rel="noopener" class="gh-link" title="View on GitHub">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+        </svg>
+      </a>
+
+      <div class="topbar__divider"></div>
+
+      <button id="runBtn" class="run-btn">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Run
+        <span class="kbd">⌘↵</span>
       </button>
-    </div>
-  </nav>
+    </header>
 
-  <div class="workspace">
-    
-    <!-- Code Editor Panel -->
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title">Source Code</div>
-        <select id="language"></select>
-      </div>
-      <div class="editor-container">
-        <textarea id="source" spellcheck="false" placeholder="Write your code here..."></textarea>
-      </div>
-    </div>
+    <!-- ── Workspace ── -->
+    <div class="workspace">
 
-    <!-- I/O and Output Panel -->
-    <div class="panel">
-      
-      <div class="io-grid">
-        <div class="io-box">
-          <div class="io-header">Standard Input (stdin)</div>
-          <textarea id="stdin" spellcheck="false" placeholder="Input string to pass to the program..."></textarea>
+      <!-- Editor Pane -->
+      <div class="editor-pane">
+        <div class="pane-hdr">
+          <span class="hdr-dot hdr-dot--green"></span>
+          <span id="editorTitle" class="hdr-title">main.py</span>
+          <span id="langLabel" class="hdr-meta">—</span>
         </div>
-        <div class="io-box">
-          <div class="io-header">Expected Output 
-            <span style="font-weight: 400; opacity: 0.5;">(Optional)</span>
+        <div class="editor-body">
+          <div id="monaco-container" style="display:none;"></div>
+          <textarea id="source-fallback" spellcheck="false" placeholder="// write your code here"></textarea>
+        </div>
+      </div>
+
+      <!-- Side Pane -->
+      <div class="side-pane">
+
+        <!-- stdin / expected side by side -->
+        <div class="inputs-row">
+          <div class="input-cell">
+            <div class="pane-hdr">
+              <span class="hdr-dot"></span>
+              <span class="hdr-title">stdin</span>
+            </div>
+            <textarea id="stdin" class="input-textarea" spellcheck="false" placeholder="standard input…"></textarea>
           </div>
-          <textarea id="expected" spellcheck="false" placeholder="Leave blank if you don't want to assert output..."></textarea>
+          <div class="input-cell">
+            <div class="pane-hdr">
+              <span class="hdr-dot"></span>
+              <span class="hdr-title">expected stdout</span>
+              <span class="hdr-meta">optional</span>
+            </div>
+            <textarea id="expected" class="input-textarea" spellcheck="false" placeholder="assert output…"></textarea>
+          </div>
         </div>
-      </div>
 
-      <div class="terminal-container">
-        <div class="panel-header">
-          <div class="panel-title">Execution Terminal</div>
-          <div id="statusBadge" class="status-badge"></div>
+        <!-- Terminal / Output -->
+        <div class="terminal-pane">
+          <div class="terminal-hdr">
+            <span class="hdr-dot"></span>
+            <span style="color:var(--t2);">output</span>
+            <span id="statusBadge" class="status-badge"></span>
+          </div>
+          <div class="terminal-body" id="terminalBody">
+            <div class="out-idle" id="outputEl">Ready — select a language and hit Run.</div>
+          </div>
         </div>
-        <div id="output" class="terminal-output" style="color: rgba(255,255,255,0.4);">Ready. Select a language and hit 'Run Code'.</div>
+
       </div>
-      
     </div>
+
+    <!-- ── Status Bar ── -->
+    <footer class="statusbar">
+      <span class="sb-dot" id="sbDot"></span>
+      <span id="sysStatus">connecting…</span>
+      <span class="sb-sep">│</span>
+      <span id="sysVersion">v—</span>
+      <span class="sb-spacer"></span>
+      <span>jobs&thinsp;<span id="sysJobs">0</span>/<span id="sysMaxJobs">—</span></span>
+      <span class="sb-sep">│</span>
+      <span>total&thinsp;<span id="sysTotal">0</span></span>
+    </footer>
+
   </div>
 
-  <script>
-    const el = (id) => document.getElementById(id);
-    const api = { info: '/info', run: '/run' };
+  <!-- Monaco loader (requirejs) — falls back to plain textarea on error -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"
+          onerror="initFallback()"></script>
 
-    const templates = {
-      py3: "print('Hello from goboxd!')\n# print(input())",
-      bash: "echo 'Hello from goboxd!'",
-      js: "console.log('Hello from goboxd!');",
-      c: "#include <stdio.h>\n\nint main() {\n    printf(\"Hello from goboxd!\\n\");\n    return 0;\n}",
-      cpp: "#include <iostream>\n\nint main() {\n    std::cout << \"Hello from goboxd!\\n\";\n    return 0;\n}",
-      go: "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"Hello from goboxd!\")\n}"
+  <script>
+    'use strict';
+
+    /* ── Utilities ─────────────────────────────────────── */
+    const $ = id => document.getElementById(id);
+    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    /* ── Language → extension/Monaco-id map ─────────────── */
+    const langMeta = {
+      py3:    { ext:'py',   monacoLang:'python' },
+      bash:   { ext:'sh',   monacoLang:'shell' },
+      js:     { ext:'js',   monacoLang:'javascript' },
+      c:      { ext:'c',    monacoLang:'c' },
+      cpp:    { ext:'cpp',  monacoLang:'cpp' },
+      go:     { ext:'go',   monacoLang:'go' },
+      java:   { ext:'java', monacoLang:'java' },
+      ruby:   { ext:'rb',   monacoLang:'ruby' },
+      lua:    { ext:'lua',  monacoLang:'lua' },
+      rust:   { ext:'rs',   monacoLang:'rust' },
+      kotlin: { ext:'kt',   monacoLang:'kotlin' },
+      ocaml:  { ext:'ml',   monacoLang:'plaintext' },
     };
 
-    function setTemplate() {
-      const lang = el('language').value;
-      el('source').value = templates[lang] || "";
+    /* ── Starter templates ─────────────────────────────── */
+    const templates = {
+      py3:    "n = int(input())\nprint(n * 2)\n",
+      bash:   "read n\necho $((n * 2))\n",
+      js:     "const lines = require('fs').readFileSync('/dev/stdin','utf8').trim().split('\\n');\nconst n = parseInt(lines[0]);\nconsole.log(n * 2);\n",
+      c:      "#include <stdio.h>\n\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n    printf(\"%d\\n\", n * 2);\n    return 0;\n}\n",
+      cpp:    "#include <iostream>\nusing namespace std;\n\nint main() {\n    int n;\n    cin >> n;\n    cout << n * 2 << '\\n';\n    return 0;\n}\n",
+      go:     "package main\n\nimport (\n\t\"bufio\"\n\t\"fmt\"\n\t\"os\"\n)\n\nfunc main() {\n\treader := bufio.NewReader(os.Stdin)\n\tvar n int\n\tfmt.Fscan(reader, &n)\n\tfmt.Println(n * 2)\n}\n",
+      java:   "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        int n = sc.nextInt();\n        System.out.println(n * 2);\n    }\n}\n",
+      ruby:   "n = gets.to_i\nputs n * 2\n",
+      lua:    "local n = tonumber(io.read())\nprint(n * 2)\n",
+      rust:   "use std::io::{self, BufRead};\n\nfn main() {\n    let stdin = io::stdin();\n    let line = stdin.lock().lines().next().unwrap().unwrap();\n    let n: i64 = line.trim().parse().unwrap();\n    println!(\"{}\", n * 2);\n}\n",
+      kotlin: "fun main() {\n    val n = readLine()!!.trim().toLong()\n    println(n * 2)\n}\n",
+      ocaml:  "let () =\n  let n = Scanf.scanf \" %d\" (fun x -> x) in\n  Printf.printf \"%d\\n\" (n * 2)\n",
+    };
+
+    /* ── State ─────────────────────────────────────────── */
+    let monacoReady = false;
+    const monacoFallbackTimer = setTimeout(initFallback, 4500);
+
+    /* ── File chip & editor title ───────────────────────── */
+    function updateFileLabel(langId) {
+      const meta = langMeta[langId] || {};
+      const ext  = meta.ext || 'txt';
+      const name = `main.${ext}`;
+      $('fileChip').textContent    = name;
+      $('editorTitle').textContent = name;
     }
 
-    async function fetchSystemInfo() {
+    /* ── Set code template ─────────────────────────────── */
+    function setTemplate() {
+      const lang = $('language').value;
+      const code = templates[lang] || '';
+      updateFileLabel(lang);
+      if (monacoReady && window.monacoEditor) {
+        const monacoLang = (langMeta[lang] || {}).monacoLang || 'plaintext';
+        monaco.editor.setModelLanguage(window.monacoEditor.getModel(), monacoLang);
+        window.monacoEditor.setValue(code);
+        window.monacoEditor.setScrollPosition({ scrollTop: 0 });
+      } else {
+        $('source-fallback').value = code;
+      }
+    }
+
+    /* ── Get current source ─────────────────────────────── */
+    function getSource() {
+      if (monacoReady && window.monacoEditor) return window.monacoEditor.getValue();
+      return $('source-fallback').value;
+    }
+
+    /* ── Fallback textarea init ─────────────────────────── */
+    function initFallback() {
+      if (monacoReady) return;
+      $('monaco-container').style.display  = 'none';
+      $('source-fallback').style.display   = 'block';
+      $('source-fallback').addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const s = this.selectionStart, en = this.selectionEnd;
+          this.value = this.value.slice(0, s) + '    ' + this.value.slice(en);
+          this.selectionStart = this.selectionEnd = s + 4;
+        }
+      });
+      if ($('language').value) setTemplate();
+    }
+
+    /* ── Monaco init ─────────────────────────────────────── */
+    if (typeof require !== 'undefined') {
+      require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' } });
+      require(['vs/editor/editor.main'], () => {
+        clearTimeout(monacoFallbackTimer);
+        monacoReady = true;
+        $('source-fallback').style.display  = 'none';
+        $('monaco-container').style.display = 'block';
+
+        window.monacoEditor = monaco.editor.create($('monaco-container'), {
+          value:            '',
+          language:         'plaintext',
+          theme:            'vs-dark',
+          minimap:          { enabled: false },
+          fontSize:         13,
+          fontFamily:       "'JetBrains Mono', Consolas, monospace",
+          fontLigatures:    true,
+          lineHeight:       21,
+          automaticLayout:  true,
+          padding:          { top: 14, bottom: 14 },
+          renderLineHighlight: 'line',
+          renderLineHighlightOnlyWhenFocus: true,
+          overviewRulerBorder: false,
+          scrollBeyondLastLine: false,
+          smoothScrolling: true,
+          cursorBlinking:  'smooth',
+          scrollbar: {
+            vertical:            'auto',
+            horizontal:          'auto',
+            useShadows:          false,
+            verticalScrollbarSize:   5,
+            horizontalScrollbarSize: 5,
+          },
+        });
+
+        window.monacoEditor.addCommand(
+          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+          () => { if (!$('runBtn').disabled) $('runBtn').click(); }
+        );
+
+        if ($('language').value) setTemplate();
+      });
+    }
+
+    /* ── System info ────────────────────────────────────── */
+    async function fetchInfo() {
       try {
-        const res = await fetch(api.info);
-        if (!res.ok) throw new Error("Fetch failed");
+        const res  = await fetch('/info');
+        if (!res.ok) throw new Error();
         const data = await res.json();
-        
-        const select = el('language');
-        if (select.children.length === 0) {
+
+        const sel = $('language');
+        if (sel.children.length === 0 && data.languages) {
           data.languages.forEach(lang => {
             const opt = document.createElement('option');
-            opt.value = lang.id;
+            opt.value       = lang.id;
             opt.textContent = `${lang.name} (${lang.version})`;
-            select.appendChild(opt);
+            sel.appendChild(opt);
           });
           setTemplate();
-          select.addEventListener('change', setTemplate);
+          sel.addEventListener('change', () => {
+            setTemplate();
+            const selLang   = $('language').value;
+            const monoLang  = (langMeta[selLang] || {}).monacoLang || 'plaintext';
+            $('langLabel').textContent = data.languages.find(l => l.id === selLang)?.name || selLang;
+            if (monacoReady && window.monacoEditor) {
+              monaco.editor.setModelLanguage(window.monacoEditor.getModel(), monoLang);
+            }
+          });
+          // Set initial lang label
+          const first = data.languages[0];
+          if (first) $('langLabel').textContent = first.name;
         }
 
-        el('sysStatus').textContent = "Online";
-        el('sysStatus').style.color = "inherit";
-        document.querySelector('.status-dot').style.background = "#10b981";
-        document.querySelector('.status-dot').style.boxShadow = "0 0 10px rgba(16, 185, 129, 0.5)";
-        
-        el('sysJobs').textContent = data.stats.in_flight_jobs;
-        el('sysMaxJobs').textContent = data.limits.max_concurrent_jobs;
-        el('sysTotal').textContent = data.stats.jobs_total;
-        el('sysVersion').textContent = data.build_info.version;
-        
-      } catch (err) {
-        el('sysStatus').textContent = "Offline";
-        el('sysStatus').style.color = "#f87171";
-        document.querySelector('.status-dot').style.background = "#f87171";
-        document.querySelector('.status-dot').style.boxShadow = "0 0 10px rgba(239, 68, 68, 0.5)";
+        $('sbDot').className    = 'sb-dot online';
+        $('sysStatus').textContent = 'online';
+        $('sysVersion').textContent = data.build_info?.version ?? 'v—';
+        $('sysJobs').textContent    = data.stats?.in_flight_jobs ?? 0;
+        $('sysMaxJobs').textContent = data.limits?.max_concurrent_jobs ?? '—';
+        $('sysTotal').textContent   = data.stats?.jobs_total ?? 0;
+      } catch {
+        $('sbDot').className       = 'sb-dot offline';
+        $('sysStatus').textContent = 'offline';
       }
     }
 
-    setInterval(fetchSystemInfo, 5000);
-    fetchSystemInfo();
+    setInterval(fetchInfo, 5000);
+    fetchInfo();
 
-    el('runBtn').addEventListener('click', async () => {
-      const btn = el('runBtn');
-      const output = el('output');
-      const badge = el('statusBadge');
-      
-      btn.disabled = true;
-      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Running...`;
-      
-      // Setup spin animation for button icon dynamically
-      if(!document.getElementById('spinStyle')) {
-        const style = document.createElement('style');
-        style.id = 'spinStyle';
-        style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } } .spin { animation: spin 1s linear infinite; }`;
-        document.head.appendChild(style);
+    /* ── Output rendering ───────────────────────────────── */
+    function verdictClass(status) {
+      if (status === 'accepted' || status === 'ok') return 'verdict--ok';
+      if (['time_exceeded', 'output_whitespace_mismatch'].includes(status)) return 'verdict--warn';
+      return 'verdict--fail';
+    }
+
+    function renderResult(data, ms) {
+      const isAccepted = data.status === 'accepted';
+      const isBuildFail = data.status === 'build_failed';
+
+      let html = `<div class="out-wrap">`;
+
+      // Header
+      html += `<div class="out-head">`;
+      html += `<span class="out-verdict ${verdictClass(data.status)}">${esc(data.status.replace(/_/g,' '))}</span>`;
+      html += `<div class="out-stats">`;
+      html += `<span class="kv"><span class="k">wall</span>${ms} ms</span>`;
+      if (data.build?.duration_ms != null) {
+        html += `<span class="kv"><span class="k">build</span>${data.build.duration_ms} ms</span>`;
       }
-      
-      badge.className = 'status-badge badge-pending show';
-      badge.textContent = 'EXECUTING';
-      output.style.color = 'rgba(255,255,255,0.6)';
-      output.textContent = 'Compiling and running in sandbox...';
+      if (data.tests?.length) {
+        const t = data.tests[0];
+        if (t.duration_ms != null) {
+          html += `<span class="kv"><span class="k">run</span>${t.duration_ms} ms</span>`;
+        }
+        if (t.memory_peak_kb != null && t.memory_peak_kb > 0) {
+          html += `<span class="kv"><span class="k">mem</span>${t.memory_peak_kb} kb</span>`;
+        }
+      }
+      html += `</div></div>`;
+
+      // Build error
+      if (isBuildFail && data.build) {
+        const raw = (data.build.stderr || data.build.stdout || '').trim();
+        html += `<div class="out-block">`;
+        html += `<div class="out-block-label">build error</div>`;
+        html += `<div class="out-pre out-pre--err">${esc(raw) || '[no output]'}</div>`;
+        html += `</div>`;
+      }
+
+      // Tests
+      if (data.tests?.length) {
+        data.tests.forEach((test, i) => {
+          if (i > 0) html += `<div class="out-divider"></div>`;
+          html += `<div class="out-block">`;
+          const testVerdict = verdictClass(test.status);
+          html += `<div class="out-block-label">`;
+          html += `<span class="out-verdict ${testVerdict}" style="font-size:9px;padding:2px 6px;">`;
+          html += `${esc(test.status.replace(/_/g,' '))}</span>`;
+          html += `&nbsp;&nbsp;test ${i + 1}`;
+          html += `</div>`;
+
+          if (test.stdout) {
+            html += `<div class="out-pre">${esc(test.stdout)}</div>`;
+          } else {
+            html += `<div class="out-pre out-pre--dim">[no stdout]</div>`;
+          }
+
+          if (test.stderr) {
+            html += `<div class="out-block" style="margin-top:10px;">`;
+            html += `<div class="out-block-label">stderr</div>`;
+            html += `<div class="out-pre out-pre--err">${esc(test.stderr)}</div>`;
+            html += `</div>`;
+          }
+          html += `</div>`;
+        });
+      }
+
+      html += `</div>`;
+      return html;
+    }
+
+    /* ── Badge helpers ──────────────────────────────────── */
+    function setBadge(cls, text) {
+      const b = $('statusBadge');
+      b.className = `status-badge show ${cls}`;
+      b.textContent = text;
+    }
+
+    function clearBadge() {
+      $('statusBadge').className = 'status-badge';
+    }
+
+    function setOutput(html) {
+      $('terminalBody').innerHTML = html;
+    }
+
+    /* ── Run handler ─────────────────────────────────────── */
+    $('runBtn').addEventListener('click', async () => {
+      const btn = $('runBtn');
+      btn.disabled = true;
+      btn.innerHTML = `<svg class="spin" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Running`;
+
+      setBadge('badge--running', 'executing');
+      setOutput(`<div class="out-idle blink">Running in sandbox…</div>`);
 
       const payload = {
-        language: el('language').value,
-        source: el('source').value,
+        language: $('language').value,
+        source:   getSource(),
         tests: [{
-          stdin: el('stdin').value,
-          expected_stdout: el('expected').value
-        }]
+          stdin:           $('stdin').value,
+          expected_stdout: $('expected').value,
+        }],
       };
 
       try {
-        const start = performance.now();
-        const res = await fetch(api.run, {
-          method: 'POST',
+        const t0  = performance.now();
+        const res = await fetch('/run', {
+          method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body:    JSON.stringify(payload),
         });
-        const ms = (performance.now() - start).toFixed(0);
+        const ms   = Math.round(performance.now() - t0);
         const data = await res.json();
-        
-        output.style.color = '#f8fafc'; // reset text color for output
 
         if (!res.ok) {
-          badge.className = 'status-badge badge-error show';
-          badge.textContent = 'API ERROR';
-          output.style.color = '#f87171';
-          output.textContent = JSON.stringify(data, null, 2);
+          setBadge('badge--fail', 'api error');
+          setOutput(`<div class="out-wrap"><div class="out-pre out-pre--err">${esc(JSON.stringify(data, null, 2))}</div></div>`);
           return;
         }
 
-        const isAccepted = data.status === 'accepted';
-        badge.className = `status-badge show ${isAccepted ? 'badge-success' : 'badge-error'}`;
-        badge.textContent = data.status.replace(/_/g, ' ').toUpperCase();
-
-        let outText = `⚡ Execution Time: ${ms}ms\n\n`;
-        
-        if (data.build && data.build.status !== 'ok') {
-          outText += `[BUILD FAILED in ${data.build.duration_ms}ms]\n\n${data.build.stderr || data.build.stdout}\n`;
-          output.style.color = '#f87171';
-        } else if (data.tests && data.tests.length > 0) {
-          const test = data.tests[0];
-          outText += `[TEST: ${test.status.toUpperCase()} | Mem: ${test.memory_peak_kb} KB | Time: ${test.duration_ms}ms]\n\n`;
-          
-          if (test.stdout) outText += `--- STDOUT ---\n${test.stdout}\n\n`;
-          if (test.stderr) outText += `--- STDERR ---\n${test.stderr}\n`;
-          
-          if (test.status !== 'accepted') output.style.color = '#fca5a5';
-          else output.style.color = '#a78bfa';
-        }
-
-        output.textContent = outText || "[No output returned from program]";
-        fetchSystemInfo();
+        const ok = data.status === 'accepted';
+        setBadge(ok ? 'badge--ok' : 'badge--fail', data.status.replace(/_/g, ' '));
+        setOutput(renderResult(data, ms));
+        fetchInfo();
 
       } catch (err) {
-        badge.className = 'status-badge badge-error show';
-        badge.textContent = 'NETWORK ERROR';
-        output.style.color = '#f87171';
-        output.textContent = err.toString();
+        setBadge('badge--fail', 'network error');
+        setOutput(`<div class="out-pre out-pre--err">${esc(String(err))}</div>`);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run Code`;
+        btn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run <span class="kbd">⌘↵</span>`;
+      }
+    });
+
+    /* ── Global keyboard shortcut (Cmd/Ctrl+Enter) ─────── */
+    document.addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        if (!$('runBtn').disabled && !monacoReady) {
+          e.preventDefault();
+          $('runBtn').click();
+        }
       }
     });
   </script>

@@ -49,7 +49,7 @@ type TestResult struct {
 	Stdout       string `json:"stdout"        example:"hello"`
 	Stderr       string `json:"stderr"        example:""`
 	DurationMs   int64  `json:"duration_ms"   example:"38"`
-	MemoryPeakKB int64  `json:"memory_peak_kb,omitempty" example:"1024"`
+	MemoryPeakKB int64  `json:"memory_peak_kb" example:"1024"`
 }
 
 // ErrorResponse is returned for 4xx/5xx errors.

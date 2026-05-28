@@ -107,7 +107,7 @@ Adding a language requires **no Go code changes**, provided the language fits th
 
 ## Security Model
 
-The sandbox was designed specifically to address seven known vulnerabilities from older systems. For a detailed breakdown, see the [Security Documentation](security.md) and [Loopholes Documentation](loopholes.md).
+The sandbox was designed specifically to address seven known vulnerabilities from older systems. For a detailed breakdown, see the [Security Documentation](security.md).
 
 | Layer | Protections Applied |
 |-------|---------------------|
