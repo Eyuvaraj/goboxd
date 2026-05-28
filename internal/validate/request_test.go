@@ -30,6 +30,9 @@ func TestFilename(t *testing.T) {
 		{"leading dot2", ".hidden"},
 		{"too long", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, // 66 chars
 		{"null byte", "foo\x00bar"},
+		{"space", "solution .py"},
+		{"exclamation", "file!.py"},
+		{"at sign", "file@.py"},
 	}
 	for _, tc := range bad {
 		if err := validate.Filename(tc.s); err == nil {

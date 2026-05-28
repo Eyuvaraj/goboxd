@@ -2,136 +2,241 @@
 
 This document tracks AI interactions during the development of goboxd, as required by the hackathon specification.
 
+---
+
+## 2026-05-14 [Planning out how to structure the whole project]
+
+**Prompt:** I have to build a Go HTTP service that takes code, runs it inside a sandbox, and returns results. I'm new to Go but have a basic understanding of how systems work. I have a repo with empty folders. Where do I start and how should I break this up?
+
+**Response summary:**
+- Split the project into separate folders: handlers, runner, sandbox, validation, config.
+- Use a YAML file for languages instead of hardcoding them — adding a new one then requires no Go code change.
+- Use `chi` as the HTTP router because it's lightweight and plays nicely with standard library middleware.
+
+**What we used / didn't use:**
+- Used the package layout almost exactly as described — it matched what the spec wanted.
+- Skipped a dedicated `metrics` package; `sync/atomic` counters were enough.
+
+---
+
+## 2026-05-23 [Writing the first working version of everything]
+
+**Prompt:** Can you help me implement this? I need: loading languages from YAML, a POST /run handler with input validation, a runner that limits how many jobs run at once, a sandbox package that builds the nsjail command, a status parser for what happened, health endpoints (/healthz, /readyz, /info), integration tests for each language, and a load test script.
+
+**Response summary:**
+- Generated the first working skeleton for all main packages in one session — config, registry, handler, runner, sandbox, validate, stats.
+- Wrote the full `configs/languages.yaml` with all seven required languages and correct build/run shapes.
+- Produced integration tests for Python, C, C++, Java, Bash, Node.js, and Verilog.
+
+**What we used / didn't use:**
+- Almost all of it was used directly — this formed the first real version of the project (~43 new files).
+- Several bugs were found and fixed afterward (logged below), but the overall structure came from this session.
+- Skipped the Prometheus metrics suggestion — overkill for a hackathon.
+
+---
+
 ## 2026-05-23 [Running jobs and limiting server load]
 
-**Prompt:** "I need to run nsjail from my Go code, but I want to make sure it doesn't crash my server. Also, how do I make sure my server only runs a few jobs at a time so it doesn't freeze under heavy load?"
+**Prompt:** I need to run nsjail from my Go code, but I want to make sure it doesn't crash my server. Also, how do I make sure my server only runs a few jobs at a time so it doesn't freeze under heavy load?
 
 **Response summary:**
-- The AI suggested using something called `io.LimitReader` to cut off the text output if it gets too long.
-- To limit jobs, it showed me how to use a Go channel (like a waiting line) to only allow a few jobs to run at the same time. 
+- Use `io.LimitReader` to cap how much output the child process can write before it gets cut off.
+- Use a buffered Go channel as a "waiting line" — only a fixed number of jobs run at once, the rest wait.
 
 **What we used / didn't use:**
-- I used the `io.LimitReader` and the channel waiting line exactly as shown.
-- They were simple to understand and didn't require me to install any extra packages. 
+- Used both exactly as shown — no extra packages needed.
 
-## 2026-05-23 [Adding Swagger API Docs]
+---
 
-**Prompt:** "I want to add Swagger documentation to my Go API so users can see the endpoints and test them. What's the easiest way to do this without writing everything by hand?"
+## 2026-05-23 [Adding Swagger API docs]
+
+**Prompt:** I want to add Swagger documentation to my Go API so users can see the endpoints and test them. What's the easiest way to do this without writing everything by hand?
 
 **Response summary:**
-- The AI suggested using `swaggo/swag` which reads comments above my Go functions to generate the Swagger files automatically.
-- It also gave me some example comments to add above my routes to explain the inputs and outputs.
+- Use `swaggo/swag` — it reads comments above Go functions and generates the Swagger files automatically.
+- Gave example comment formats for routes.
 
 **What we used / didn't use:**
-- I used `swaggo/swag` because it keeps the documentation right next to the code.
-- I didn't use its suggestion to serve a fancy Swagger UI web page because the hackathon rules say no web UIs, so I just kept the generated YAML file.
+- Used `swaggo/swag` because it keeps docs next to the code.
+- Didn't serve a Swagger UI page at this stage — added that later on May 28.
+
+---
 
 ## 2026-05-23 [Fixing file permissions]
 
-**Prompt:** "When I create temporary folders for the sandbox, I want to make sure other users on the server can't read the files inside. How do I set strict folder permissions in Go?"
+**Prompt:** When I create temporary folders for the sandbox, I want to make sure other users on the server can't read the files inside. How do I set strict folder permissions in Go?
 
 **Response summary:**
-- The AI explained that `os.MkdirTemp` uses safe permissions by default (`0700`), meaning only the owner can read it.
-- It also showed me how to use `os.Chmod` to lock down permissions on files that I copy into the folder.
+- `os.MkdirTemp` uses `0700` permissions by default — only the owner can read it.
+- `os.Chmod` can lock down individual files written into the folder.
 
 **What we used / didn't use:**
-- I used its advice to double-check my folder permissions.
-- I ended up just relying on the safe defaults of `MkdirTemp` instead of manually running `Chmod` everywhere.
+- Kept the safe defaults from `MkdirTemp` rather than manually calling `Chmod` everywhere.
+
+---
+
+## 2026-05-24 [Adding five bonus languages at once]
+
+**Prompt:** The competition gives bonus points for extra languages beyond the required seven. I want to add Ruby, Lua, Rust, Kotlin, and OCaml. Can you write the YAML config blocks, the Dockerfile install lines, and the install shell scripts for each one?
+
+**Response summary:**
+- Wrote YAML configs for all five, including the right compiler commands and argument templates.
+- For Kotlin: build with `kotlinc` into a `.jar`, run with `java -jar` — it runs on the JVM.
+- Each language needs a working `--version` command so `/readyz` can confirm it's installed.
+
+**What we used / didn't use:**
+- Used all five configs with small path tweaks inside Docker.
+- Rust had a slow compile time (expected) — noted that in the language docs.
+
+---
 
 ## 2026-05-24 [Securing the sandbox]
 
-**Prompt:** "I need to make my nsjail sandbox secure. How do I block dangerous things? Also, how can I tell if a program got killed because it used too much memory?"
+**Prompt:** I need to make my nsjail sandbox secure. How do I block dangerous system calls? Also, how can I tell if a program got killed because it used too much memory?
 
 **Response summary:**
-- The AI gave me a list of system calls to block (using a Kafel policy string).
-- It also explained that when a program runs out of memory in cgroup v2, the system sends it a "SIGKILL" signal (signal 9), so I can check for that to know if it ran out of memory.
+- Provided a Kafel policy string for `--seccomp_string` to block dangerous syscalls (ptrace, bpf, io_uring, kexec, etc.).
+- When cgroup v2 kills a process for using too much memory, it sends signal 9 (SIGKILL) — checking for that lets you return `memory_exceeded` instead of a generic error.
 
 **What we used / didn't use:**
-- I used the block list it gave me for the `--seccomp_string` flag.
-- I also added the check for signal 9 to correctly report memory errors to the user instead of generic runtime errors.
+- Used the syscall block list and the signal 9 check as given.
+
+---
 
 ## 2026-05-24 [Fixing bugs with logs and language order]
 
-**Prompt:** "I have two weird bugs. My code is matching the word 'nsjail' anywhere in the logs and marking everything as an internal error. Also, my API returns the list of languages in a random order every time I refresh. How do I fix these?"
+**Prompt:** I have two weird bugs. My code is marking everything as an internal error because it finds the word "nsjail" anywhere in the logs. Also, my API returns languages in a random order every time. How do I fix these?
 
 **Response summary:**
-- The AI explained that Go maps always loop in a random order by design, and I should use a separate list (slice) to keep them in order.
-- For the log bug, it pointed out that real nsjail errors start with `[E][`, so I should look for that instead of just the word "nsjail".
+- Go maps loop in random order by design — keep a separate ordered slice populated at load time.
+- Real nsjail errors start with `[E][`, not just any line containing "nsjail".
 
 **What we used / didn't use:**
-- I added a list to keep my languages ordered, and I changed my code to search for `[E][`.
-- I didn't use the AI's suggestion to download a third-party sorted map package because I wanted to keep things simple.
+- Added an ordered slice for languages; changed the log check to look for `[E][`.
+- Skipped a third-party sorted-map package — the slice approach was simpler.
+
+---
 
 ## 2026-05-24 [Upgrading Go in Docker]
 
-**Prompt:** "My code linter is failing inside my Docker build. It says 'golangci-lint v2 requires Go >= 1.25' but I think my Docker image has an older version. How do I upgrade it?"
+**Prompt:** My linter is failing inside my Docker build. It says golangci-lint v2 requires Go >= 1.25 but I think my image has an older version. How do I upgrade it?
 
 **Response summary:**
-- The AI told me that I just need to change the first line in my Dockerfile from `FROM golang:1.24` to `FROM golang:1.26-bookworm` to get the latest version.
-- It also mentioned that the `bookworm` tag is better because it's based on a newer Linux version.
+- Change `FROM golang:1.24` to `FROM golang:1.26-bookworm` — the `bookworm` tag uses a newer Linux base.
 
 **What we used / didn't use:**
-- I used the `golang:1.26-bookworm` tag it suggested, and the linter started passing immediately.
-- I didn't bother pinning the exact minor version (like 1.26.3) because letting it grab the latest patch is easier to maintain.
+- Used `golang:1.26-bookworm` exactly; linter passed immediately.
+- Didn't pin to an exact patch version (1.26.x) — easier to let it grab the latest patch.
 
-## 2026-05-24 [Capping user limits]
+---
 
-**Prompt:** "My API lets users send custom time and memory limits for their code. But right now, someone could send a time limit of 99999 seconds and freeze up a spot in the queue forever. How do I stop this?"
+## 2026-05-24 [Capping user-supplied limits]
+
+**Prompt:** My API lets users send custom time and memory limits for their code. But right now, someone could send a time limit of 99999 seconds and freeze up a slot in the queue forever. How do I stop this?
 
 **Response summary:**
-- The AI suggested adding a validation check that compares the user's requested limit against the default limit for that language.
-- It recommended rejecting any request where the user asks for more than double the default limit.
+- Validate the user's requested limit against the language's default — reject anything more than double the default.
+- Return a 400 error with a clear message if the limit is too high.
 
 **What we used / didn't use:**
-- I used the "double the default" rule because it felt like a fair balance between flexibility and safety.
-- I added a clean error message to reject these bad requests with a 400 Bad Request status.
+- Used the "double the default" rule — fair balance between flexibility and safety.
+
+---
 
 ## 2026-05-24 [Tracking the queue size]
 
-**Prompt:** "I am using a channel to limit how many jobs run at once. How can I safely check how many jobs are currently waiting in that channel so I can show it on my `/info` endpoint?"
+**Prompt:** I am using a channel to limit how many jobs run at once. How can I safely check how many jobs are currently waiting so I can show it on my /info endpoint?
 
 **Response summary:**
-- The AI told me I could use the `len()` function on my buffered channel to see how many spots are currently taken.
-- It also showed me how to use `sync/atomic` counters to safely track total jobs across different threads.
+- `len(channel)` gives the number of currently occupied slots in a buffered channel.
+- `sync/atomic` counters are safe for tracking totals across concurrent requests.
 
 **What we used / didn't use:**
-- I used the atomic counters exactly as shown because they are perfectly safe to use when lots of requests come in at once.
-- I used `len(channel)` to calculate the active queue size, which made my `/info` stats much more useful.
+- Used atomic counters for totals and `len(channel)` for active queue size — made `/info` stats much more useful.
 
-## 2026-05-26 [Adding Go support]
+---
 
-**Prompt:** "I'm trying to let users run Go code in my sandbox, but it keeps failing because it's trying to download modules and we have no internet inside the jail. What environment variables do I need to set to make `go build` work completely offline?"
+## 2026-05-26 [Adding Go language support]
+
+**Prompt:** I'm trying to let users run Go code in my sandbox, but it keeps failing because it's trying to download modules and there's no internet inside the jail. What environment variables do I need to set to make `go build` work completely offline?
 
 **Response summary:**
-- It told me to set `GO111MODULE=off` so Go doesn't look for modules.
-- It suggested `CGO_ENABLED=0` to keep it simple.
-- It recommended moving the cache to a folder where the jail is allowed to write (`GOCACHE=/.cache/go-build`).
+- `GO111MODULE=off` — stops Go from looking for a go.mod or downloading modules.
+- `CGO_ENABLED=0` — keeps the build simple, no C compiler needed.
+- `GOCACHE=/.cache/go-build` — points the build cache to a folder the jail can write to.
 
 **What we used / didn't use:**
-- I added those exact variables to the environment list in my language config file.
-- Go compiled perfectly on the first try.
+- Added all three to the language's `env` list in `configs/languages.yaml` — Go compiled on the first try.
+
+---
+
+## 2026-05-28 [Debugging why integration tests were all failing]
+
+**Prompt:** My integration tests are all failing but I can't figure out why. `/readyz` always says nsjail is broken even though it's installed. Compiled languages like C++ say their probe fails even though g++ is there. And running any compiled language gives `internal_error`. Can you look at the code and figure out what's happening?
+
+**Response summary:**
+- Bug 1 — nsjail probe: `nsjail --version` doesn't work; nsjail has no `--version` flag and always exits with code 255, which my code read as failure. Fix: check the binary exists with `os.Stat`, then run `nsjail --help` (exit 255 from `--help` is fine — it just means the binary ran).
+- Bug 2 — compiler probe: For compiled languages, the code was checking if the *output binary* (`/solution`) exists, not the *compiler* (`/usr/bin/g++`). That file never exists at startup.
+- Bug 3 — bind-mount crash: The code added the directory containing `/solution` to nsjail's bind-mounts. Since `filepath.Dir("/solution")` is `/`, it tried to mount the entire root filesystem — nsjail logged that as `[E][`, which my status parser read as `internal_error`.
+
+**What we used / didn't use:**
+- All three fixes were used; tests went from all-failing to all-passing.
+- The bind-mount one was completely non-obvious — wouldn't have spotted it without walking through it step by step.
+
+---
+
+## 2026-05-28 [Reading peak memory usage after a job finishes]
+
+**Prompt:** My API always shows `memory_peak_kb: 0` in the response. The spec example shows a real number there. How do I actually track peak memory for each sandbox job?
+
+**Response summary:**
+- With cgroup v2, Linux writes a file called `memory.peak` inside the job's cgroup folder after the process exits.
+- Name each job's cgroup uniquely, then read that file after `cmd.Wait()` returns and divide by 1024.
+- Test inside the Docker container, not on the host — cgroup v2 paths differ depending on how Docker is set up.
+
+**What we used / didn't use:**
+- Used this approach; had to adjust the cgroup path slightly for Docker, but the core idea was correct.
+- Now every response shows a real `memory_peak_kb` instead of 0.
+
+---
+
+## 2026-05-28 [Building an interactive playground to test the API]
+
+**Prompt:** I want to add a simple web page at /playground where I can type code, pick a language, and click run to see the output — so I can test the API without using curl every time. Can you build a self-contained HTML page for this?
+
+**Response summary:**
+- A single HTML file with no external dependencies: code text area, language dropdown, run button, output panel.
+- Uses the browser's `fetch()` to call `POST /run` directly.
+- Also suggested adding Swagger UI at `/docs/` so judges can browse the full API spec interactively.
+
+**What we used / didn't use:**
+- Used the HTML as a starting point and cleaned up styling afterward.
+- Both playground and Swagger UI are embedded in the Go binary using the `embed` package — no extra files at runtime.
+
+---
 
 ## 2026-05-28 [Java crashing on Device]
 
-**Prompt:** "My Java programs are crashing in the sandbox with an error about compressed class space on my Device. My memory limit is set to 512 MB. Why is this happening and how do I fix it?"
+**Prompt:** My Java programs are crashing in the sandbox with an error about compressed class space on my Device. My memory limit is set to 512 MB. Why is this happening and how do I fix it?
 
 **Response summary:**
-- The AI explained that Java on ARM64 chips reserves about 1 GB of virtual memory just to start up, even if it doesn't use it.
-- It said I should raise my virtual memory limit (`RLIMIT_AS`) to something huge like 4096 MB, and just rely on cgroups to limit the actual physical memory.
+- Java on ARM64 reserves ~1 GB of *virtual* memory just to start up, even if it doesn't use it.
+- Raise `RLIMIT_AS` (virtual address space limit) to something like 4096 MB — cgroup memory.max still enforces real RAM usage.
 
 **What we used / didn't use:**
-- I raised the virtual memory limit to 4096 MB like it said, and Java started working immediately.
-- The cgroup limit still properly stopped programs that tried to use too much real memory.
+- Raised the virtual memory limit to 4096 MB; Java started working immediately.
+- The cgroup limit still correctly stops programs that try to use too much real memory.
+
+---
 
 ## 2026-05-28 [Writing tests and checking code]
 
-**Prompt:** "can you build and test all the apis and its output and verify them and do the needful updates... and audit the code and write tests"
+**Prompt:** can you build and test all the apis and its output and verify them and do the needful updates... and audit the code and write tests
 
 **Response summary:**
-- The AI looked through my code and noticed I didn't have any tests for my API endpoints.
-- It wrote a bunch of tests to check things like bad JSON, missing files, and files being too big.
-- It also caught a tiny bug where I was deleting leading spaces from the output, but the rules say I should only delete trailing spaces.
+- Noticed there were no tests for the API handlers — wrote tests for bad JSON, missing filenames, oversized source, etc.
+- Caught a bug: code was trimming leading spaces from output, but the spec says only trailing spaces should be trimmed.
 
 **What we used / didn't use:**
-- I used all the tests it generated because they tested a lot of edge cases I hadn't thought of.
-- I also used its fix to use `TrimRight` instead of `TrimSpace` so my output checker follows the rules perfectly.
+- Used all the generated tests — they covered edge cases I hadn't thought of.
+- Used the `TrimRight` fix so output comparison follows the spec exactly.

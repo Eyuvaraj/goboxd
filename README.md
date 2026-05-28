@@ -1,8 +1,8 @@
 # goboxd
 
-An HTTP service that accepts source code, compiles or interprets it inside an nsjail sandbox, runs it against test cases, and returns per-test results. Built in Go for Paradox 2026.
+An HTTP service that accepts source code, compiles or interprets it inside an nsjail sandbox, runs it against test cases, and returns per-test results. Built for the goboxd hackathon at Paradox IIT Madras 2026.
 
-HTTP routing uses [chi](https://github.com/go-chi/chi) because its handlers are plain `net/http`-compatible functions with no framework-specific context types, and middleware composition is explicit. gin and echo were considered but both require wrapping the request in framework types that make handler testing and future router changes unnecessarily complicated.
+HTTP routing uses [chi](https://github.com/go-chi/chi) because its handlers are plain `net/http`-compatible functions with no framework-specific context types, and middleware composition is explicit. Gin and Echo were considered but both require wrapping requests in framework types that complicate handler testing.
 
 ## Running
 
@@ -17,13 +17,11 @@ make lint         # golangci-lint
 make load         # load-test benchmark (requires hey or k6 in PATH)
 ```
 
-Verify it is up:
+The container must run with `--privileged` (already set in docker-compose.yml) for nsjail namespace support.
 
-```
-curl http://localhost:8080/healthz
-```
+**Sandbox:** Each job runs inside [nsjail](https://github.com/google/nsjail) — a Linux process isolation tool that uses namespaces, cgroups, and `seccomp` to confine untrusted code. [Kafel](https://github.com/google/kafel) is used to define the seccomp policy that blocks dangerous syscalls (`ptrace`, `bpf`, `io_uring`, clock manipulation, kernel module ops) while allowing only what compilers and interpreters need.
 
-The container must run with `--privileged` (already set in docker-compose.yml) for nsjail namespace support. nsjail will not run on macOS or Windows directly; use Docker Desktop or a Linux VM.
+Once the service is up, open `http://localhost:8080/playground/` to try it interactively.
 
 ## API
 
@@ -38,32 +36,33 @@ HTTP 200 is returned for all structurally valid requests. Execution outcomes are
 
 ## Languages
 
-In-scope: `py3`, `bash`, `js`, `c`, `cpp`, `java`, `verilog`.  
-Bonus: `ruby`, `lua`, `rust`, `kotlin`, `ocaml`.
+| Language | ID | Type |
+|---|---|---|
+| Python 3 | `py3` | required |
+| Bash | `bash` | required |
+| JavaScript (Node) | `js` | required |
+| C | `c` | required |
+| C++ | `cpp` | required |
+| Java | `java` | required |
+| Verilog | `verilog` | required |
+| Ruby | `ruby` | bonus |
+| Lua | `lua` | bonus |
+| Rust | `rust` | bonus |
+| Kotlin | `kotlin` | bonus |
+| OCaml | `ocaml` | bonus |
+| Go | `go` | bonus |
 
 Adding a language is one YAML block in `configs/languages.yaml` plus a toolchain install in the Dockerfile. No Go code change. See [docs/languages.md](docs/languages.md).
 
-## Configuration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8080` | HTTP listen port |
-| `NSJAIL_PATH` | `/usr/local/bin/nsjail` | nsjail binary path |
-| `JAIL_DIR` | `/tmp/goboxd` | Sandbox workspace root |
-| `LANGUAGE_FILE` | `/etc/goboxd/languages.yaml` | Language registry |
-| `MAX_SOURCE_BYTES` | `262144` | Source size cap |
-| `MAX_TESTS` | `50` | Test cases per request |
-| `MAX_CONCURRENT_JOBS` | `num CPUs` | Concurrent execution slots |
-| `MAX_OUTPUT_BYTES` | `262144` | Captured stdout cap per phase |
-| `MAX_STDIN_BYTES` | `65536` | stdin cap per test case |
-
 ## Docs
 
-- [docs/swagger.yaml](docs/swagger.yaml) — full API contract and error codes (Swagger/OpenAPI)
+- [docs/swagger.yaml](docs/swagger.yaml) — full API schema (Swagger/OpenAPI)
 - [docs/architecture.md](docs/architecture.md) — package layout, request lifecycle, concurrency model
 - [docs/security.md](docs/security.md) — seven security holes, their fixes, and seccomp hardening
-- [docs/languages.md](docs/languages.md) — language registry schema
-- [docs/benchmarks.md](docs/benchmarks.md) — load-test results
+- [docs/languages.md](docs/languages.md) — language registry schema and demo-day add flow
+- [docs/benchmarks.md](docs/benchmarks.md) — load-test results at 1/10/50/100 concurrent clients
+
+The playground at `/playground/` is a browser UI for writing and running code against the live service — useful for manual testing and demo day.
 
 ## License
 

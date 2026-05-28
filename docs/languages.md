@@ -1,14 +1,12 @@
 # Language Configuration
 
-`goboxd` uses a fully data-driven configuration model for languages. **No Go code changes are required** to add support for a new language. The entire language catalog is managed through `configs/languages.yaml`.
+`goboxd` is fully data-driven. **No Go code changes are needed** to add a language. The entire catalog lives in `configs/languages.yaml`.
 
 ---
 
 ## Supported Languages
 
-The following languages are currently supported out of the box:
-
-### Core Languages
+### In-scope (required by spec)
 
 | ID | Language | Type | Toolchain |
 |----|----------|------|-----------|
@@ -20,132 +18,103 @@ The following languages are currently supported out of the box:
 | `java` | Java | Compiled | `javac` / `java` |
 | `verilog` | Verilog | Compiled | `iverilog` / `vvp` |
 
-### Additional Supported Languages
+### Bonus
 
 | ID | Language | Type | Toolchain |
 |----|----------|------|-----------|
-| `ruby` | Ruby | Interpreted | `ruby` |
-| `lua` | Lua 5.4 | Interpreted | `lua5.4` |
-| `rust` | Rust | Compiled | `rustc` |
-| `kotlin` | Kotlin | Compiled | `kotlinc` / `java` |
-| `ocaml` | OCaml | Interpreted | `ocaml` |
-| `go` | Go | Compiled | `go build` |
+| `ruby` | Ruby | Interpreted | `/usr/bin/ruby` |
+| `lua` | Lua 5.4 | Interpreted | `/usr/bin/lua5.4` |
+| `rust` | Rust | Compiled | `/usr/bin/rustc` |
+| `kotlin` | Kotlin | Compiled | `/usr/bin/kotlinc` + `java` |
+| `ocaml` | OCaml | Interpreted | `/usr/bin/ocaml` |
+| `go` | Go | Compiled | `/usr/bin/go build` |
 
 ---
 
-## YAML Configuration Schema
-
-The `languages.yaml` file defines how the sandbox interacts with each language's toolchain.
+## YAML Schema
 
 ```yaml
 languages:
-  - id: py3                        # Unique identifier used in API requests
-    name: Python 3                 # Human-readable display name
-    source_filename: solution.py   # Static filename used inside the sandbox
-    
-    # Advanced Filename Strategies (e.g., for Java):
+  - id: cpp                          # unique identifier used in API requests
+    name: C++                        # human-readable display name
+    source_filename: solution.cpp    # fixed filename written into the workspace
+
+    # Java uses from_request so the filename matches the public class name:
     # source_filename_strategy: from_request
-    # artifact_filename: solution
     # artifact_filename_strategy: from_request
 
-    # Build Phase (Omit for interpreted languages)
-    build:                         
-      cmd: /usr/bin/gcc
+    build:                           # omit entirely for interpreted languages
+      cmd: /usr/bin/g++
       args: ["{{flags}}", "-o", "{{artifact}}", "{{source}}"]
       limits:
         wall_time_s: 10
         memory_kb: 524288
         max_processes: 100
-      flag_allowlist:              # Strict allowlist. Unlisted client flags result in 400 Bad Request
+      flag_allowlist:                # unlisted flags return 400 invalid_flag
         - "-O2"
-        - "-std=*"                 # The '*' wildcard allows prefix matching
+        - "-std=*"                   # trailing * = prefix match
 
-    # Run Phase
     run:
-      cmd: /usr/bin/python3
-      args: ["{{source}}"]         # Available templates: {{source}}, {{artifact}}, {{flags}}
+      cmd: /solution                 # compiled artifact lives at the workspace root
+      args: []
       limits:
-        wall_time_s: 9
-        memory_kb: 102400
-        max_processes: 100
-      flag_allowlist: []           # An empty list explicitly forbids any client-provided run flags
+        wall_time_s: 5
+        memory_kb: 262144
+        max_processes: 64
+
+    env:                             # optional extra env vars injected via --env KEY=VALUE
+      - GO111MODULE=off              # example from the Go language definition
 ```
 
-### Template Expansion
+### Template variables
 
-To avoid shell injection vulnerabilities, `goboxd` expands templates directly into argument array elements. **A shell is never used.**
+| Placeholder | Expands to |
+|-------------|-----------|
+| `{{source}}` | Source filename inside the workspace |
+| `{{artifact}}` | Compiled output filename |
+| `{{flags}}` | Zero or more validated client-supplied flags (in-place expansion) |
 
-| Placeholder | Resolves To | Example |
-|-------------|-------------|---------|
-| `{{source}}` | The source code filename | `solution.py` |
-| `{{artifact}}` | The compiled output filename | `solution` |
-| `{{flags}}` | Array of validated client flags | `["-O2", "-Wall"]` |
-
-> **Note:** If `{{flags}}` is used in the `args` array, it expands in-place into zero or more separate elements.
+Expansion is done element-by-element in `sandbox.ExpandArgs` — never through a shell.
 
 ---
 
-## Step-by-Step: Adding a New Language
+## Demo-Day Flow: Adding a Language in Under 30 Minutes
 
-Adding a new language (e.g., PHP) is straightforward and typically takes under 15 minutes.
+With a warm Docker cache (layers already built), adding a language takes under 10 minutes. Cold build adds ~5 minutes for the base image layer.
 
-1. **Create an Installation Script:**
-   Add `scripts/lang_install/php.sh` to install the required packages.
-   ```bash
-   #!/usr/bin/env bash
-   set -euo pipefail
-   apt-get install -y --no-install-recommends php-cli
-   php --version
-   ```
+### Steps
 
-2. **Update the Dockerfile:**
-   Add the toolchain to the `runtime` stage's `apt-get` installation block.
+1. **Add a YAML block** to `configs/languages.yaml` — copy the shape closest to the new language (interpreted or compiled).
+
+2. **Add the toolchain** to the Dockerfile runtime stage:
    ```dockerfile
    php-cli \
    ```
-   Add a smoke test to verify the installation:
-   ```dockerfile
-   && php --version \
+
+3. **Rebuild:**
+   ```
+   make build
+   make run
    ```
 
-3. **Register the Language in `languages.yaml`:**
-   ```yaml
-   - id: php
-     name: PHP
-     source_filename: solution.php
-     run:
-       cmd: /usr/bin/php
-       args: ["{{source}}"]
-       limits:
-         wall_time_s: 10
-         memory_kb: 131072
-         max_processes: 50
+4. **Verify:**
+   ```
+   curl http://localhost:8080/readyz | jq .languages.php
+   # → {"ok": true, "version": "PHP 8.2.x"}
    ```
 
-4. **Rebuild and Deploy:**
-   Rebuild the Docker image. The new language will automatically appear in `/readyz` and `/info` endpoints.
+5. **Test:**
+   ```
+   curl -s http://localhost:8080/run -d '{
+     "language": "php",
+     "source": "<?php echo \"hello\\n\";",
+     "tests": [{"stdin": "", "expected_stdout": "hello\n"}]
+   }' | jq .status
+   # → "accepted"
+   ```
 
----
+No Go code change at any step.
 
-## Environment Variables (`env`)
+### Probe command
 
-Certain toolchains require specific environment variables to function properly in an isolated sandbox (e.g., Go requires `GO111MODULE=off` when compiling outside of a standard module directory). 
-
-You can define these at the language level:
-
-```yaml
-- id: go
-  name: Go
-  source_filename: solution.go
-  artifact_filename: solution
-  env:
-    - GO111MODULE=off
-    - CGO_ENABLED=0
-    - GOPATH=/
-    - GOCACHE=/.cache/go-build
-  build:
-    cmd: /usr/bin/go
-    args: ["build", "-o", "{{artifact}}", "{{source}}"]
-```
-
-These variables are injected into the `nsjail` invocation via `--env KEY=VALUE` arguments. They supplement the baseline sandbox environment variables (`HOME`, `PATH`, `TMP`), which are always provided.
+By default `/readyz` runs `<cmd> --version` against each language's run command. If a toolchain uses a different flag (e.g. `version` without dashes), set `probe_cmd` in the YAML — though none of the current 13 languages need this.

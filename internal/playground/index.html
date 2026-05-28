@@ -11,220 +11,308 @@
 
   <style>
     :root {
-      --bg:      #090909;
-      --s1:      #0e0e0e;
-      --s2:      #141414;
-      --s3:      #1b1b1b;
-      --b1:      #1f1f1f;
-      --b2:      #2b2b2b;
-      --t1:      #e4e4e7;
-      --t2:      #6b6b74;
-      --t3:      #3a3a42;
-      --green:   #22c55e;
-      --red:     #f87171;
-      --yellow:  #fbbf24;
-      --blue:    #60a5fa;
-      --mono:    'JetBrains Mono', Consolas, 'Courier New', monospace;
-      --ui:      'Inter', system-ui, -apple-system, sans-serif;
+      --bg:        #ffffff;
+      --s1:        #f6f8fa;
+      --s2:        #eaeef2;
+      --b1:        #d0d7de;
+      --b2:        #afb8c1;
+      --t1:        #1f2328;
+      --t2:        #57606a;
+      --t3:        #8c959f;
+      --t4:        #c9d1d9;
+      --accent:    #0969da;
+      --green:     #1a7f37;
+      --green-bg:  #dafbe1;
+      --red:       #d1242f;
+      --red-bg:    #ffebe9;
+      --yellow:    #9a6700;
+      --yellow-bg: #fff8c5;
+      --blue-bg:   #ddf4ff;
+      --void:       #03060b;
+      --void-mid:   #0a1118;
+      --topbar-bg:  #f8fafc;
+      --caret:      #0969da;
+      --sel-bg:     #b9ddff;
+      --sel-fg:     #06111f;
+      --code-cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='24' viewBox='0 0 16 24'%3E%3Cpath d='M8 3v18' stroke='%230969da' stroke-width='2'/%3E%3Cpath d='M4 4h8M4 20h8' stroke='%230969da' stroke-width='1.5' stroke-linecap='square'/%3E%3Cpath d='M7 3v18' stroke='%23ddf4ff' stroke-width='.75' opacity='.8'/%3E%3C/svg%3E") 8 12, text;
+      --sandbox-gap: clamp(8px, 1.1vw, 14px);
+      --mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+      --ui:   'Inter', system-ui, -apple-system, sans-serif;
     }
 
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      height: 100%;
+      background: var(--void);
     }
 
-    html, body {
+    body {
       height: 100%;
       overflow: hidden;
-      background: var(--bg);
+      display: grid;
+      position: relative;
+      padding: var(--sandbox-gap);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.055), transparent 18%, rgba(0,0,0,0.28) 100%),
+        linear-gradient(135deg, #020409 0%, var(--void-mid) 46%, #05080d 100%);
       color: var(--t1);
-      font-family: var(--ui);
+      font-family: var(--mono);
       font-size: 13px;
       line-height: 1;
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
     }
 
-    /* ─── App Shell ─────────────────────────────────────── */
+    ::selection {
+      background: var(--sel-bg);
+      color: var(--sel-fg);
+    }
+
     .app {
       display: flex;
       flex-direction: column;
-      height: 100vh;
-      height: 100dvh;
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      min-width: min(640px, 100%);
+      min-height: 0;
+      background: var(--bg);
+      border: 1px solid rgba(221,244,255,0.16);
+      border-radius: 0;
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.82),
+        0 20px 66px rgba(0,0,0,0.72),
+        0 0 22px rgba(9,105,218,0.18),
+        inset 0 0 0 1px rgba(255,255,255,0.42);
+      overflow: hidden;
+      isolation: isolate;
     }
 
-    /* ─── Top Bar ────────────────────────────────────────── */
+    @supports (height: 100dvh) {
+      body {
+        height: 100dvh;
+      }
+    }
+
+    /* ── Top bar ── */
     .topbar {
-      height: 44px;
-      min-height: 44px;
-      background: var(--s1);
+      height: 48px;
+      min-height: 48px;
+      flex-shrink: 0;
+      position: relative;
+      background: var(--topbar-bg);
       border-bottom: 1px solid var(--b1);
+      box-shadow:
+        inset 0 1px rgba(255,255,255,0.85),
+        0 1px 0 rgba(255,255,255,0.35);
       display: flex;
       align-items: center;
-      padding: 0 16px;
-      gap: 12px;
-      z-index: 20;
-      flex-shrink: 0;
+      padding: 0 14px;
+      gap: 10px;
+      z-index: 200;
+      /* NO overflow:hidden — dropdown must escape this box */
+    }
+
+    .topbar > * {
+      position: relative;
+      z-index: 1;
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 0;
+      gap: 8px;
       flex-shrink: 0;
-      margin-right: 4px;
+    }
+
+    .brand__logo {
+      width: 24px;
+      height: 24px;
+      display: block;
+      flex-shrink: 0;
+      image-rendering: crisp-edges;
     }
 
     .brand__name {
       font-family: var(--mono);
+      font-size: 13px;
       font-weight: 600;
-      font-size: 15px;
       color: var(--t1);
-      letter-spacing: -0.04em;
+      letter-spacing: -0.03em;
+      white-space: nowrap;
     }
 
-    .brand__slash {
+    .brand__tag {
       font-family: var(--mono);
-      font-size: 15px;
-      color: var(--b2);
-      margin: 0 5px;
-    }
-
-    .brand__sub {
-      font-family: var(--mono);
-      font-size: 11px;
+      font-size: 10px;
       color: var(--t3);
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
+      border: 1px solid var(--b1);
+      padding: 2px 7px;
+      background: var(--s2);
+      white-space: nowrap;
     }
 
-    .topbar__divider {
-      width: 1px;
-      height: 20px;
-      background: var(--b1);
-      flex-shrink: 0;
-    }
+    .vbar { width: 1px; height: 22px; background: var(--b1); flex-shrink: 0; }
+    .flex1 { flex: 1; min-width: 4px; }
 
-    /* Language select */
-    .lang-select {
+    /* ── Custom language picker ── */
+    .c-select { position: relative; flex-shrink: 1; min-width: 0; max-width: 260px; }
+
+    .cs-trigger {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 32px;
+      padding: 0 10px;
       background: var(--bg);
-      border: 1px solid var(--b2);
+      border: 1px solid var(--b1);
       color: var(--t1);
       font-family: var(--mono);
       font-size: 12px;
-      padding: 5px 28px 5px 10px;
-      outline: none;
       cursor: pointer;
-      appearance: none;
-      -webkit-appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b6b74' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 9px center;
-      transition: border-color 0.1s;
-      min-width: 130px;
+      min-width: 160px;
+      max-width: 260px;
+      width: 260px;
+      justify-content: space-between;
+      transition: border-color 0.12s, box-shadow 0.12s;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    #csLabel {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .cs-trigger:hover { border-color: var(--b2); }
+
+    .cs-trigger.open {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(9,105,218,0.1);
+    }
+
+    .cs-chevron {
+      color: var(--t3);
+      transition: transform 0.15s;
       flex-shrink: 0;
+      pointer-events: none;
     }
 
-    .lang-select:hover, .lang-select:focus {
-      border-color: var(--t2);
-    }
+    .cs-trigger.open .cs-chevron { transform: rotate(180deg); }
 
-    .file-chip {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--t2);
-      padding: 3px 8px;
+    .cs-menu {
+      position: absolute;
+      top: calc(100% + 5px);
+      left: 0;
+      min-width: 100%;
+      background: var(--bg);
       border: 1px solid var(--b1);
-      background: var(--s2);
-      flex-shrink: 0;
+      box-shadow: 0 8px 24px rgba(140,149,159,0.25);
+      z-index: 9999;
+      list-style: none;
+      padding: 4px 0;
+      max-height: 300px;
+      overflow-y: auto;
     }
 
-    .topbar__spacer { flex: 1; }
+    .cs-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--t1);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.06s;
+    }
 
-    /* Team badge */
+    .cs-item:hover { background: var(--s1); }
+
+    .cs-item.selected { background: var(--blue-bg); color: var(--accent); }
+
+    .cs-item .cs-dot {
+      width: 5px; height: 5px;
+      background: var(--b1);
+      flex-shrink: 0;
+      border-radius: 50%;
+    }
+
+    .cs-item.selected .cs-dot { background: var(--accent); }
+
+    /* ── Team badge ── */
     .team-badge {
       font-family: var(--mono);
       font-size: 10px;
       font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--blue);
-      border: 1px solid rgba(96, 165, 250, 0.2);
-      padding: 3px 8px;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      border: 1px solid rgba(9,105,218,0.22);
+      padding: 3px 9px;
       flex-shrink: 0;
+      background: rgba(9,105,218,0.04);
+      white-space: nowrap;
     }
 
-    /* GitHub link */
+    /* ── GitHub link ── */
     .gh-link {
       color: var(--t2);
       text-decoration: none;
       display: flex;
       align-items: center;
+      flex-shrink: 0;
       padding: 4px;
       transition: color 0.1s;
-      flex-shrink: 0;
     }
-
     .gh-link:hover { color: var(--t1); }
 
-    /* Run button */
+    /* ── Run button ── */
     .run-btn {
       display: flex;
       align-items: center;
       gap: 7px;
-      background: var(--green);
-      color: #050f06;
+      height: 32px;
+      padding: 0 16px;
+      background: #1a7f37;
+      color: #ffffff;
       border: none;
-      padding: 6px 16px;
       font-family: var(--ui);
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.1s, opacity 0.1s;
       flex-shrink: 0;
-      letter-spacing: 0.01em;
       white-space: nowrap;
+      transition: background 0.1s, opacity 0.1s;
     }
 
-    .run-btn:hover:not(:disabled) { background: #4ade80; }
-    .run-btn:active:not(:disabled) { opacity: 0.8; }
+    .run-btn:hover:not(:disabled) { background: #1f8f3f; }
+    .run-btn:active:not(:disabled) { opacity: 0.82; }
 
     .run-btn:disabled {
-      background: var(--s3);
+      background: var(--s2);
       color: var(--t3);
       border: 1px solid var(--b1);
       cursor: not-allowed;
     }
 
-    .run-btn .kbd {
-      font-family: var(--mono);
-      font-size: 9px;
-      font-weight: 400;
-      opacity: 0.55;
-      letter-spacing: 0;
-    }
+    /* ── Workspace ── */
+    .workspace { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 
-    /* ─── Workspace ─────────────────────────────────────── */
-    .workspace {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-      min-height: 0;
-    }
-
-    /* ─── Editor Pane ───────────────────────────────────── */
     .editor-pane {
       display: flex;
       flex-direction: column;
       width: 56%;
+      min-width: 0;
       flex-shrink: 0;
       border-right: 1px solid var(--b1);
-      min-width: 0;
       overflow: hidden;
     }
 
-    /* ─── Side Pane ─────────────────────────────────────── */
     .side-pane {
       display: flex;
       flex-direction: column;
@@ -233,106 +321,70 @@
       overflow: hidden;
     }
 
-    /* ─── Generic Pane Header ───────────────────────────── */
+    /* ── Pane header ── */
     .pane-hdr {
-      height: 32px;
-      min-height: 32px;
-      background: var(--s2);
+      height: 34px;
+      min-height: 34px;
+      flex-shrink: 0;
+      background: var(--s1);
       border-bottom: 1px solid var(--b1);
       display: flex;
       align-items: center;
       padding: 0 12px;
-      gap: 8px;
+      gap: 7px;
       font-family: var(--mono);
       font-size: 11px;
       color: var(--t2);
       user-select: none;
-      flex-shrink: 0;
     }
 
-    .hdr-dot {
-      width: 5px;
-      height: 5px;
-      background: var(--b2);
-      flex-shrink: 0;
-    }
+    .ph-icon { color: var(--t3); display: flex; align-items: center; flex-shrink: 0; }
+    .ph-icon--amber { color: #da7c0c; }
+    .ph-title { color: var(--t1); }
+    .ph-right { margin-left: auto; color: var(--t3); font-size: 10px; }
 
-    .hdr-dot--green  { background: var(--green); }
-    .hdr-dot--blue   { background: var(--blue); }
-    .hdr-dot--yellow { background: var(--yellow); }
+    /* ── Editor body ── */
+    .editor-body { flex: 1; position: relative; overflow: hidden; min-height: 0; }
 
-    .hdr-title {
-      color: var(--t1);
-      font-size: 11px;
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .hdr-meta {
-      color: var(--t3);
-      font-size: 10px;
-      margin-left: auto;
-      flex-shrink: 0;
-    }
-
-    /* ─── Editor Body ───────────────────────────────────── */
-    .editor-body {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-      min-height: 0;
-    }
-
-    #monaco-container {
-      position: absolute;
-      inset: 0;
-    }
+    #monaco-container { position: absolute; inset: 0; }
+    #monaco-container .monaco-mouse-cursor-text { cursor: var(--code-cursor); }
 
     #source-fallback {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      background: #1e1e1e;
-      color: #d4d4d4;
+      background: #ffffff;
+      color: var(--t1);
       font-family: var(--mono);
       font-size: 13px;
       line-height: 1.65;
-      padding: 14px 16px;
+      padding: 14px 18px;
       border: none;
       resize: none;
       outline: none;
       tab-size: 4;
+      caret-color: var(--caret);
+      cursor: var(--code-cursor);
     }
+    #source-fallback::selection { background: var(--sel-bg); color: var(--sel-fg); }
+    #source-fallback::placeholder { color: var(--t4); }
 
-    #source-fallback::placeholder { color: #3e3e3e; }
-
-    /* ─── Inputs Row (stdin + expected) ─────────────────── */
+    /* ── Input row ── */
     .inputs-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      height: 190px;
-      min-height: 190px;
+      height: 188px;
+      min-height: 188px;
       flex-shrink: 0;
       border-bottom: 1px solid var(--b1);
       overflow: hidden;
     }
 
-    .input-cell {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      min-width: 0;
-    }
+    .input-cell { display: flex; flex-direction: column; overflow: hidden; }
+    .input-cell + .input-cell { border-left: 1px solid var(--b1); }
 
-    .input-cell + .input-cell {
-      border-left: 1px solid var(--b1);
-    }
-
-    .input-textarea {
+    .input-ta {
       flex: 1;
       background: var(--bg);
       color: var(--t1);
@@ -344,34 +396,29 @@
       resize: none;
       outline: none;
       width: 100%;
-      min-height: 0;
+      caret-color: var(--caret);
+      cursor: var(--code-cursor);
     }
+    .input-ta::selection { background: var(--sel-bg); color: var(--sel-fg); }
+    .input-ta::placeholder { color: var(--t4); }
 
-    .input-textarea::placeholder { color: var(--t3); }
+    /* ── Output pane ── */
+    .out-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 
-    /* ─── Terminal Pane ─────────────────────────────────── */
-    .terminal-pane {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      min-height: 0;
-    }
-
-    .terminal-hdr {
-      height: 32px;
-      min-height: 32px;
-      background: var(--s2);
+    .out-hdr {
+      height: 34px;
+      min-height: 34px;
+      flex-shrink: 0;
+      background: var(--s1);
       border-bottom: 1px solid var(--b1);
       display: flex;
       align-items: center;
       padding: 0 12px;
-      gap: 8px;
+      gap: 7px;
       font-family: var(--mono);
       font-size: 11px;
       color: var(--t2);
       user-select: none;
-      flex-shrink: 0;
     }
 
     .status-badge {
@@ -381,91 +428,90 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.07em;
-      padding: 2px 7px;
+      padding: 2px 8px;
       opacity: 0;
-      transition: opacity 0.2s ease;
+      transition: opacity 0.2s;
       flex-shrink: 0;
     }
-
     .status-badge.show { opacity: 1; }
+    .badge--ok      { background: var(--green-bg);  color: var(--green);  border: 1px solid rgba(26,127,55,0.18); }
+    .badge--fail    { background: var(--red-bg);    color: var(--red);    border: 1px solid rgba(209,36,47,0.18); }
+    .badge--running { background: var(--blue-bg);   color: var(--accent); border: 1px solid rgba(9,105,218,0.18); }
 
-    .badge--ok      { background: rgba(34,197,94,0.1);  color: var(--green);  border: 1px solid rgba(34,197,94,0.2); }
-    .badge--fail    { background: rgba(248,113,113,0.1); color: var(--red);    border: 1px solid rgba(248,113,113,0.2); }
-    .badge--running { background: rgba(96,165,250,0.1);  color: var(--blue);   border: 1px solid rgba(96,165,250,0.2); }
-
-    .terminal-body {
+    .out-body {
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
-      padding: 14px 16px;
+      padding: 22px 20px;
       background: var(--bg);
       min-height: 0;
     }
 
-    /* ─── Output Rendering ──────────────────────────────── */
-    .out-idle {
+    /* ── Idle state ── */
+    .idle-wrap { display: flex; flex-direction: column; gap: 12px; }
+
+    .idle-art {
       font-family: var(--mono);
-      font-size: 12px;
-      color: var(--t3);
+      font-size: 11.5px;
+      line-height: 1.3;
+      color: var(--t4);
+      white-space: pre;
+      user-select: none;
     }
 
-    .out-wrap {
+    .idle-hint {
       font-family: var(--mono);
-      font-size: 12px;
-      line-height: 1.6;
+      font-size: 11px;
+      color: var(--t4);
     }
 
-    .out-head {
+    /* ── Result output ── */
+    .result-wrap { font-family: var(--mono); font-size: 12px; line-height: 1.6; }
+
+    .result-head {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--b1);
     }
 
-    .out-verdict {
+    .verdict {
+      font-family: var(--mono);
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.07em;
-      padding: 3px 9px;
+      letter-spacing: 0.05em;
+      padding: 3px 10px;
     }
+    .verdict--ok   { background: var(--green-bg);  color: var(--green); }
+    .verdict--fail { background: var(--red-bg);    color: var(--red); }
+    .verdict--warn { background: var(--yellow-bg); color: var(--yellow); }
 
-    .verdict--ok   { background: rgba(34,197,94,0.12);  color: var(--green); }
-    .verdict--fail { background: rgba(248,113,113,0.12); color: var(--red); }
-    .verdict--warn { background: rgba(251,191,36,0.12);  color: var(--yellow); }
+    .result-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+    .stat { display: flex; gap: 5px; font-size: 11px; color: var(--t2); }
+    .stat-k { color: var(--t3); }
 
-    .out-stats {
-      display: flex;
-      gap: 16px;
-      color: var(--t2);
-      font-size: 11px;
-      flex-wrap: wrap;
-    }
+    .res-block { margin-top: 16px; }
 
-    .out-stats .kv {
-      display: flex;
-      gap: 5px;
-    }
-
-    .out-stats .k { color: var(--t3); }
-
-    .out-block {
-      margin-top: 14px;
-    }
-
-    .out-block-label {
+    .res-block-label {
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       color: var(--t3);
-      margin-bottom: 6px;
+      margin-bottom: 7px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
+    .res-block-label::after { content: ''; flex: 1; height: 1px; background: var(--b1); }
 
-    .out-pre {
+    .res-pre {
       background: var(--s1);
       border: 1px solid var(--b1);
-      padding: 10px 12px;
+      padding: 10px 14px;
       color: var(--t1);
       font-family: var(--mono);
       font-size: 12px;
@@ -474,497 +520,720 @@
       word-break: break-all;
       overflow-x: auto;
     }
+    .res-pre--err { background: var(--red-bg); border-color: rgba(209,36,47,0.2); color: var(--red); }
+    .res-pre--dim { color: var(--t4); }
 
-    .out-pre--err { color: var(--red); }
-    .out-pre--dim { color: var(--t3); }
+    .res-sep { height: 1px; background: var(--b1); margin: 20px 0; }
 
-    .out-divider {
-      height: 1px;
-      background: var(--b1);
-      margin: 16px 0;
-    }
-
-    /* ─── Status Bar ────────────────────────────────────── */
+    /* ── Status bar ── */
     .statusbar {
-      height: 24px;
-      min-height: 24px;
+      height: 25px;
+      min-height: 25px;
+      flex-shrink: 0;
       background: var(--s1);
       border-top: 1px solid var(--b1);
       display: flex;
       align-items: center;
-      padding: 0 12px;
+      padding: 0 14px;
       font-family: var(--mono);
       font-size: 11px;
       color: var(--t2);
       user-select: none;
       gap: 8px;
-      flex-shrink: 0;
     }
 
     .sb-dot {
-      width: 5px;
-      height: 5px;
-      background: var(--t3);
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--t4);
       flex-shrink: 0;
       transition: background 0.3s, box-shadow 0.3s;
     }
+    .sb-dot.online  { background: var(--green); box-shadow: 0 0 5px rgba(26,127,55,0.35); }
+    .sb-dot.offline { background: var(--red);   box-shadow: 0 0 5px rgba(209,36,47,0.35); }
 
-    .sb-dot.online  { background: var(--green); box-shadow: 0 0 5px rgba(34,197,94,0.5); }
-    .sb-dot.offline { background: var(--red);   box-shadow: 0 0 5px rgba(248,113,113,0.5); }
+    .sb-sep   { color: var(--b1); }
+    .sb-space { flex: 1; }
 
-    .sb-sep { color: var(--b2); }
-    .sb-spacer { flex: 1; }
-
-    /* ─── Scrollbars ────────────────────────────────────── */
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    /* ── Scrollbars ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--b2); }
-    ::-webkit-scrollbar-thumb:hover { background: var(--t3); }
+    ::-webkit-scrollbar-thumb { background: var(--b1); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--b2); }
 
-    /* ─── Animations ────────────────────────────────────── */
+    /* ── Animations ── */
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { animation: spin 0.65s linear infinite; display: inline-block; }
 
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.3; }
-    }
-    .blink { animation: blink 1s ease infinite; }
+    @keyframes fade-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .pulse { animation: fade-pulse 1.1s ease infinite; }
   </style>
 
-  <link rel="icon" href="/favicon.svg">
+  <link rel="icon" href="favicon.svg">
 </head>
 
 <body>
-  <div class="app">
+<div class="app">
 
-    <!-- ── Top Bar ── -->
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand__name">goboxd</span>
-        <span class="brand__slash">/</span>
-        <span class="brand__sub">playground</span>
-      </div>
+  <!-- ── Top Bar ── -->
+  <header class="topbar">
 
-      <div class="topbar__divider"></div>
+    <div class="brand">
+      <img src="favicon.svg" alt="goboxd" class="brand__logo">
+      <span class="brand__name">goboxd</span>
+      <span class="brand__tag">playground</span>
+    </div>
 
-      <select id="language" class="lang-select"></select>
+    <div class="vbar"></div>
 
-      <span id="fileChip" class="file-chip">main.py</span>
-
-      <div class="topbar__spacer"></div>
-
-      <span class="team-badge">Alpha</span>
-
-      <a href="https://github.com/Eyuvaraj/goboxd" target="_blank" rel="noopener" class="gh-link" title="View on GitHub">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+    <div class="c-select" id="langPicker">
+      <button class="cs-trigger" id="csTrigger" type="button"
+              aria-haspopup="listbox" aria-expanded="false">
+        <span id="csLabel">Loading…</span>
+        <svg class="cs-chevron" width="12" height="12" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="6 9 12 15 18 9"/>
         </svg>
-      </a>
-
-      <div class="topbar__divider"></div>
-
-      <button id="runBtn" class="run-btn">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        Run
-        <span class="kbd">⌘↵</span>
       </button>
-    </header>
+      <ul class="cs-menu" id="csMenu" role="listbox"></ul>
+    </div>
 
-    <!-- ── Workspace ── -->
-    <div class="workspace">
+    <div class="flex1"></div>
 
-      <!-- Editor Pane -->
-      <div class="editor-pane">
-        <div class="pane-hdr">
-          <span class="hdr-dot hdr-dot--green"></span>
-          <span id="editorTitle" class="hdr-title">main.py</span>
-          <span id="langLabel" class="hdr-meta">—</span>
-        </div>
-        <div class="editor-body">
-          <div id="monaco-container" style="display:none;"></div>
-          <textarea id="source-fallback" spellcheck="false" placeholder="// write your code here"></textarea>
-        </div>
+    <span class="team-badge">Team Alpha</span>
+
+    <a href="https://github.com/Eyuvaraj/goboxd" target="_blank" rel="noopener"
+       class="gh-link" title="View on GitHub">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+      </svg>
+    </a>
+
+    <div class="vbar"></div>
+
+    <button id="runBtn" class="run-btn" type="button">
+      <!-- Lucide: play -->
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      Run
+    </button>
+
+  </header>
+
+  <!-- ── Workspace ── -->
+  <div class="workspace">
+
+    <div class="editor-pane">
+      <div class="pane-hdr">
+        <!-- Lucide: code-2 -->
+        <span class="ph-icon ph-icon--amber">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"/>
+            <polyline points="8 6 2 12 8 18"/>
+          </svg>
+        </span>
+        <span id="editorTitle" class="ph-title">main.py</span>
+        <span id="langLabel" class="ph-right">—</span>
       </div>
-
-      <!-- Side Pane -->
-      <div class="side-pane">
-
-        <!-- stdin / expected side by side -->
-        <div class="inputs-row">
-          <div class="input-cell">
-            <div class="pane-hdr">
-              <span class="hdr-dot"></span>
-              <span class="hdr-title">stdin</span>
-            </div>
-            <textarea id="stdin" class="input-textarea" spellcheck="false" placeholder="standard input…"></textarea>
-          </div>
-          <div class="input-cell">
-            <div class="pane-hdr">
-              <span class="hdr-dot"></span>
-              <span class="hdr-title">expected stdout</span>
-              <span class="hdr-meta">optional</span>
-            </div>
-            <textarea id="expected" class="input-textarea" spellcheck="false" placeholder="assert output…"></textarea>
-          </div>
-        </div>
-
-        <!-- Terminal / Output -->
-        <div class="terminal-pane">
-          <div class="terminal-hdr">
-            <span class="hdr-dot"></span>
-            <span style="color:var(--t2);">output</span>
-            <span id="statusBadge" class="status-badge"></span>
-          </div>
-          <div class="terminal-body" id="terminalBody">
-            <div class="out-idle" id="outputEl">Ready — select a language and hit Run.</div>
-          </div>
-        </div>
-
+      <div class="editor-body">
+        <div id="monaco-container" style="display:none;"></div>
+        <textarea id="source-fallback" spellcheck="false"
+                  placeholder="// write your code here…"></textarea>
       </div>
     </div>
 
-    <!-- ── Status Bar ── -->
-    <footer class="statusbar">
-      <span class="sb-dot" id="sbDot"></span>
-      <span id="sysStatus">connecting…</span>
-      <span class="sb-sep">│</span>
-      <span id="sysVersion">v—</span>
-      <span class="sb-spacer"></span>
-      <span>jobs&thinsp;<span id="sysJobs">0</span>/<span id="sysMaxJobs">—</span></span>
-      <span class="sb-sep">│</span>
-      <span>total&thinsp;<span id="sysTotal">0</span></span>
-    </footer>
+    <div class="side-pane">
 
+      <div class="inputs-row">
+        <div class="input-cell">
+          <div class="pane-hdr">
+            <!-- Lucide: terminal -->
+            <span class="ph-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 17 10 11 4 5"/>
+                <line x1="12" y1="19" x2="20" y2="19"/>
+              </svg>
+            </span>
+            <span class="ph-title">stdin</span>
+          </div>
+          <textarea id="stdin" class="input-ta" spellcheck="false"
+                    placeholder="standard input…"></textarea>
+        </div>
+        <div class="input-cell">
+          <div class="pane-hdr">
+            <!-- Lucide: check -->
+            <span class="ph-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </span>
+            <span class="ph-title">expected stdout</span>
+            <span class="ph-right">optional</span>
+          </div>
+          <textarea id="expected" class="input-ta" spellcheck="false"
+                    placeholder="assert output…"></textarea>
+        </div>
+      </div>
+
+      <div class="out-pane">
+        <div class="out-hdr">
+          <!-- Lucide: monitor -->
+          <span class="ph-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+          </span>
+          <span>output</span>
+          <span id="statusBadge" class="status-badge"></span>
+        </div>
+        <div class="out-body" id="outBody">
+          <div class="idle-wrap">
+            <pre id="figletArt" class="idle-art"></pre>
+            <div class="idle-hint">select a language → write code → run</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
   </div>
 
-  <!-- Monaco loader (requirejs) — falls back to plain textarea on error -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"
-          onerror="initFallback()"></script>
+  <!-- ── Status Bar ── -->
+  <footer class="statusbar">
+    <span class="sb-dot" id="sbDot"></span>
+    <span id="sysStatus">connecting…</span>
+    <span class="sb-sep">│</span>
+    <span id="sysVersion">v—</span>
+    <span class="sb-space"></span>
+    <span>jobs&thinsp;<span id="sysJobs">0</span>/<span id="sysMaxJobs">—</span></span>
+    <span class="sb-sep">│</span>
+    <span>total&thinsp;<span id="sysTotal">0</span></span>
+  </footer>
 
-  <script>
-    'use strict';
+</div>
 
-    /* ── Utilities ─────────────────────────────────────── */
-    const $ = id => document.getElementById(id);
-    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+<!-- figlet for idle ASCII art (browser-compatible UMD build) -->
+<script src="https://cdn.jsdelivr.net/npm/figlet@1.7.0/lib/figlet.js"></script>
 
-    /* ── Language → extension/Monaco-id map ─────────────── */
-    const langMeta = {
-      py3:    { ext:'py',   monacoLang:'python' },
-      bash:   { ext:'sh',   monacoLang:'shell' },
-      js:     { ext:'js',   monacoLang:'javascript' },
-      c:      { ext:'c',    monacoLang:'c' },
-      cpp:    { ext:'cpp',  monacoLang:'cpp' },
-      go:     { ext:'go',   monacoLang:'go' },
-      java:   { ext:'java', monacoLang:'java' },
-      ruby:   { ext:'rb',   monacoLang:'ruby' },
-      lua:    { ext:'lua',  monacoLang:'lua' },
-      rust:   { ext:'rs',   monacoLang:'rust' },
-      kotlin: { ext:'kt',   monacoLang:'kotlin' },
-      ocaml:  { ext:'ml',   monacoLang:'plaintext' },
-    };
+<!-- Monaco loader -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"
+        onerror="initFallback()"></script>
 
-    /* ── Starter templates ─────────────────────────────── */
-    const templates = {
-      py3:    "n = int(input())\nprint(n * 2)\n",
-      bash:   "read n\necho $((n * 2))\n",
-      js:     "const lines = require('fs').readFileSync('/dev/stdin','utf8').trim().split('\\n');\nconst n = parseInt(lines[0]);\nconsole.log(n * 2);\n",
-      c:      "#include <stdio.h>\n\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n    printf(\"%d\\n\", n * 2);\n    return 0;\n}\n",
-      cpp:    "#include <iostream>\nusing namespace std;\n\nint main() {\n    int n;\n    cin >> n;\n    cout << n * 2 << '\\n';\n    return 0;\n}\n",
-      go:     "package main\n\nimport (\n\t\"bufio\"\n\t\"fmt\"\n\t\"os\"\n)\n\nfunc main() {\n\treader := bufio.NewReader(os.Stdin)\n\tvar n int\n\tfmt.Fscan(reader, &n)\n\tfmt.Println(n * 2)\n}\n",
-      java:   "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        int n = sc.nextInt();\n        System.out.println(n * 2);\n    }\n}\n",
-      ruby:   "n = gets.to_i\nputs n * 2\n",
-      lua:    "local n = tonumber(io.read())\nprint(n * 2)\n",
-      rust:   "use std::io::{self, BufRead};\n\nfn main() {\n    let stdin = io::stdin();\n    let line = stdin.lock().lines().next().unwrap().unwrap();\n    let n: i64 = line.trim().parse().unwrap();\n    println!(\"{}\", n * 2);\n}\n",
-      kotlin: "fun main() {\n    val n = readLine()!!.trim().toLong()\n    println(n * 2)\n}\n",
-      ocaml:  "let () =\n  let n = Scanf.scanf \" %d\" (fun x -> x) in\n  Printf.printf \"%d\\n\" (n * 2)\n",
-    };
+<script>
+'use strict';
 
-    /* ── State ─────────────────────────────────────────── */
-    let monacoReady = false;
-    const monacoFallbackTimer = setTimeout(initFallback, 4500);
+/* ── Helpers ── */
+const $ = id => document.getElementById(id);
+const esc = s => String(s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-    /* ── File chip & editor title ───────────────────────── */
-    function updateFileLabel(langId) {
-      const meta = langMeta[langId] || {};
-      const ext  = meta.ext || 'txt';
-      const name = `main.${ext}`;
-      $('fileChip').textContent    = name;
-      $('editorTitle').textContent = name;
+/* ── figlet idle art ── */
+(function() {
+  const el = $('figletArt');
+  if (typeof figlet === 'undefined') { el.textContent = 'safe to run'; return; }
+  try {
+    figlet.defaults({ fontPath: 'https://cdn.jsdelivr.net/npm/figlet@1.7.0/fonts' });
+    figlet('safe to run', { font: 'Slant' }, function(err, data) {
+      el.textContent = err ? 'safe to run' : data;
+    });
+  } catch(e) { el.textContent = 'safe to run'; }
+})();
+
+/* ── Language metadata ── */
+const langMeta = {
+  py3:    { ext:'py',   monaco:'python'     },
+  bash:   { ext:'sh',   monaco:'shell'      },
+  js:     { ext:'js',   monaco:'javascript' },
+  c:      { ext:'c',    monaco:'c'          },
+  cpp:    { ext:'cpp',  monaco:'cpp'        },
+  go:     { ext:'go',   monaco:'go'         },
+  java:   { ext:'java', monaco:'java'       },
+  ruby:   { ext:'rb',   monaco:'ruby'       },
+  lua:    { ext:'lua',  monaco:'lua'        },
+  rust:   { ext:'rs',   monaco:'rust'       },
+  kotlin: { ext:'kt',   monaco:'kotlin'     },
+  ocaml:  { ext:'ml',   monaco:'plaintext'  },
+};
+
+/* ── Templates — simple, no-input math problems ── */
+const templates = {
+
+  py3: `# FizzBuzz
+for i in range(1, 21):
+    if i % 15 == 0:
+        print("FizzBuzz")
+    elif i % 3 == 0:
+        print("Fizz")
+    elif i % 5 == 0:
+        print("Buzz")
+    else:
+        print(i)
+`,
+
+  bash: `# Sum of 1 to 100 (Gauss)
+sum=0
+for i in $(seq 1 100); do
+    sum=$((sum + i))
+done
+echo "Sum of 1 to 100 = $sum"
+`,
+
+  js: `// Fibonacci sequence
+let a = 0, b = 1;
+for (let i = 0; i < 10; i++) {
+    console.log(a);
+    [a, b] = [b, a + b];
+}
+`,
+
+  c: `#include <stdio.h>
+
+int main(void) {
+    /* Factorial of 1 to 10 */
+    long long fact = 1;
+    for (int i = 1; i <= 10; i++) {
+        fact *= i;
+        printf("%2d! = %lld\\n", i, fact);
     }
+    return 0;
+}
+`,
 
-    /* ── Set code template ─────────────────────────────── */
-    function setTemplate() {
-      const lang = $('language').value;
-      const code = templates[lang] || '';
-      updateFileLabel(lang);
-      if (monacoReady && window.monacoEditor) {
-        const monacoLang = (langMeta[lang] || {}).monacoLang || 'plaintext';
-        monaco.editor.setModelLanguage(window.monacoEditor.getModel(), monacoLang);
-        window.monacoEditor.setValue(code);
-        window.monacoEditor.setScrollPosition({ scrollTop: 0 });
-      } else {
-        $('source-fallback').value = code;
-      }
+  cpp: `#include <iostream>
+using namespace std;
+
+int main() {
+    // FizzBuzz
+    for (int i = 1; i <= 20; i++) {
+        if      (i % 15 == 0) cout << "FizzBuzz\\n";
+        else if (i % 3  == 0) cout << "Fizz\\n";
+        else if (i % 5  == 0) cout << "Buzz\\n";
+        else                  cout << i << "\\n";
     }
+    return 0;
+}
+`,
 
-    /* ── Get current source ─────────────────────────────── */
-    function getSource() {
-      if (monacoReady && window.monacoEditor) return window.monacoEditor.getValue();
-      return $('source-fallback').value;
-    }
+  go: `package main
 
-    /* ── Fallback textarea init ─────────────────────────── */
-    function initFallback() {
-      if (monacoReady) return;
-      $('monaco-container').style.display  = 'none';
-      $('source-fallback').style.display   = 'block';
-      $('source-fallback').addEventListener('keydown', function(e) {
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          const s = this.selectionStart, en = this.selectionEnd;
-          this.value = this.value.slice(0, s) + '    ' + this.value.slice(en);
-          this.selectionStart = this.selectionEnd = s + 4;
+import "fmt"
+
+func main() {
+\t// FizzBuzz
+\tfor i := 1; i <= 20; i++ {
+\t\tswitch {
+\t\tcase i%15 == 0:
+\t\t\tfmt.Println("FizzBuzz")
+\t\tcase i%3 == 0:
+\t\t\tfmt.Println("Fizz")
+\t\tcase i%5 == 0:
+\t\t\tfmt.Println("Buzz")
+\t\tdefault:
+\t\t\tfmt.Println(i)
+\t\t}
+\t}
+}
+`,
+
+  java: `public class Main {
+    public static void main(String[] args) {
+        // FizzBuzz
+        for (int i = 1; i <= 20; i++) {
+            if      (i % 15 == 0) System.out.println("FizzBuzz");
+            else if (i % 3  == 0) System.out.println("Fizz");
+            else if (i % 5  == 0) System.out.println("Buzz");
+            else                  System.out.println(i);
         }
-      });
-      if ($('language').value) setTemplate();
+    }
+}
+`,
+
+  ruby: `# Fibonacci sequence
+a, b = 0, 1
+10.times do
+    puts a
+    a, b = b, a + b
+end
+`,
+
+  lua: `-- Factorial of 1 to 10
+local fact = 1
+for i = 1, 10 do
+    fact = fact * i
+    print(i .. "! = " .. fact)
+end
+`,
+
+  rust: `fn main() {
+    // FizzBuzz
+    for i in 1..=20 {
+        if      i % 15 == 0 { println!("FizzBuzz"); }
+        else if i % 3  == 0 { println!("Fizz"); }
+        else if i % 5  == 0 { println!("Buzz"); }
+        else                { println!("{}", i); }
+    }
+}
+`,
+
+  kotlin: `fun main() {
+    // FizzBuzz
+    for (i in 1..20) {
+        println(when {
+            i % 15 == 0 -> "FizzBuzz"
+            i % 3  == 0 -> "Fizz"
+            i % 5  == 0 -> "Buzz"
+            else        -> i
+        })
+    }
+}
+`,
+
+  ocaml: `(* Factorial of 1 to 10 *)
+let () =
+  let fact = ref 1 in
+  for i = 1 to 10 do
+    fact := !fact * i;
+    Printf.printf "%2d! = %d\n" i !fact
+  done
+`,
+};
+
+/* ── State ── */
+let monacoReady    = false;
+let selectedLangId = '';
+let allLanguages   = [];
+let pickerOpen     = false;
+
+const monacoTimer = setTimeout(initFallback, 4500);
+
+/* ── Dropdown ── */
+const csTrigger = $('csTrigger');
+const csMenu    = $('csMenu');
+const csLabel   = $('csLabel');
+
+/* Start hidden via CSS display:none */
+csMenu.style.display = 'none';
+
+function openPicker() {
+  pickerOpen = true;
+  csMenu.style.display = 'block';
+  csTrigger.classList.add('open');
+  csTrigger.setAttribute('aria-expanded', 'true');
+}
+
+function closePicker() {
+  pickerOpen = false;
+  csMenu.style.display = 'none';
+  csTrigger.classList.remove('open');
+  csTrigger.setAttribute('aria-expanded', 'false');
+}
+
+csTrigger.addEventListener('click', e => {
+  e.stopPropagation();
+  pickerOpen ? closePicker() : openPicker();
+});
+
+document.addEventListener('click', e => {
+  if (!$('langPicker').contains(e.target)) closePicker();
+});
+
+function cleanVersion(v) {
+  if (!v) return '';
+  const lines = v.split('\n')
+    .map(l => l.trim())
+    .filter(l => l && !/^(OpenJDK|Java HotSpot|warning:|Warning)/i.test(l));
+  const ver = lines[0] || v.split('\n')[0].trim();
+  return ver.length > 40 ? ver.slice(0, 40) + '…' : ver;
+}
+
+function langLabel(lang) {
+  const v = cleanVersion(lang.version);
+  return v ? `${lang.name} (${v})` : lang.name;
+}
+
+function buildPickerItems(languages) {
+  csMenu.innerHTML = '';
+  languages.forEach(lang => {
+    const li  = document.createElement('li');
+    li.className = 'cs-item' + (lang.id === selectedLangId ? ' selected' : '');
+    li.role = 'option';
+    li.dataset.value = lang.id;
+
+    const dot = document.createElement('span');
+    dot.className = 'cs-dot';
+
+    li.appendChild(dot);
+    li.appendChild(document.createTextNode(langLabel(lang)));
+
+    li.addEventListener('click', e => {
+      e.stopPropagation();
+      chooseLang(lang.id, langLabel(lang));
+      closePicker();
+    });
+    csMenu.appendChild(li);
+  });
+}
+
+function chooseLang(id, displayText) {
+  selectedLangId = id;
+  csLabel.textContent = displayText;
+  csMenu.querySelectorAll('.cs-item').forEach(el => {
+    el.classList.toggle('selected', el.dataset.value === id);
+  });
+  applyLang(id);
+}
+
+/* ── Language + templates ── */
+function applyLang(langId) {
+  const meta = langMeta[langId] || {};
+  $('editorTitle').textContent = `main.${meta.ext || 'txt'}`;
+  const found = allLanguages.find(l => l.id === langId);
+  $('langLabel').textContent = found ? found.name : langId;
+
+  const code = templates[langId] || '';
+  if (monacoReady && window.monacoEditor) {
+    monaco.editor.setModelLanguage(
+      window.monacoEditor.getModel(),
+      meta.monaco || 'plaintext'
+    );
+    window.monacoEditor.setValue(code);
+    window.monacoEditor.setScrollPosition({ scrollTop: 0 });
+  } else {
+    $('source-fallback').value = code;
+  }
+}
+
+function getSource() {
+  return (monacoReady && window.monacoEditor)
+    ? window.monacoEditor.getValue()
+    : $('source-fallback').value;
+}
+
+/* ── Textarea fallback ── */
+function initFallback() {
+  if (monacoReady) return;
+  $('monaco-container').style.display = 'none';
+  $('source-fallback').style.display  = 'block';
+  $('source-fallback').addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = this.selectionStart, en = this.selectionEnd;
+      this.value = this.value.slice(0, s) + '    ' + this.value.slice(en);
+      this.selectionStart = this.selectionEnd = s + 4;
+    }
+  });
+  if (selectedLangId) applyLang(selectedLangId);
+}
+
+/* ── Monaco ── */
+if (typeof require !== 'undefined') {
+  require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' } });
+  require(['vs/editor/editor.main'], () => {
+    clearTimeout(monacoTimer);
+    monacoReady = true;
+    $('source-fallback').style.display  = 'none';
+    $('monaco-container').style.display = 'block';
+
+    monaco.editor.defineTheme('goboxd-playground', {
+      base: 'vs',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editorCursor.foreground': '#0969da',
+        'editor.selectionBackground': '#b9ddff',
+        'editor.inactiveSelectionBackground': '#dceeff',
+        'editor.selectionHighlightBackground': '#d6f2ff88',
+        'editor.lineHighlightBackground': '#f6f8fa',
+      },
+    });
+
+    window.monacoEditor = monaco.editor.create($('monaco-container'), {
+      value:            '',
+      language:         'plaintext',
+      theme:            'goboxd-playground',
+      minimap:          { enabled: false },
+      fontSize:         13,
+      fontFamily:       "'JetBrains Mono', Consolas, monospace",
+      fontLigatures:    true,
+      lineHeight:       21,
+      automaticLayout:  true,
+      padding:          { top: 14, bottom: 14 },
+      renderLineHighlightOnlyWhenFocus: true,
+      overviewRulerBorder:  false,
+      scrollBeyondLastLine: false,
+      smoothScrolling:      true,
+      cursorBlinking:       'phase',
+      cursorStyle:          'line',
+      cursorWidth:          2,
+      scrollbar: { vertical:'auto', horizontal:'auto', useShadows:false,
+                   verticalScrollbarSize:5, horizontalScrollbarSize:5 },
+    });
+
+    window.monacoEditor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      () => { if (!$('runBtn').disabled) $('runBtn').click(); }
+    );
+
+    if (selectedLangId) applyLang(selectedLangId);
+  });
+}
+
+/* ── System info ── */
+async function fetchInfo() {
+  try {
+    const res  = await fetch('/info');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+
+    if (allLanguages.length === 0 && data.languages?.length) {
+      allLanguages   = data.languages;
+      const first    = allLanguages[0];
+      selectedLangId = first.id;
+      csLabel.textContent = langLabel(first);
+      buildPickerItems(allLanguages);
+      applyLang(selectedLangId);
     }
 
-    /* ── Monaco init ─────────────────────────────────────── */
-    if (typeof require !== 'undefined') {
-      require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' } });
-      require(['vs/editor/editor.main'], () => {
-        clearTimeout(monacoFallbackTimer);
-        monacoReady = true;
-        $('source-fallback').style.display  = 'none';
-        $('monaco-container').style.display = 'block';
+    $('sbDot').className        = 'sb-dot online';
+    $('sysStatus').textContent  = 'online';
+    $('sysVersion').textContent = data.build_info?.version        ?? 'v—';
+    $('sysJobs').textContent    = data.stats?.in_flight_jobs       ?? 0;
+    $('sysMaxJobs').textContent = data.limits?.max_concurrent_jobs ?? '—';
+    $('sysTotal').textContent   = data.stats?.jobs_total           ?? 0;
+  } catch {
+    $('sbDot').className       = 'sb-dot offline';
+    $('sysStatus').textContent = 'offline';
+  }
+}
 
-        window.monacoEditor = monaco.editor.create($('monaco-container'), {
-          value:            '',
-          language:         'plaintext',
-          theme:            'vs-dark',
-          minimap:          { enabled: false },
-          fontSize:         13,
-          fontFamily:       "'JetBrains Mono', Consolas, monospace",
-          fontLigatures:    true,
-          lineHeight:       21,
-          automaticLayout:  true,
-          padding:          { top: 14, bottom: 14 },
-          renderLineHighlight: 'line',
-          renderLineHighlightOnlyWhenFocus: true,
-          overviewRulerBorder: false,
-          scrollBeyondLastLine: false,
-          smoothScrolling: true,
-          cursorBlinking:  'smooth',
-          scrollbar: {
-            vertical:            'auto',
-            horizontal:          'auto',
-            useShadows:          false,
-            verticalScrollbarSize:   5,
-            horizontalScrollbarSize: 5,
-          },
-        });
+setInterval(fetchInfo, 5000);
+fetchInfo();
 
-        window.monacoEditor.addCommand(
-          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-          () => { if (!$('runBtn').disabled) $('runBtn').click(); }
-        );
+/* ── Output rendering ── */
+function verdictCls(s) {
+  if (s === 'accepted' || s === 'ok') return 'verdict--ok';
+  if (['time_exceeded','output_whitespace_mismatch'].includes(s)) return 'verdict--warn';
+  return 'verdict--fail';
+}
 
-        if ($('language').value) setTemplate();
-      });
+function setBadge(cls, text) {
+  const b = $('statusBadge');
+  b.className   = `status-badge show ${cls}`;
+  b.textContent = text;
+}
+
+function setOut(html) { $('outBody').innerHTML = html; }
+
+function renderResult(data, ms) {
+  let h = '<div class="result-wrap"><div class="result-head">';
+  h += `<span class="verdict ${verdictCls(data.status)}">${esc(data.status.replace(/_/g,' '))}</span>`;
+  h += '<div class="result-stats">';
+  h += `<span class="stat"><span class="stat-k">wall</span>${ms}&thinsp;ms</span>`;
+  if (data.build?.duration_ms != null)
+    h += `<span class="stat"><span class="stat-k">build</span>${data.build.duration_ms}&thinsp;ms</span>`;
+  if (data.tests?.length) {
+    const t = data.tests[0];
+    if (t.duration_ms != null)
+      h += `<span class="stat"><span class="stat-k">run</span>${t.duration_ms}&thinsp;ms</span>`;
+    if (t.memory_peak_kb > 0)
+      h += `<span class="stat"><span class="stat-k">mem</span>${t.memory_peak_kb}&thinsp;kb</span>`;
+  }
+  h += '</div></div>';
+
+  if (data.status === 'build_failed' && data.build) {
+    const raw = (data.build.stderr || data.build.stdout || '').trim();
+    h += '<div class="res-block"><div class="res-block-label">build error</div>';
+    h += `<div class="res-pre res-pre--err">${esc(raw) || '[no output]'}</div></div>`;
+  }
+
+  data.tests?.forEach((test, i) => {
+    if (i > 0) h += '<div class="res-sep"></div>';
+    const vc = verdictCls(test.status);
+    h += '<div class="res-block">';
+    h += `<div class="res-block-label"><span class="verdict ${vc}" style="font-size:9px;padding:2px 7px;">${esc(test.status.replace(/_/g,' '))}</span>test ${i + 1}</div>`;
+    h += test.stdout
+      ? `<div class="res-pre">${esc(test.stdout)}</div>`
+      : `<div class="res-pre res-pre--dim">[no stdout]</div>`;
+    if (test.stderr) {
+      h += '<div class="res-block" style="margin-top:10px"><div class="res-block-label">stderr</div>';
+      h += `<div class="res-pre res-pre--err">${esc(test.stderr)}</div></div>`;
+    }
+    h += '</div>';
+  });
+
+  return h + '</div>';
+}
+
+/* ── Run ── */
+$('runBtn').addEventListener('click', async () => {
+  const btn = $('runBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="spin" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>&nbsp;Running';
+
+  setBadge('badge--running', 'executing');
+  setOut('<div class="idle-wrap pulse"><div class="idle-hint">running in sandbox…</div></div>');
+
+  const src = getSource();
+  const payload = {
+    language: selectedLangId,
+    source:   src,
+    tests: [{ stdin: $('stdin').value, expected_stdout: $('expected').value }],
+  };
+  if (selectedLangId === 'java') {
+    const m = src.match(/public\s+class\s+(\w+)/);
+    const cls = m ? m[1] : 'Main';
+    payload.source_filename   = cls + '.java';
+    payload.artifact_filename = cls;
+  }
+
+  try {
+    const t0  = performance.now();
+    const res = await fetch('/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const ms   = Math.round(performance.now() - t0);
+    const data = await res.json();
+
+    if (!res.ok) {
+      setBadge('badge--fail', 'api error');
+      setOut(`<div class="result-wrap"><div class="res-block-label">api error</div><div class="res-pre res-pre--err">${esc(JSON.stringify(data,null,2))}</div></div>`);
+      return;
     }
 
-    /* ── System info ────────────────────────────────────── */
-    async function fetchInfo() {
-      try {
-        const res  = await fetch('/info');
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-
-        const sel = $('language');
-        if (sel.children.length === 0 && data.languages) {
-          data.languages.forEach(lang => {
-            const opt = document.createElement('option');
-            opt.value       = lang.id;
-            opt.textContent = `${lang.name} (${lang.version})`;
-            sel.appendChild(opt);
-          });
-          setTemplate();
-          sel.addEventListener('change', () => {
-            setTemplate();
-            const selLang   = $('language').value;
-            const monoLang  = (langMeta[selLang] || {}).monacoLang || 'plaintext';
-            $('langLabel').textContent = data.languages.find(l => l.id === selLang)?.name || selLang;
-            if (monacoReady && window.monacoEditor) {
-              monaco.editor.setModelLanguage(window.monacoEditor.getModel(), monoLang);
-            }
-          });
-          // Set initial lang label
-          const first = data.languages[0];
-          if (first) $('langLabel').textContent = first.name;
-        }
-
-        $('sbDot').className    = 'sb-dot online';
-        $('sysStatus').textContent = 'online';
-        $('sysVersion').textContent = data.build_info?.version ?? 'v—';
-        $('sysJobs').textContent    = data.stats?.in_flight_jobs ?? 0;
-        $('sysMaxJobs').textContent = data.limits?.max_concurrent_jobs ?? '—';
-        $('sysTotal').textContent   = data.stats?.jobs_total ?? 0;
-      } catch {
-        $('sbDot').className       = 'sb-dot offline';
-        $('sysStatus').textContent = 'offline';
-      }
-    }
-
-    setInterval(fetchInfo, 5000);
+    setBadge(data.status === 'accepted' ? 'badge--ok' : 'badge--fail',
+             data.status.replace(/_/g,' '));
+    setOut(renderResult(data, ms));
     fetchInfo();
 
-    /* ── Output rendering ───────────────────────────────── */
-    function verdictClass(status) {
-      if (status === 'accepted' || status === 'ok') return 'verdict--ok';
-      if (['time_exceeded', 'output_whitespace_mismatch'].includes(status)) return 'verdict--warn';
-      return 'verdict--fail';
-    }
+  } catch (err) {
+    setBadge('badge--fail', 'network error');
+    setOut(`<div class="result-wrap"><div class="res-pre res-pre--err">${esc(String(err))}</div></div>`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run';
+  }
+});
 
-    function renderResult(data, ms) {
-      const isAccepted = data.status === 'accepted';
-      const isBuildFail = data.status === 'build_failed';
-
-      let html = `<div class="out-wrap">`;
-
-      // Header
-      html += `<div class="out-head">`;
-      html += `<span class="out-verdict ${verdictClass(data.status)}">${esc(data.status.replace(/_/g,' '))}</span>`;
-      html += `<div class="out-stats">`;
-      html += `<span class="kv"><span class="k">wall</span>${ms} ms</span>`;
-      if (data.build?.duration_ms != null) {
-        html += `<span class="kv"><span class="k">build</span>${data.build.duration_ms} ms</span>`;
-      }
-      if (data.tests?.length) {
-        const t = data.tests[0];
-        if (t.duration_ms != null) {
-          html += `<span class="kv"><span class="k">run</span>${t.duration_ms} ms</span>`;
-        }
-        if (t.memory_peak_kb != null && t.memory_peak_kb > 0) {
-          html += `<span class="kv"><span class="k">mem</span>${t.memory_peak_kb} kb</span>`;
-        }
-      }
-      html += `</div></div>`;
-
-      // Build error
-      if (isBuildFail && data.build) {
-        const raw = (data.build.stderr || data.build.stdout || '').trim();
-        html += `<div class="out-block">`;
-        html += `<div class="out-block-label">build error</div>`;
-        html += `<div class="out-pre out-pre--err">${esc(raw) || '[no output]'}</div>`;
-        html += `</div>`;
-      }
-
-      // Tests
-      if (data.tests?.length) {
-        data.tests.forEach((test, i) => {
-          if (i > 0) html += `<div class="out-divider"></div>`;
-          html += `<div class="out-block">`;
-          const testVerdict = verdictClass(test.status);
-          html += `<div class="out-block-label">`;
-          html += `<span class="out-verdict ${testVerdict}" style="font-size:9px;padding:2px 6px;">`;
-          html += `${esc(test.status.replace(/_/g,' '))}</span>`;
-          html += `&nbsp;&nbsp;test ${i + 1}`;
-          html += `</div>`;
-
-          if (test.stdout) {
-            html += `<div class="out-pre">${esc(test.stdout)}</div>`;
-          } else {
-            html += `<div class="out-pre out-pre--dim">[no stdout]</div>`;
-          }
-
-          if (test.stderr) {
-            html += `<div class="out-block" style="margin-top:10px;">`;
-            html += `<div class="out-block-label">stderr</div>`;
-            html += `<div class="out-pre out-pre--err">${esc(test.stderr)}</div>`;
-            html += `</div>`;
-          }
-          html += `</div>`;
-        });
-      }
-
-      html += `</div>`;
-      return html;
-    }
-
-    /* ── Badge helpers ──────────────────────────────────── */
-    function setBadge(cls, text) {
-      const b = $('statusBadge');
-      b.className = `status-badge show ${cls}`;
-      b.textContent = text;
-    }
-
-    function clearBadge() {
-      $('statusBadge').className = 'status-badge';
-    }
-
-    function setOutput(html) {
-      $('terminalBody').innerHTML = html;
-    }
-
-    /* ── Run handler ─────────────────────────────────────── */
-    $('runBtn').addEventListener('click', async () => {
-      const btn = $('runBtn');
-      btn.disabled = true;
-      btn.innerHTML = `<svg class="spin" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Running`;
-
-      setBadge('badge--running', 'executing');
-      setOutput(`<div class="out-idle blink">Running in sandbox…</div>`);
-
-      const payload = {
-        language: $('language').value,
-        source:   getSource(),
-        tests: [{
-          stdin:           $('stdin').value,
-          expected_stdout: $('expected').value,
-        }],
-      };
-
-      try {
-        const t0  = performance.now();
-        const res = await fetch('/run', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify(payload),
-        });
-        const ms   = Math.round(performance.now() - t0);
-        const data = await res.json();
-
-        if (!res.ok) {
-          setBadge('badge--fail', 'api error');
-          setOutput(`<div class="out-wrap"><div class="out-pre out-pre--err">${esc(JSON.stringify(data, null, 2))}</div></div>`);
-          return;
-        }
-
-        const ok = data.status === 'accepted';
-        setBadge(ok ? 'badge--ok' : 'badge--fail', data.status.replace(/_/g, ' '));
-        setOutput(renderResult(data, ms));
-        fetchInfo();
-
-      } catch (err) {
-        setBadge('badge--fail', 'network error');
-        setOutput(`<div class="out-pre out-pre--err">${esc(String(err))}</div>`);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run <span class="kbd">⌘↵</span>`;
-      }
-    });
-
-    /* ── Global keyboard shortcut (Cmd/Ctrl+Enter) ─────── */
-    document.addEventListener('keydown', e => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        if (!$('runBtn').disabled && !monacoReady) {
-          e.preventDefault();
-          $('runBtn').click();
-        }
-      }
-    });
-  </script>
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !monacoReady && !$('runBtn').disabled) {
+    e.preventDefault();
+    $('runBtn').click();
+  }
+});
+</script>
 </body>
 </html>

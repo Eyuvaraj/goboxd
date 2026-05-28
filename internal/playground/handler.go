@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-//go:embed index.html
+//go:embed index.html favicon.svg
 var staticFiles embed.FS
 
 // Handler returns an http.Handler that serves the playground SPA.

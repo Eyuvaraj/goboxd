@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"unicode"
 
 	"github.com/thesouldev/goboxd/internal/config"
 )
@@ -24,11 +23,11 @@ var ErrFilenameAbsolute = errors.New("filename must not be an absolute path")
 var ErrFilenameSeparator = errors.New("filename must be a single path component with no separators")
 var ErrFilenameLeadingDot = errors.New("filename must not start with a dot")
 var ErrFilenameTooLong = errors.New("filename exceeds maximum length")
-var ErrFilenameInvalidChar = errors.New("filename contains invalid characters")
+var ErrFilenameInvalidChar = errors.New("filename contains invalid characters: only [a-zA-Z0-9._-] are allowed")
 
 // Filename validates that s is safe to use as a filename inside a sandbox
 // directory. Rules: non-empty, not absolute, single path component (no /),
-// no leading dot, printable ASCII only, length ≤ MaxFilenameLen.
+// no leading dot, [a-zA-Z0-9._-] only, length ≤ MaxFilenameLen.
 func Filename(s string) error {
 	if s == "" {
 		return ErrFilenameEmpty
@@ -49,11 +48,18 @@ func Filename(s string) error {
 		return ErrFilenameTooLong
 	}
 	for _, r := range s {
-		if !unicode.IsPrint(r) || r > 127 {
+		if !isFilenameChar(r) {
 			return ErrFilenameInvalidChar
 		}
 	}
 	return nil
+}
+
+func isFilenameChar(r rune) bool {
+	return (r >= 'a' && r <= 'z') ||
+		(r >= 'A' && r <= 'Z') ||
+		(r >= '0' && r <= '9') ||
+		r == '.' || r == '_' || r == '-'
 }
 
 // Flags validates that every flag in flags appears in allowlist.
