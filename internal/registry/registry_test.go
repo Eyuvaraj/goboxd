@@ -99,3 +99,110 @@ languages:
 		t.Error("expected error for missing run.cmd")
 	}
 }
+
+func TestLoadUnknownPlaceholder(t *testing.T) {
+	yaml := `
+languages:
+  - id: bad
+    name: Bad
+    source_filename: solution.py
+    run:
+      cmd: /usr/bin/python3
+      args: ["{{srce}}"]
+      limits: {wall_time_s: 5, memory_kb: 1024, max_processes: 10}
+`
+	path := writeYAML(t, yaml)
+	_, err := registry.Load(path)
+	if err == nil {
+		t.Error("expected error for unknown placeholder {{srce}}")
+	}
+}
+
+func TestLoadUnclosedPlaceholder(t *testing.T) {
+	yaml := `
+languages:
+  - id: bad
+    name: Bad
+    source_filename: solution.py
+    run:
+      cmd: /usr/bin/python3
+      args: ["{{source"]
+      limits: {wall_time_s: 5, memory_kb: 1024, max_processes: 10}
+`
+	path := writeYAML(t, yaml)
+	_, err := registry.Load(path)
+	if err == nil {
+		t.Error("expected error for unclosed {{")
+	}
+}
+
+func TestLoadZeroWallTime(t *testing.T) {
+	yaml := `
+languages:
+  - id: bad
+    name: Bad
+    source_filename: solution.py
+    run:
+      cmd: /usr/bin/python3
+      args: ["{{source}}"]
+      limits: {wall_time_s: 0, memory_kb: 1024, max_processes: 10}
+`
+	path := writeYAML(t, yaml)
+	_, err := registry.Load(path)
+	if err == nil {
+		t.Error("expected error for wall_time_s: 0")
+	}
+}
+
+func TestLoadZeroMemory(t *testing.T) {
+	yaml := `
+languages:
+  - id: bad
+    name: Bad
+    source_filename: solution.py
+    run:
+      cmd: /usr/bin/python3
+      args: ["{{source}}"]
+      limits: {wall_time_s: 5, memory_kb: 0, max_processes: 10}
+`
+	path := writeYAML(t, yaml)
+	_, err := registry.Load(path)
+	if err == nil {
+		t.Error("expected error for memory_kb: 0")
+	}
+}
+
+func TestLoadInvalidSourceFilenameStrategy(t *testing.T) {
+	yaml := `
+languages:
+  - id: bad
+    name: Bad
+    source_filename_strategy: typo
+    run:
+      cmd: /usr/bin/python3
+      args: ["{{source}}"]
+      limits: {wall_time_s: 5, memory_kb: 1024, max_processes: 10}
+`
+	path := writeYAML(t, yaml)
+	_, err := registry.Load(path)
+	if err == nil {
+		t.Error("expected error for invalid source_filename_strategy")
+	}
+}
+
+func TestLoadMissingSourceFilename(t *testing.T) {
+	yaml := `
+languages:
+  - id: bad
+    name: Bad
+    run:
+      cmd: /usr/bin/python3
+      args: ["{{source}}"]
+      limits: {wall_time_s: 5, memory_kb: 1024, max_processes: 10}
+`
+	path := writeYAML(t, yaml)
+	_, err := registry.Load(path)
+	if err == nil {
+		t.Error("expected error for missing source_filename with no strategy")
+	}
+}

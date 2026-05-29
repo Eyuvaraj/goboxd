@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/thesouldev/goboxd/internal/config"
@@ -87,11 +88,76 @@ func validateLang(l *config.LanguageDef) error {
 	if l.Name == "" {
 		return fmt.Errorf("name is required")
 	}
+
+	if l.SourceFilenameStrategy != "" && l.SourceFilenameStrategy != "from_request" {
+		return fmt.Errorf("source_filename_strategy must be \"from_request\" or empty, got %q", l.SourceFilenameStrategy)
+	}
+	if l.SourceFilenameStrategy != "from_request" && l.SourceFilename == "" {
+		return fmt.Errorf("source_filename is required when source_filename_strategy is not from_request")
+	}
+	if l.ArtifactFilenameStrategy != "" && l.ArtifactFilenameStrategy != "from_request" {
+		return fmt.Errorf("artifact_filename_strategy must be \"from_request\" or empty, got %q", l.ArtifactFilenameStrategy)
+	}
+
 	if l.Run.Cmd == "" {
 		return fmt.Errorf("run.cmd is required")
 	}
-	if l.Build != nil && l.Build.Cmd == "" {
-		return fmt.Errorf("build.cmd is required when build block is present")
+	if err := checkLimits("run", l.Run.Limits); err != nil {
+		return err
+	}
+	if err := checkArgs("run", l.Run.Args); err != nil {
+		return err
+	}
+
+	if l.Build != nil {
+		if l.Build.Cmd == "" {
+			return fmt.Errorf("build.cmd is required when build block is present")
+		}
+		if err := checkLimits("build", l.Build.Limits); err != nil {
+			return err
+		}
+		if err := checkArgs("build", l.Build.Args); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// checkLimits rejects limits where any field is zero or negative.
+func checkLimits(phase string, limits config.LimitsDef) error {
+	if limits.WallTimeS <= 0 {
+		return fmt.Errorf("%s.limits.wall_time_s must be > 0", phase)
+	}
+	if limits.MemoryKB <= 0 {
+		return fmt.Errorf("%s.limits.memory_kb must be > 0", phase)
+	}
+	if limits.MaxProcesses <= 0 {
+		return fmt.Errorf("%s.limits.max_processes must be > 0", phase)
+	}
+	return nil
+}
+
+// checkArgs rejects args containing unknown {{...}} placeholders.
+// Valid tokens are {{source}}, {{artifact}}, and {{flags}}.
+func checkArgs(phase string, args []string) error {
+	for _, arg := range args {
+		s := arg
+		for {
+			i := strings.Index(s, "{{")
+			if i == -1 {
+				break
+			}
+			j := strings.Index(s[i:], "}}")
+			if j == -1 {
+				return fmt.Errorf("%s.args: unclosed '{{' in %q", phase, arg)
+			}
+			token := s[i : i+j+2]
+			if token != "{{source}}" && token != "{{artifact}}" && token != "{{flags}}" {
+				return fmt.Errorf("%s.args: unknown placeholder %s (valid: {{source}}, {{artifact}}, {{flags}})", phase, token)
+			}
+			s = s[i+j+2:]
+		}
 	}
 	return nil
 }

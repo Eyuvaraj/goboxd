@@ -66,7 +66,7 @@ flowchart TD
 | `internal/stats/` | Atomic counters for in-flight jobs, queue size, totals, and internal error tracking |
 | `internal/logctx/` | Typed context key for per-request log fields written by the handler, read by middleware after `ServeHTTP` |
 | `internal/playground/` | Embeds the playground SPA served at `/playground/` |
-| `configs/languages.yaml` | All 13 language definitions (7 required + 6 bonus) |
+| `configs/languages.yaml` | All 13 language definitions (7 required + 6 Additional) |
 | `tests/integration/` | End-to-end tests (build tag: `integration`) |
 
 ---

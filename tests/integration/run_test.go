@@ -461,7 +461,7 @@ func TestWhitespaceMismatch(t *testing.T) {
 }
 
 // skipIfNotRegistered skips the test when the language is not in the registry.
-// Use this for bonus languages that can be commented out in configs/languages.yaml.
+// Use this for additional languages that can be commented out in configs/languages.yaml.
 func skipIfNotRegistered(t *testing.T, langID string) {
 	t.Helper()
 	resp, err := http.Get(baseURL + "/info")
@@ -485,7 +485,7 @@ func skipIfNotRegistered(t *testing.T, langID string) {
 	t.Skipf("%s not registered in this build (uncomment in configs/languages.yaml to enable)", langID)
 }
 
-// Bonus language smoke tests — skipped automatically when the language is not registered.
+// Additional language smoke tests — skipped automatically when the language is not registered.
 
 func TestRubyHelloWorld(t *testing.T) {
 	skipIfNotRegistered(t, "ruby")
