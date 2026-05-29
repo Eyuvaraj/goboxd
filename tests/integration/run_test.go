@@ -460,9 +460,35 @@ func TestWhitespaceMismatch(t *testing.T) {
 	}
 }
 
-// Bonus language smoke tests — all require the language toolchain to be installed.
+// skipIfNotRegistered skips the test when the language is not in the registry.
+// Use this for bonus languages that can be commented out in configs/languages.yaml.
+func skipIfNotRegistered(t *testing.T, langID string) {
+	t.Helper()
+	resp, err := http.Get(baseURL + "/info")
+	if err != nil {
+		t.Fatalf("GET /info: %v", err)
+	}
+	defer resp.Body.Close()
+	var body struct {
+		Languages []struct {
+			ID string `json:"id"`
+		} `json:"languages"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode /info: %v", err)
+	}
+	for _, l := range body.Languages {
+		if l.ID == langID {
+			return
+		}
+	}
+	t.Skipf("%s not registered in this build (uncomment in configs/languages.yaml to enable)", langID)
+}
+
+// Bonus language smoke tests — skipped automatically when the language is not registered.
 
 func TestRubyHelloWorld(t *testing.T) {
+	skipIfNotRegistered(t, "ruby")
 	resp, code := postRun(t, runRequest{
 		Language: "ruby",
 		Source:   "puts 'hello'\n",
@@ -477,6 +503,7 @@ func TestRubyHelloWorld(t *testing.T) {
 }
 
 func TestLuaHelloWorld(t *testing.T) {
+	skipIfNotRegistered(t, "lua")
 	resp, code := postRun(t, runRequest{
 		Language: "lua",
 		Source:   `print("hello")` + "\n",
@@ -491,6 +518,7 @@ func TestLuaHelloWorld(t *testing.T) {
 }
 
 func TestRustHelloWorld(t *testing.T) {
+	skipIfNotRegistered(t, "rust")
 	src := `fn main() { println!("hello"); }` + "\n"
 	resp, code := postRun(t, runRequest{
 		Language: "rust",
@@ -506,6 +534,7 @@ func TestRustHelloWorld(t *testing.T) {
 }
 
 func TestGoHelloWorld(t *testing.T) {
+	skipIfNotRegistered(t, "go")
 	src := `package main
 import "fmt"
 func main() { fmt.Println("hello") }
@@ -524,6 +553,7 @@ func main() { fmt.Println("hello") }
 }
 
 func TestOCamlHelloWorld(t *testing.T) {
+	skipIfNotRegistered(t, "ocaml")
 	src := `print_string "hello\n";;` + "\n"
 	resp, code := postRun(t, runRequest{
 		Language: "ocaml",
@@ -539,6 +569,7 @@ func TestOCamlHelloWorld(t *testing.T) {
 }
 
 func TestKotlinHelloWorld(t *testing.T) {
+	skipIfNotRegistered(t, "kotlin")
 	src := `fun main() { println("hello") }` + "\n"
 	resp, code := postRun(t, runRequest{
 		Language: "kotlin",
