@@ -46,13 +46,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         default-jdk-headless \
         iverilog \
         bash \
-        # Bonus languages
+        # Bonus languages — active
         ruby \
         lua5.4 \
-        rustc \
         ocaml \
-        kotlin \
-        golang-go \
+        # Demo day: uncomment to add Rust, Kotlin, Go (one apt line each)
+        # rustc \
+        # kotlin \
+        # golang-go \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=nsjail-builder /usr/local/bin/nsjail /usr/local/bin/nsjail
@@ -69,10 +70,10 @@ RUN python3 --version \
     && bash --version \
     && ruby --version \
     && lua5.4 -e 'print("ok")' \
-    && rustc --version \
-    && ocaml -version \
-    && kotlinc -version \
-    && go version
+    && ocaml -version
+    # && rustc --version \
+    # && kotlinc -version \
+    # && go version
 
 RUN mkdir -p /tmp/goboxd
 
