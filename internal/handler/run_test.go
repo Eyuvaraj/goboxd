@@ -178,14 +178,22 @@ func TestRunHandler_UnknownLanguage(t *testing.T) {
 }
 
 func TestRunHandler_EmptySource(t *testing.T) {
-	h := newTestRunHandler(t, nil)
+	// Empty source is valid — the pipeline handles it (interpreted languages run
+	// an empty file; compiled languages get a build_failed). Verify it reaches
+	// the runner and returns 200 with the runner's result.
+	mock := &mockSubmitter{resp: runner.Response{
+		Status: validate.StatusAccepted,
+		Build:  runner.BuildResult{Status: validate.BuildStatusOK},
+		Tests:  []runner.TestResult{{Status: validate.StatusAccepted}},
+	}}
+	h := newTestRunHandler(t, mock)
 	w := postJSON(t, h, map[string]any{
 		"language": "py3",
 		"source":   "",
 		"tests":    []map[string]any{{"stdin": "", "expected_stdout": ""}},
 	})
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("want 400, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d; empty source should reach the runner", w.Code)
 	}
 }
 

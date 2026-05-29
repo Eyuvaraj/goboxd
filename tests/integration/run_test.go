@@ -294,6 +294,91 @@ func TestUnknownLanguage(t *testing.T) {
 	}
 }
 
+func TestInvalidJSON(t *testing.T) {
+	resp, err := http.Post(baseURL+"/run", "application/json",
+		bytes.NewBufferString(`{"language": "py3", "source": `))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 400 {
+		t.Fatalf("expected 400 for malformed JSON, got %d", resp.StatusCode)
+	}
+	var er errorResponse
+	json.NewDecoder(resp.Body).Decode(&er)
+	if er.Error.Code != "invalid_json" {
+		t.Fatalf("expected invalid_json, got %s", er.Error.Code)
+	}
+}
+
+func TestInvalidTestCount(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{
+		"language": "py3",
+		"source":   "print('hi')\n",
+		"tests":    []testCase{},
+	})
+	resp, err := http.Post(baseURL+"/run", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 400 {
+		t.Fatalf("expected 400 for empty tests, got %d", resp.StatusCode)
+	}
+	var er errorResponse
+	json.NewDecoder(resp.Body).Decode(&er)
+	if er.Error.Code != "invalid_test_count" {
+		t.Fatalf("expected invalid_test_count, got %s", er.Error.Code)
+	}
+}
+
+func TestStdinTooLarge(t *testing.T) {
+	large := make([]byte, 70*1024) // 70 KiB > 64 KiB limit
+	for i := range large {
+		large[i] = 'x'
+	}
+	body, _ := json.Marshal(map[string]any{
+		"language": "py3",
+		"source":   "print('hi')\n",
+		"tests":    []map[string]any{{"stdin": string(large), "expected_stdout": "hi\n"}},
+	})
+	resp, err := http.Post(baseURL+"/run", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 400 {
+		t.Fatalf("expected 400 for oversized stdin, got %d", resp.StatusCode)
+	}
+	var er errorResponse
+	json.NewDecoder(resp.Body).Decode(&er)
+	if er.Error.Code != "stdin_too_large" {
+		t.Fatalf("expected stdin_too_large, got %s", er.Error.Code)
+	}
+}
+
+func TestMissingSourceFilename(t *testing.T) {
+	body, _ := json.Marshal(map[string]any{
+		"language": "java",
+		"source":   "public class Main { public static void main(String[] a) {} }",
+		// source_filename intentionally omitted
+		"tests": []testCase{{Stdin: "", ExpectedStdout: ""}},
+	})
+	resp, err := http.Post(baseURL+"/run", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 400 {
+		t.Fatalf("expected 400 for missing source_filename, got %d", resp.StatusCode)
+	}
+	var er errorResponse
+	json.NewDecoder(resp.Body).Decode(&er)
+	if er.Error.Code != "missing_source_filename" {
+		t.Fatalf("expected missing_source_filename, got %s", er.Error.Code)
+	}
+}
+
 func TestPathTraversalFilename(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{
 		"language":        "java",

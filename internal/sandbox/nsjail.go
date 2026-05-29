@@ -164,7 +164,21 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	// Create the cgroup directory so nsjail can use it and we can read it later.
 	cgroupPath := filepath.Join("/sys/fs/cgroup", cfg.CgroupParent)
 	_ = os.Mkdir(cgroupPath, 0o755)
-	defer func() { _ = os.Remove(cgroupPath) }()
+	defer func() {
+		// If nsjail was killed (e.g. context timeout) before it could clean up its
+		// own child cgroup, the parent directory will be non-empty and os.Remove
+		// (rmdir) would fail with ENOTEMPTY. Remove child cgroup directories first;
+		// kernel virtual files (cgroup.procs, memory.peak, …) are not real inodes
+		// and do not prevent rmdir of the parent once sub-cgroups are gone.
+		if entries, err := os.ReadDir(cgroupPath); err == nil {
+			for _, e := range entries {
+				if e.IsDir() {
+					_ = os.Remove(filepath.Join(cgroupPath, e.Name()))
+				}
+			}
+		}
+		_ = os.Remove(cgroupPath)
+	}()
 
 	argv := buildArgv(cfg)
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
@@ -299,10 +313,12 @@ func buildArgv(cfg RunConfig) []string {
 
 	if cfg.Limits.WallTimeS > 0 {
 		argv = append(argv, "--time_limit", fmt.Sprintf("%d", cfg.Limits.WallTimeS))
-		// CPU time cap: secondary guard alongside wall-clock --time_limit.
-		// Prevents a compute-bound process from burning CPU when the system is
-		// under load (where wall time can expire without proportional CPU use).
-		argv = append(argv, "--rlimit_cpu", fmt.Sprintf("%d", cfg.Limits.WallTimeS))
+		// CPU rlimit set one second above the wall-time limit so that nsjail's
+		// own wall-time check always fires first and logs "run time >= time limit".
+		// When both are equal, a 100% CPU-bound process receives SIGXCPU from the
+		// kernel before nsjail's poll loop wakes up, causing the status to parse
+		// as runtime_error instead of time_exceeded.
+		argv = append(argv, "--rlimit_cpu", fmt.Sprintf("%d", cfg.Limits.WallTimeS+1))
 	}
 	if cfg.Limits.MemoryKB > 0 {
 		// cgroup memory.max enforces RSS; this is the primary limit and makes

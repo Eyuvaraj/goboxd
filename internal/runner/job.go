@@ -27,7 +27,7 @@ type TestResult struct {
 	Stdout       string `json:"stdout"`
 	Stderr       string `json:"stderr"`
 	DurationMs   int64  `json:"duration_ms"`
-	MemoryPeakKB int64  `json:"memory_peak_kb,omitempty"`
+	MemoryPeakKB int64  `json:"memory_peak_kb"`
 }
 
 // JobRequest is the validated, parsed input to a job.

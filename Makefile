@@ -2,10 +2,11 @@
 
 COMPOSE ?= docker compose
 TOOLS   := $(COMPOSE) --profile tools run --rm tools
+COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 # Build the runtime Docker image.
 build:
-	$(COMPOSE) build goboxd
+	$(COMPOSE) build --build-arg COMMIT=$(COMMIT) goboxd
 
 # Start the service locally (requires Docker).
 run:

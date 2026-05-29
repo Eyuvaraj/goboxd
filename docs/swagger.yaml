@@ -5,10 +5,10 @@ definitions:
         example: 64
         type: integer
       memory_kb:
-        example: 65536
+        example: 262144
         type: integer
       wall_time_s:
-        example: 10
+        example: 5
         type: integer
     type: object
   handler.BuildInfo:
@@ -124,14 +124,13 @@ definitions:
         example: /usr/local/bin/nsjail
         type: string
       version:
-        example: 'nsjail version: 3.6'
+        example: 'nsjail version: 3.4'
         type: string
     type: object
   handler.PhaseOverride:
     properties:
       flags:
-        example:
-        - -O2
+        example: []
         items:
           type: string
         type: array
@@ -170,20 +169,22 @@ definitions:
   handler.RunRequest:
     properties:
       artifact_filename:
-        example: Main
+        example: solution
         type: string
       build:
         $ref: '#/definitions/handler.PhaseOverride'
       language:
-        example: py3
+        example: cpp
         type: string
       run:
         $ref: '#/definitions/handler.PhaseOverride'
       source:
-        example: print(input())
+        example: |-
+          #include <iostream>
+          int main(){std::cout<<"hi";}
         type: string
       source_filename:
-        example: Main.java
+        example: solution.cpp
         type: string
       tests:
         items:
@@ -206,7 +207,7 @@ definitions:
         - memory_exceeded
         - runtime_error
         - internal_error
-        example: accepted
+        example: wrong_output
         type: string
       tests:
         items:
@@ -249,12 +250,11 @@ definitions:
   handler.TestCase:
     properties:
       expected_stdout:
-        example: |
-          hello
+        example: hi
         type: string
       stdin:
         example: |
-          hello
+          1
         type: string
     type: object
   handler.TestResult:
@@ -263,7 +263,7 @@ definitions:
         example: 38
         type: integer
       memory_peak_kb:
-        example: 1024
+        example: 8192
         type: integer
       status:
         enum:
@@ -275,21 +275,17 @@ definitions:
         - runtime_error
         - not_executed
         - internal_error
-        example: accepted
+        example: wrong_output
         type: string
       stderr:
         example: ""
         type: string
       stdout:
-        example: hello
+        example: HI
         type: string
     type: object
 info:
   contact: {}
-  description: |-
-    goboxd — Go Sandbox Daemon. Compiles and runs untrusted code inside an nsjail sandbox.
-
-    **Interactive playground:** [/playground/](/playground/)
 paths:
   /healthz:
     get:
@@ -353,6 +349,40 @@ paths:
         **Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.
 
         **Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 `invalid_limits`.
+
+        ---
+
+        **Sample request (C++, one test case):**
+        ```json
+        {
+        "language": "cpp",
+        "source": "#include <iostream>\nint main(){std::cout<<\"hi\";}",
+        "source_filename": "solution.cpp",
+        "artifact_filename": "solution",
+        "build": {
+        "limits": { "wall_time_s": 5, "memory_kb": 1048576, "max_processes": 100 },
+        "flags": ["-O2"]
+        },
+        "run": {
+        "limits": { "wall_time_s": 3, "memory_kb": 524288, "max_processes": 64 },
+        "flags": []
+        },
+        "tests": [
+        { "stdin": "1\n", "expected_stdout": "hi" }
+        ]
+        }
+        ```
+
+        **Sample response** (code printed `"HI"` instead of `"hi"` — wrong_output):
+        ```json
+        {
+        "status": "wrong_output",
+        "build": { "status": "ok", "stdout": "", "stderr": "", "duration_ms": 412 },
+        "tests": [
+        { "status": "wrong_output", "stdout": "HI", "stderr": "", "duration_ms": 38, "memory_peak_kb": 8192 }
+        ]
+        }
+        ```
       parameters:
       - description: Code execution request
         in: body

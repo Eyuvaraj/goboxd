@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Load test for goboxd — POST /run with a trivial py3 hello-world.
+# Load test for goboxd — POST /run with py3 and cpp hello-world payloads.
 # Requires: hey (https://github.com/rakyll/hey) or k6 (https://k6.io)
 # Usage: bash scripts/load_test.sh [HOST]
 
@@ -21,45 +21,73 @@ fi
 HOST="${1:-http://localhost:8080}"
 ENDPOINT="${HOST}/run"
 
-BODY='{
+PY3_BODY='{
   "language": "py3",
   "source": "print(\"Hello, World!\")",
   "tests": [{"stdin": "", "expected_stdout": "Hello, World!\n"}]
 }'
 
-if command -v hey &>/dev/null; then
-  echo "=== Using hey ==="
+CPP_BODY='{
+  "language": "cpp",
+  "source": "#include <iostream>\nint main(){std::cout<<\"Hello, World!\\n\";}",
+  "source_filename": "solution.cpp",
+  "artifact_filename": "solution",
+  "tests": [{"stdin": "", "expected_stdout": "Hello, World!\n"}]
+}'
+
+run_hey() {
+  local label="$1"
+  local body="$2"
+  echo ""
+  echo "=============================="
+  echo " Language: ${label}"
+  echo "=============================="
   for C in 1 10 50 100; do
     echo ""
     echo "--- ${C} concurrent clients ---"
-    echo "$BODY" | hey -n 200 -c "$C" -m POST \
+    # cpp has a build step; use fewer requests so the run doesn't take too long
+    local N=200
+    [ "$label" = "cpp" ] && N=100
+    printf '%s' "$body" | hey -n "$N" -c "$C" -m POST \
       -T "application/json" \
       -D /dev/stdin \
       "$ENDPOINT"
   done
-elif command -v k6 &>/dev/null; then
-  echo "=== Using k6 ==="
+}
+
+run_k6() {
+  local label="$1"
+  local body="$2"
+  echo ""
+  echo "=============================="
+  echo " Language: ${label}"
+  echo "=============================="
   for C in 1 10 50 100; do
+    local N=200
+    [ "$label" = "cpp" ] && N=100
     echo ""
     echo "--- ${C} concurrent clients ---"
-    k6 run --vus "$C" --iterations 200 - <<'K6EOF'
+    ENDPOINT="$ENDPOINT" K6_BODY="$body" k6 run --vus "$C" --iterations "$N" - <<'K6EOF'
 import http from 'k6/http';
 import { check } from 'k6';
-
-const body = JSON.stringify({
-  language: 'py3',
-  source: 'print("Hello, World!")',
-  tests: [{ stdin: '', expected_stdout: 'Hello, World!\n' }],
-});
-
 export default function () {
-  const res = http.post(__ENV.ENDPOINT, body, {
+  const res = http.post(__ENV.ENDPOINT, __ENV.K6_BODY, {
     headers: { 'Content-Type': 'application/json' },
   });
   check(res, { 'status 200': (r) => r.status === 200 });
 }
 K6EOF
   done
+}
+
+if command -v hey &>/dev/null; then
+  echo "=== Using hey ==="
+  run_hey "py3" "$PY3_BODY"
+  run_hey "cpp" "$CPP_BODY"
+elif command -v k6 &>/dev/null; then
+  echo "=== Using k6 ==="
+  run_k6 "py3" "$PY3_BODY"
+  run_k6 "cpp" "$CPP_BODY"
 else
   echo "Error: install 'hey' or 'k6' to run load tests." >&2
   echo "  hey: go install github.com/rakyll/hey@latest" >&2

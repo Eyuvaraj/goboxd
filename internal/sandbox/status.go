@@ -34,6 +34,12 @@ func ParseRunStatus(log []byte, exitCode int) string {
 	case bytes.Contains(logLow, []byte("memory.max")) &&
 		bytes.Contains(log, []byte("killed by signal")):
 		return validate.StatusMemoryExceeded
+	// SIGXCPU (CPU time limit exceeded) fires when the rlimit_cpu guard is hit.
+	// rlimit_cpu is set one second above --time_limit as a fallback; if it
+	// fires anyway (e.g. under heavy system load), it still means a time limit
+	// was the cause — report time_exceeded, not runtime_error.
+	case bytes.Contains(log, []byte("SIGXCPU")):
+		return validate.StatusTimeExceeded
 	case bytes.Contains(log, []byte("killed by signal")):
 		return validate.StatusRuntimeError
 	case exitCode == 0:

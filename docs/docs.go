@@ -83,7 +83,7 @@ const docTemplate = `{
         },
         "/run": {
             "post": {
-                "description": "Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.\n\n**Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the ` + "`" + `status` + "`" + ` fields of the response body — not as HTTP error codes.\n\n**Filename requirements:** Some languages (e.g. Java) require ` + "`" + `source_filename` + "`" + ` and ` + "`" + `artifact_filename` + "`" + ` to match the public class name. The ` + "`" + `strategy` + "`" + ` field in the language definition controls this.\n\n**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 ` + "`" + `invalid_flag` + "`" + `.\n\n**Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 ` + "`" + `invalid_limits` + "`" + `.",
+                "description": "Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.\n\n**Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the ` + "`" + `status` + "`" + ` fields of the response body — not as HTTP error codes.\n\n**Filename requirements:** Some languages (e.g. Java) require ` + "`" + `source_filename` + "`" + ` and ` + "`" + `artifact_filename` + "`" + ` to match the public class name. The ` + "`" + `strategy` + "`" + ` field in the language definition controls this.\n\n**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 ` + "`" + `invalid_flag` + "`" + `.\n\n**Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 ` + "`" + `invalid_limits` + "`" + `.\n\n---\n\n**Sample request (C++, one test case):**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"language\": \"cpp\",\n\"source\": \"#include \u003ciostream\u003e\\nint main(){std::cout\u003c\u003c\\\"hi\\\";}\",\n\"source_filename\": \"solution.cpp\",\n\"artifact_filename\": \"solution\",\n\"build\": {\n\"limits\": { \"wall_time_s\": 5, \"memory_kb\": 1048576, \"max_processes\": 100 },\n\"flags\": [\"-O2\"]\n},\n\"run\": {\n\"limits\": { \"wall_time_s\": 3, \"memory_kb\": 524288, \"max_processes\": 64 },\n\"flags\": []\n},\n\"tests\": [\n{ \"stdin\": \"1\\n\", \"expected_stdout\": \"hi\" }\n]\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n**Sample response** (code printed ` + "`" + `\"HI\"` + "`" + ` instead of ` + "`" + `\"hi\"` + "`" + ` — wrong_output):\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"status\": \"wrong_output\",\n\"build\": { \"status\": \"ok\", \"stdout\": \"\", \"stderr\": \"\", \"duration_ms\": 412 },\n\"tests\": [\n{ \"status\": \"wrong_output\", \"stdout\": \"HI\", \"stderr\": \"\", \"duration_ms\": 38, \"memory_peak_kb\": 8192 }\n]\n}\n` + "`" + `` + "`" + `` + "`" + `",
                 "consumes": [
                     "application/json"
                 ],
@@ -144,11 +144,11 @@ const docTemplate = `{
                 },
                 "memory_kb": {
                     "type": "integer",
-                    "example": 65536
+                    "example": 262144
                 },
                 "wall_time_s": {
                     "type": "integer",
-                    "example": 10
+                    "example": 5
                 }
             }
         },
@@ -310,7 +310,7 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string",
-                    "example": "nsjail version: 3.6"
+                    "example": "nsjail version: 3.4"
                 }
             }
         },
@@ -319,12 +319,10 @@ const docTemplate = `{
             "properties": {
                 "flags": {
                     "type": "array",
+                    "example": [],
                     "items": {
                         "type": "string"
-                    },
-                    "example": [
-                        "-O2"
-                    ]
+                    }
                 },
                 "limits": {
                     "$ref": "#/definitions/config.LimitsDef"
@@ -376,25 +374,25 @@ const docTemplate = `{
             "properties": {
                 "artifact_filename": {
                     "type": "string",
-                    "example": "Main"
+                    "example": "solution"
                 },
                 "build": {
                     "$ref": "#/definitions/handler.PhaseOverride"
                 },
                 "language": {
                     "type": "string",
-                    "example": "py3"
+                    "example": "cpp"
                 },
                 "run": {
                     "$ref": "#/definitions/handler.PhaseOverride"
                 },
                 "source": {
                     "type": "string",
-                    "example": "print(input())"
+                    "example": "#include \u003ciostream\u003e\nint main(){std::cout\u003c\u003c\"hi\";}"
                 },
                 "source_filename": {
                     "type": "string",
-                    "example": "Main.java"
+                    "example": "solution.cpp"
                 },
                 "tests": {
                     "type": "array",
@@ -423,7 +421,7 @@ const docTemplate = `{
                         "runtime_error",
                         "internal_error"
                     ],
-                    "example": "accepted"
+                    "example": "wrong_output"
                 },
                 "tests": {
                     "type": "array",
@@ -484,11 +482,11 @@ const docTemplate = `{
             "properties": {
                 "expected_stdout": {
                     "type": "string",
-                    "example": "hello\n"
+                    "example": "hi"
                 },
                 "stdin": {
                     "type": "string",
-                    "example": "hello\n"
+                    "example": "1\n"
                 }
             }
         },
@@ -501,7 +499,7 @@ const docTemplate = `{
                 },
                 "memory_peak_kb": {
                     "type": "integer",
-                    "example": 1024
+                    "example": 8192
                 },
                 "status": {
                     "type": "string",
@@ -515,7 +513,7 @@ const docTemplate = `{
                         "not_executed",
                         "internal_error"
                     ],
-                    "example": "accepted"
+                    "example": "wrong_output"
                 },
                 "stderr": {
                     "type": "string",
@@ -523,7 +521,7 @@ const docTemplate = `{
                 },
                 "stdout": {
                     "type": "string",
-                    "example": "hello"
+                    "example": "HI"
                 }
             }
         }

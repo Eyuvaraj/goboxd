@@ -42,6 +42,40 @@ func NewRunHandler(r Submitter, reg *registry.Registry, cfg config.Server) *RunH
 //	@Description	**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.
 //	@Description
 //	@Description	**Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 `invalid_limits`.
+//	@Description
+//	@Description	---
+//	@Description
+//	@Description	**Sample request (C++, one test case):**
+//	@Description	```json
+//	@Description	{
+//	@Description	  "language": "cpp",
+//	@Description	  "source": "#include <iostream>\nint main(){std::cout<<\"hi\";}",
+//	@Description	  "source_filename": "solution.cpp",
+//	@Description	  "artifact_filename": "solution",
+//	@Description	  "build": {
+//	@Description	    "limits": { "wall_time_s": 5, "memory_kb": 1048576, "max_processes": 100 },
+//	@Description	    "flags": ["-O2"]
+//	@Description	  },
+//	@Description	  "run": {
+//	@Description	    "limits": { "wall_time_s": 3, "memory_kb": 524288, "max_processes": 64 },
+//	@Description	    "flags": []
+//	@Description	  },
+//	@Description	  "tests": [
+//	@Description	    { "stdin": "1\n", "expected_stdout": "hi" }
+//	@Description	  ]
+//	@Description	}
+//	@Description	```
+//	@Description
+//	@Description	**Sample response** (code printed `"HI"` instead of `"hi"` — wrong_output):
+//	@Description	```json
+//	@Description	{
+//	@Description	  "status": "wrong_output",
+//	@Description	  "build": { "status": "ok", "stdout": "", "stderr": "", "duration_ms": 412 },
+//	@Description	  "tests": [
+//	@Description	    { "status": "wrong_output", "stdout": "HI", "stderr": "", "duration_ms": 38, "memory_peak_kb": 8192 }
+//	@Description	  ]
+//	@Description	}
+//	@Description	```
 //	@Tags			execution
 //	@Accept			json
 //	@Produce		json
@@ -67,10 +101,6 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// --- Validate source ---
-	if req.Source == "" {
-		writeError(w, http.StatusBadRequest, "missing_source", "source is required")
-		return
-	}
 	if err := validate.SourceSize(req.Source, h.cfg.MaxSourceBytes); err != nil {
 		writeError(w, http.StatusBadRequest, "source_too_large", err.Error())
 		return
@@ -118,11 +148,13 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if req.Run != nil && len(lang.Run.FlagAllowlist) > 0 {
+	if req.Run != nil {
 		runFlags = req.Run.Flags
-		if err := validate.Flags(runFlags, lang.Run.FlagAllowlist); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_flag", err.Error())
-			return
+		if len(runFlags) > 0 {
+			if err := validate.Flags(runFlags, lang.Run.FlagAllowlist); err != nil {
+				writeError(w, http.StatusBadRequest, "invalid_flag", err.Error())
+				return
+			}
 		}
 	}
 

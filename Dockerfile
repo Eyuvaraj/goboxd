@@ -1,8 +1,8 @@
 ARG GO_VERSION=1.26
 ARG DEBIAN_VERSION=bookworm
 
-# ---- Build nsjail 3.6 from source ----
-# nsjail is included as a git submodule at external/nsjail (pinned to tag 3.6).
+# ---- Build nsjail 3.4 from source ----
+# nsjail is included as a git submodule at external/nsjail (pinned to tag 3.4).
 # Build it from the checked-out source rather than fetching from the network at build time.
 FROM debian:${DEBIAN_VERSION}-slim AS nsjail-builder
 RUN apt-get update && apt-get install -y --no-install-recommends \

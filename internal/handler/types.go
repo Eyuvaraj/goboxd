@@ -6,10 +6,10 @@ import "github.com/thesouldev/goboxd/internal/config"
 
 // RunRequest is the JSON body for POST /run.
 type RunRequest struct {
-	Language         string         `json:"language"          example:"py3"`
-	Source           string         `json:"source"            example:"print(input())"`
-	SourceFilename   string         `json:"source_filename"   example:"Main.java"`
-	ArtifactFilename string         `json:"artifact_filename" example:"Main"`
+	Language         string         `json:"language"          example:"cpp"`
+	Source           string         `json:"source"            example:"#include <iostream>\nint main(){std::cout<<\"hi\";}"`
+	SourceFilename   string         `json:"source_filename"   example:"solution.cpp"`
+	ArtifactFilename string         `json:"artifact_filename" example:"solution"`
 	Build            *PhaseOverride `json:"build"`
 	Run              *PhaseOverride `json:"run"`
 	Tests            []TestCase     `json:"tests"`
@@ -18,19 +18,19 @@ type RunRequest struct {
 // PhaseOverride lets the client override limits and supply extra flags for a phase.
 type PhaseOverride struct {
 	Limits config.LimitsDef `json:"limits"`
-	Flags  []string         `json:"flags" example:"-O2"`
+	Flags  []string         `json:"flags"`
 }
 
 // TestCase is one stdin/expected_stdout pair in the request.
 type TestCase struct {
-	Stdin          string `json:"stdin"           example:"hello\n"`
-	ExpectedStdout string `json:"expected_stdout" example:"hello\n"`
+	Stdin          string `json:"stdin"           example:"1\n"`
+	ExpectedStdout string `json:"expected_stdout" example:"hi"`
 }
 
 // RunResponse is the JSON body returned by POST /run.
 type RunResponse struct {
 	// Status summarises the overall result. "accepted" means build succeeded and all tests passed.
-	Status string       `json:"status" enums:"accepted,build_failed,wrong_output,output_whitespace_mismatch,time_exceeded,memory_exceeded,runtime_error,internal_error" example:"accepted"`
+	Status string       `json:"status" enums:"accepted,build_failed,wrong_output,output_whitespace_mismatch,time_exceeded,memory_exceeded,runtime_error,internal_error" example:"wrong_output"`
 	Build  BuildResult  `json:"build"`
 	Tests  []TestResult `json:"tests"`
 }
@@ -45,11 +45,11 @@ type BuildResult struct {
 
 // TestResult is one test-case result embedded in RunResponse.
 type TestResult struct {
-	Status       string `json:"status"        enums:"accepted,wrong_output,output_whitespace_mismatch,time_exceeded,memory_exceeded,runtime_error,not_executed,internal_error" example:"accepted"`
-	Stdout       string `json:"stdout"        example:"hello"`
+	Status       string `json:"status"        enums:"accepted,wrong_output,output_whitespace_mismatch,time_exceeded,memory_exceeded,runtime_error,not_executed,internal_error" example:"wrong_output"`
+	Stdout       string `json:"stdout"        example:"HI"`
 	Stderr       string `json:"stderr"        example:""`
 	DurationMs   int64  `json:"duration_ms"   example:"38"`
-	MemoryPeakKB int64  `json:"memory_peak_kb" example:"1024"`
+	MemoryPeakKB int64  `json:"memory_peak_kb" example:"8192"`
 }
 
 // ErrorResponse is returned for 4xx/5xx errors.
@@ -60,7 +60,7 @@ type ErrorResponse struct {
 // ErrorDetail carries the machine-readable error code and human-readable message.
 type ErrorDetail struct {
 	// Code is a stable machine-readable identifier.
-	Code    string `json:"code"    enums:"invalid_json,unknown_language,missing_source,source_too_large,missing_source_filename,missing_artifact_filename,invalid_filename,invalid_flag,invalid_limits,invalid_test_count,stdin_too_large,expected_too_large,internal_error" example:"unknown_language"`
+	Code    string `json:"code"    enums:"invalid_json,unknown_language,source_too_large,missing_source_filename,missing_artifact_filename,invalid_filename,invalid_flag,invalid_limits,invalid_test_count,stdin_too_large,expected_too_large,internal_error" example:"unknown_language"`
 	Message string `json:"message" example:"language \"cobol\" is not registered"`
 }
 
@@ -96,7 +96,7 @@ type BuildInfo struct {
 // NsjailInfo holds nsjail path and version for GET /info.
 type NsjailInfo struct {
 	Path    string `json:"path"    example:"/usr/local/bin/nsjail"`
-	Version string `json:"version" example:"nsjail version: 3.6"`
+	Version string `json:"version" example:"nsjail version: 3.4"`
 }
 
 // LanguageRunLimits holds the default run-phase limits for one language in GET /info.
