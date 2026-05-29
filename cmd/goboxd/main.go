@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/thesouldev/goboxd/docs"
 	"github.com/thesouldev/goboxd/internal/config"
 	"github.com/thesouldev/goboxd/internal/handler"
 	"github.com/thesouldev/goboxd/internal/playground"
@@ -61,6 +62,10 @@ func main() {
 
 	r.Handle("/", http.RedirectHandler("/playground/", http.StatusFound))
 	r.Mount("/playground/", http.StripPrefix("/playground/", playground.Handler()))
+
+	r.Handle("/docs", http.RedirectHandler("/docs/", http.StatusFound))
+	r.Get("/docs/", docs.UIHandler)
+	r.Get("/docs/swagger.json", docs.JSONHandler)
 
 	// WriteTimeout covers the worst-case job duration across all registered languages.
 	writeTimeout := reg.MaxJobDuration(cfg.MaxTests)
