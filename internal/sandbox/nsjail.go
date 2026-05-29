@@ -3,11 +3,13 @@ package sandbox
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -159,7 +161,7 @@ type RunResult struct {
 // It never uses a shell — argv is built as a pure []string.
 func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	// Generate a unique cgroup parent for this run to track memory peak.
-	cfg.CgroupParent = fmt.Sprintf("goboxd-%d", time.Now().UnixNano())
+	cfg.CgroupParent = "goboxd-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 
 	// Create the cgroup directory so nsjail can use it and we can read it later.
 	cgroupPath := filepath.Join("/sys/fs/cgroup", cfg.CgroupParent)
@@ -238,7 +240,8 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 
 	exitCode := 0
 	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
 			exitCode = ee.ExitCode()
 		}
 	}
@@ -248,11 +251,10 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 		stdout = append(stdout, []byte(truncationMarker)...)
 	}
 
-	// Read peak memory from cgroup v2
+	// Read peak memory from cgroup v2.
 	var peakKB int64
 	if peakBytes, err := os.ReadFile(filepath.Join(cgroupPath, "memory.peak")); err == nil {
-		var peak int64
-		if _, err := fmt.Sscanf(string(bytes.TrimSpace(peakBytes)), "%d", &peak); err == nil {
+		if peak, err := strconv.ParseInt(string(bytes.TrimSpace(peakBytes)), 10, 64); err == nil {
 			peakKB = peak / 1024
 		}
 	}
@@ -312,19 +314,19 @@ func buildArgv(cfg RunConfig) []string {
 	}
 
 	if cfg.Limits.WallTimeS > 0 {
-		argv = append(argv, "--time_limit", fmt.Sprintf("%d", cfg.Limits.WallTimeS))
+		argv = append(argv, "--time_limit", strconv.Itoa(cfg.Limits.WallTimeS))
 		// CPU rlimit set one second above the wall-time limit so that nsjail's
 		// own wall-time check always fires first and logs "run time >= time limit".
 		// When both are equal, a 100% CPU-bound process receives SIGXCPU from the
 		// kernel before nsjail's poll loop wakes up, causing the status to parse
 		// as runtime_error instead of time_exceeded.
-		argv = append(argv, "--rlimit_cpu", fmt.Sprintf("%d", cfg.Limits.WallTimeS+1))
+		argv = append(argv, "--rlimit_cpu", strconv.Itoa(cfg.Limits.WallTimeS+1))
 	}
 	if cfg.Limits.MemoryKB > 0 {
 		// cgroup memory.max enforces RSS; this is the primary limit and makes
 		// memory_exceeded detection reliable (nsjail logs the OOM event).
 		cgroupMemBytes := int64(cfg.Limits.MemoryKB) * 1024
-		argv = append(argv, "--cgroup_mem_max", fmt.Sprintf("%d", cgroupMemBytes))
+		argv = append(argv, "--cgroup_mem_max", strconv.FormatInt(cgroupMemBytes, 10))
 		// Disable swap entirely so the process OOMs at exactly memory.max rather
 		// than silently spilling into swap and making the limit unpredictable.
 		argv = append(argv, "--cgroup_mem_swap_max", "0")
@@ -337,24 +339,21 @@ func buildArgv(cfg RunConfig) []string {
 		if virtMiB < 4096 {
 			virtMiB = 4096
 		}
-		argv = append(argv, "--rlimit_as", fmt.Sprintf("%d", virtMiB))
+		argv = append(argv, "--rlimit_as", strconv.Itoa(virtMiB))
 	}
 	if cfg.Limits.MaxProcesses > 0 {
 		// cgroup pids.max is the hard limit; rlimit_nproc is the per-user fallback.
-		argv = append(argv, "--cgroup_pids_max", fmt.Sprintf("%d", cfg.Limits.MaxProcesses))
-		argv = append(argv, "--rlimit_nproc", fmt.Sprintf("%d", cfg.Limits.MaxProcesses))
+		argv = append(argv, "--cgroup_pids_max", strconv.Itoa(cfg.Limits.MaxProcesses))
+		argv = append(argv, "--rlimit_nproc", strconv.Itoa(cfg.Limits.MaxProcesses))
 	}
 
 	// File size cap: 100 MB per created file (safety net against runaway writes).
 	argv = append(argv, "--rlimit_fsize", "100")
 
+	// Each bind mount is either a bare path ("/usr") or "host:container";
+	// nsjail accepts both forms verbatim after -R.
 	for _, bm := range cfg.BindMounts {
-		parts := strings.SplitN(bm, ":", 2)
-		if len(parts) == 2 {
-			argv = append(argv, "-R", parts[0]+":"+parts[1])
-		} else {
-			argv = append(argv, "-R", bm)
-		}
+		argv = append(argv, "-R", bm)
 	}
 
 	argv = append(argv, "--seccomp_string", seccompPolicy)

@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -36,11 +37,10 @@ func ProbeNsjail(nsjailPath string) ProbeResult {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, execErr := exec.CommandContext(ctx, nsjailPath, "--help").CombinedOutput()
-	if execErr != nil {
-		if _, ok := execErr.(*exec.ExitError); !ok {
-			// Real exec failure (e.g. permission denied, ELF not found).
-			return ProbeResult{OK: false, Error: fmt.Sprintf("nsjail not found at %s: %v", nsjailPath, execErr)}
-		}
+	var exitErr *exec.ExitError
+	if execErr != nil && !errors.As(execErr, &exitErr) {
+		// Real exec failure (e.g. permission denied, ELF not found).
+		return ProbeResult{OK: false, Error: fmt.Sprintf("nsjail not found at %s: %v", nsjailPath, execErr)}
 	}
 	return ProbeResult{OK: true, Version: "ok"}
 }
@@ -78,8 +78,6 @@ func ProbeLanguage(lang *config.LanguageDef) ProbeResult {
 }
 
 func firstLine(s string) string {
-	if idx := strings.Index(s, "\n"); idx >= 0 {
-		return s[:idx]
-	}
-	return s
+	line, _, _ := strings.Cut(s, "\n")
+	return line
 }

@@ -96,7 +96,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	lang := h.reg.Get(req.Language)
 	if lang == nil {
 		writeError(w, http.StatusBadRequest, "unknown_language",
-			"language "+strQ(req.Language)+" is not registered")
+			"language "+strconv.Quote(req.Language)+" is not registered")
 		return
 	}
 
@@ -107,34 +107,15 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// --- Validate filenames (security hole #1) ---
-	srcFilename := req.SourceFilename
-	if lang.SourceFilenameStrategy == "from_request" {
-		if srcFilename == "" {
-			writeError(w, http.StatusBadRequest, "missing_source_filename",
-				"source_filename is required for this language")
-			return
-		}
-		if err := validate.Filename(srcFilename); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_filename", err.Error())
-			return
-		}
-	} else {
-		srcFilename = lang.SourceFilename
+	srcFilename, aerr := resolveFilename("source", lang.SourceFilenameStrategy, req.SourceFilename, lang.SourceFilename)
+	if aerr != nil {
+		writeError(w, http.StatusBadRequest, aerr.code, aerr.message)
+		return
 	}
-
-	artFilename := req.ArtifactFilename
-	if lang.ArtifactFilenameStrategy == "from_request" {
-		if artFilename == "" {
-			writeError(w, http.StatusBadRequest, "missing_artifact_filename",
-				"artifact_filename is required for this language")
-			return
-		}
-		if err := validate.Filename(artFilename); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_filename", err.Error())
-			return
-		}
-	} else {
-		artFilename = lang.ArtifactFilename
+	artFilename, aerr := resolveFilename("artifact", lang.ArtifactFilenameStrategy, req.ArtifactFilename, lang.ArtifactFilename)
+	if aerr != nil {
+		writeError(w, http.StatusBadRequest, aerr.code, aerr.message)
+		return
 	}
 
 	// --- Validate flags (security hole #3) ---
@@ -263,10 +244,34 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+// apiErr is a validation failure carrying the response error code and message.
+type apiErr struct {
+	code    string
+	message string
+}
+
+// resolveFilename returns the filename to use for a phase. When the language's
+// strategy is "from_request" the client must supply a valid name; otherwise the
+// language's fixed filename is used. field is "source" or "artifact" and selects
+// the error code on missing input. A non-nil result means the request is invalid.
+func resolveFilename(field, strategy, requested, fixed string) (string, *apiErr) {
+	if strategy != "from_request" {
+		return fixed, nil
+	}
+	if requested == "" {
+		return "", &apiErr{
+			code:    "missing_" + field + "_filename",
+			message: field + "_filename is required for this language",
+		}
+	}
+	if err := validate.Filename(requested); err != nil {
+		return "", &apiErr{code: "invalid_filename", message: err.Error()}
+	}
+	return requested, nil
+}
+
 func writeError(w http.ResponseWriter, code int, errCode, msg string) {
 	writeJSON(w, code, ErrorResponse{
 		Error: ErrorDetail{Code: errCode, Message: msg},
 	})
 }
-
-func strQ(s string) string { return `"` + s + `"` }
