@@ -1,7 +1,8 @@
 {
     "swagger": "2.0",
     "info": {
-        "contact": {}
+        "contact": {},
+        "description": "goboxd — Go Sandbox Daemon. Compiles and runs untrusted code inside an nsjail sandbox.\n\n**Interactive playground:** [/playground/](/playground/)"
     },
     "paths": {
         "/healthz": {

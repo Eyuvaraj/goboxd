@@ -185,16 +185,10 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 		}
 
 		status := compareOutput(result, tc.ExpectedStdout)
-		// Append the nsjail log to stderr on non-accepted outcomes so callers
-		// can see exactly what nsjail reported (mount errors, exec failures, etc.).
-		stderr := string(result.Stderr)
-		if status != validate.StatusAccepted && len(result.Log) > 0 {
-			stderr += "\n[nsjail]\n" + string(result.Log)
-		}
 		results[i] = TestResult{
 			Status:       status,
 			Stdout:       string(result.Stdout),
-			Stderr:       stderr,
+			Stderr:       string(result.Stderr),
 			DurationMs:   result.DurationMs,
 			MemoryPeakKB: result.MemoryPeakKB,
 		}

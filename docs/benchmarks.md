@@ -1,8 +1,6 @@
 # Benchmarks
 
-This document outlines the performance benchmarks for `goboxd`. 
-
-Results are derived from a clean Docker container (`make build && make run`) running on the measurement host. All tests simulate a Python 3 "Hello, World!" execution via the `POST /run` endpoint.
+Results from a clean Docker container (`make build && make run`) on the measurement host. All tests hit `POST /run` with a Python 3 hello-world payload (interpreted language, no compile step, single test case).
 
 ### Test Payload
 
@@ -23,34 +21,32 @@ Results are derived from a clean Docker container (`make build && make run`) run
 
 ## Results
 
-| Concurrent Clients | Req/s | p50 (ms) | p95 (ms) | p99 (ms) |
-|--------------------|-------|----------|----------|----------|
-| 1                  | 60.6  | 15.9     | 19.0     | 44.1     |
-| 10                 | 248.5 | 33.1     | 61.8     | 100.1    |
-| 50                 | 240.1 | 200.8    | 247.0    | 260.3    |
-| 100                | 226.9 | 402.3    | 452.9    | 464.7    |
+| Concurrent Clients | Requests | Req/s | p50 (ms) | p95 (ms) | p99 (ms) | Errors |
+|--------------------|----------|-------|----------|----------|----------|--------|
+| 1                  | 200      | 61.5  | 15.1     | 19.0     | 42.6     | 0      |
+| 10                 | 200      | 241.7 | 37.0     | 68.9     | 80.5     | 0      |
+| 50                 | 500      | 234.0 | 206.9    | 259.8    | 279.8    | 0      |
+| 100                | 500      | 241.3 | 401.1    | 475.9    | 499.6    | 0      |
 
-### Test Environment Specifications
+All responses returned HTTP 200 at every concurrency level. Requests queue (not fail) when all `MAX_CONCURRENT_JOBS` slots are busy — the semaphore holds correctly under load.
 
-- **Measurement Host:** MacBook Air (M4, 10-core CPU, 16 GB RAM)
-- **Docker Resource Limits:** None (default configuration)
+---
+
+## Test Environment
+
+- **Host:** MacBook Air (Apple M4, 10-core CPU, 16 GB RAM)
+- **Docker resource limits:** None (default)
 - **`MAX_CONCURRENT_JOBS`:** 10
+- **Load tool:** [hey](https://github.com/rakyll/hey)
 
 ---
 
 ## How to Reproduce
 
-To run these benchmarks on your own infrastructure, you will need a load testing tool like [`hey`](https://github.com/rakyll/hey) or [`k6`](https://k6.io/).
+```bash
+make build
+make run          # in one terminal
+bash scripts/load_test.sh   # in another terminal (requires hey or k6 in PATH)
+```
 
-1. **Start the server:**
-   In your first terminal, build and run the Docker image:
-   ```bash
-   make build
-   make run
-   ```
-
-2. **Execute the load test:**
-   In a second terminal, run the provided load testing script:
-   ```bash
-   bash scripts/load_test.sh
-   ```
+Install hey: `go install github.com/rakyll/hey@latest`

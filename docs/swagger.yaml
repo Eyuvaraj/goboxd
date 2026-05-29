@@ -286,6 +286,10 @@ definitions:
     type: object
 info:
   contact: {}
+  description: |-
+    goboxd — Go Sandbox Daemon. Compiles and runs untrusted code inside an nsjail sandbox.
+
+    **Interactive playground:** [/playground/](/playground/)
 paths:
   /healthz:
     get:
