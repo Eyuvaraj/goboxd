@@ -7,9 +7,8 @@ import (
 
 const probeTTL = 30 * time.Second
 
-// ProbeCache caches readiness probe results so that /readyz and /info do not
-// spawn N child processes on every call. Results are refreshed in the background
-// every probeTTL. The initial probe runs synchronously at startup.
+// ProbeCache caches probe results with a probeTTL refresh. Prevents spawning
+// child processes on every /readyz or /info call.
 type ProbeCache struct {
 	mu        sync.RWMutex
 	nsjail    ProbeResult
@@ -20,8 +19,6 @@ type ProbeCache struct {
 	nsjailPath string
 }
 
-// NewProbeCache runs the first probe synchronously and starts the background
-// refresh goroutine. Call this once after the registry is loaded.
 func NewProbeCache(reg *Registry, nsjailPath string) *ProbeCache {
 	pc := &ProbeCache{reg: reg, nsjailPath: nsjailPath}
 	pc.refresh()

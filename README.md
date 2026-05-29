@@ -93,9 +93,3 @@ Each execution runs inside `nsjail` with process isolation, filesystem isolation
 
 Browser playground for manual testing and demonstrations:
 http://localhost:8080/playground/
-
----
-
-# License
-
-Licensed under GPL v3. See `LICENSE`.

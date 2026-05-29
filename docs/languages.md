@@ -78,7 +78,7 @@ Expansion is done element-by-element in `sandbox.ExpandArgs` — never through a
 
 ---
 
-## Demo-Day Flow: Adding a Language in Under 30 Minutes
+## Adding a Language
 
 With a warm Docker cache (layers already built), adding a language takes under 10 minutes. Cold build adds ~5 minutes for the base image layer.
 

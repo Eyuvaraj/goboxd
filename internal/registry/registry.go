@@ -10,15 +10,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Registry holds all loaded and validated language definitions.
 type Registry struct {
 	langs   map[string]*config.LanguageDef
-	ordered []*config.LanguageDef // insertion order from YAML, used by All()
+	ordered []*config.LanguageDef // preserved YAML insertion order for All()
 }
 
-// Load reads the YAML file at path and returns a Registry.
-// It fails loudly if the file is missing, malformed, or any language
-// entry is invalid (missing required fields).
+// Load reads and validates the language YAML file. Returns an error if any entry is malformed.
 func Load(path string) (*Registry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -67,9 +64,8 @@ func (r *Registry) All() []*config.LanguageDef {
 // Len returns the number of registered languages.
 func (r *Registry) Len() int { return len(r.langs) }
 
-// MaxJobDuration returns an upper-bound wall time for a single job:
-// the longest build phase plus (maxTests × longest run phase) plus a 30s buffer.
-// Used to set the HTTP server WriteTimeout so valid long-running jobs aren't killed.
+// MaxJobDuration returns the upper-bound wall time for any job across all languages,
+// used to set the HTTP server WriteTimeout.
 func (r *Registry) MaxJobDuration(maxTests int) time.Duration {
 	var maxBuild, maxRun int
 	for _, lang := range r.langs {

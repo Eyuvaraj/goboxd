@@ -2,8 +2,7 @@ package sandbox
 
 import "github.com/thesouldev/goboxd/internal/config"
 
-// MergeLimits returns a LimitsDef where each non-zero field in override
-// replaces the corresponding field in base.
+// MergeLimits returns base with any non-zero override fields applied.
 func MergeLimits(base, override config.LimitsDef) config.LimitsDef {
 	result := base
 	if override.WallTimeS > 0 {

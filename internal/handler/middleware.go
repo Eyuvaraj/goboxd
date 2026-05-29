@@ -9,8 +9,7 @@ import (
 	"github.com/thesouldev/goboxd/internal/logctx"
 )
 
-// BodyLimit wraps the request body with http.MaxBytesReader.
-// Requests exceeding maxBytes receive a 413 before any handler runs.
+// BodyLimit enforces a request body size cap; oversized requests get 413.
 func BodyLimit(maxBytes int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -20,9 +19,8 @@ func BodyLimit(maxBytes int64) func(http.Handler) http.Handler {
 	}
 }
 
-// StructuredLogger logs one JSON line per request via slog.
-// For POST /run it also includes language, execution status, and test counts
-// written into the request context by the run handler via logctx.Set.
+// StructuredLogger emits one JSON log line per request. For POST /run it also
+// includes execution fields written into the context by the run handler.
 func StructuredLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)

@@ -25,9 +25,8 @@ var ErrFilenameLeadingDot = errors.New("filename must not start with a dot")
 var ErrFilenameTooLong = errors.New("filename exceeds maximum length")
 var ErrFilenameInvalidChar = errors.New("filename contains invalid characters: only [a-zA-Z0-9._-] are allowed")
 
-// Filename validates that s is safe to use as a filename inside a sandbox
-// directory. Rules: non-empty, not absolute, single path component (no /),
-// no leading dot, [a-zA-Z0-9._-] only, length ≤ MaxFilenameLen.
+// Filename validates that s is safe as a sandbox filename:
+// non-empty, not absolute, single component, no leading dot, [a-zA-Z0-9._-] only, ≤ MaxFilenameLen.
 func Filename(s string) error {
 	if s == "" {
 		return ErrFilenameEmpty
@@ -62,9 +61,8 @@ func isFilenameChar(r rune) bool {
 		r == '.' || r == '_' || r == '-'
 }
 
-// Flags validates that every flag in flags appears in allowlist.
-// An allowlist entry ending in "*" is treated as a prefix match
-// (e.g. "-std=*" matches "-std=c++17").
+// Flags validates that every flag appears in allowlist.
+// Entries ending in "*" are prefix matches (e.g. "-std=*" matches "-std=c++17").
 func Flags(flags []string, allowlist []string) error {
 	for _, f := range flags {
 		if !flagAllowed(f, allowlist) {
@@ -87,7 +85,6 @@ func flagAllowed(flag string, allowlist []string) bool {
 	return false
 }
 
-// SourceSize returns an error if the source string exceeds max bytes.
 func SourceSize(src string, max int) error {
 	if len(src) > max {
 		return fmt.Errorf("source size %d bytes exceeds maximum of %d bytes", len(src), max)
@@ -95,7 +92,6 @@ func SourceSize(src string, max int) error {
 	return nil
 }
 
-// TestCount returns an error if n exceeds max.
 func TestCount(n, max int) error {
 	if n == 0 {
 		return errors.New("at least one test case is required")
@@ -106,7 +102,6 @@ func TestCount(n, max int) error {
 	return nil
 }
 
-// StdinSize returns an error if the stdin string exceeds max bytes.
 func StdinSize(s string, max int) error {
 	if len(s) > max {
 		return fmt.Errorf("stdin size %d bytes exceeds maximum of %d bytes", len(s), max)
@@ -114,7 +109,6 @@ func StdinSize(s string, max int) error {
 	return nil
 }
 
-// ExpectedSize returns an error if the expected_stdout string exceeds max bytes.
 func ExpectedSize(s string, max int) error {
 	if len(s) > max {
 		return fmt.Errorf("expected_stdout size %d bytes exceeds maximum of %d bytes", len(s), max)
@@ -122,9 +116,8 @@ func ExpectedSize(s string, max int) error {
 	return nil
 }
 
-// Limits validates that client-supplied limit overrides do not exceed the language defaults.
-// Clients may not grant themselves more resources than the server has configured for the language.
-// Zero values in override are ignored (they mean "use the default").
+// Limits rejects overrides that exceed the language's configured maximums.
+// Zero values in override are ignored (they mean "use the language default").
 func Limits(override, langDefault config.LimitsDef) error {
 	if override.WallTimeS > 0 && override.WallTimeS > langDefault.WallTimeS {
 		return fmt.Errorf("wall_time_s %d exceeds language maximum of %d", override.WallTimeS, langDefault.WallTimeS)

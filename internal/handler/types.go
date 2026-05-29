@@ -2,20 +2,18 @@ package handler
 
 import "github.com/thesouldev/goboxd/internal/config"
 
-// ── Run endpoint ─────────────────────────────────────────────────────────────
-
 // RunRequest is the JSON body for POST /run.
 type RunRequest struct {
-	Language         string         `json:"language"          example:"cpp"`
-	Source           string         `json:"source"            example:"#include <iostream>\nint main(){std::cout<<\"hi\";}"`
-	SourceFilename   string         `json:"source_filename"   example:"solution.cpp"`
-	ArtifactFilename string         `json:"artifact_filename" example:"solution"`
+	Language         string         `json:"language"`
+	Source           string         `json:"source"`
+	SourceFilename   string         `json:"source_filename"`
+	ArtifactFilename string         `json:"artifact_filename"`
 	Build            *PhaseOverride `json:"build"`
 	Run              *PhaseOverride `json:"run"`
 	Tests            []TestCase     `json:"tests"`
 }
 
-// PhaseOverride lets the client override limits and supply extra flags for a phase.
+// PhaseOverride lets the client supply per-request flags and limit overrides.
 type PhaseOverride struct {
 	Limits config.LimitsDef `json:"limits"`
 	Flags  []string         `json:"flags"`
@@ -23,33 +21,30 @@ type PhaseOverride struct {
 
 // TestCase is one stdin/expected_stdout pair in the request.
 type TestCase struct {
-	Stdin          string `json:"stdin"           example:"1\n"`
-	ExpectedStdout string `json:"expected_stdout" example:"hi"`
+	Stdin          string `json:"stdin"`
+	ExpectedStdout string `json:"expected_stdout"`
 }
 
 // RunResponse is the JSON body returned by POST /run.
 type RunResponse struct {
-	// Status summarises the overall result. "accepted" means build succeeded and all tests passed.
-	Status string       `json:"status" enums:"accepted,build_failed,wrong_output,output_whitespace_mismatch,time_exceeded,memory_exceeded,runtime_error,internal_error" example:"wrong_output"`
+	Status string       `json:"status"`
 	Build  BuildResult  `json:"build"`
 	Tests  []TestResult `json:"tests"`
 }
 
-// BuildResult is the build phase result embedded in RunResponse.
 type BuildResult struct {
-	Status     string `json:"status"      enums:"ok,failed,internal_error" example:"ok"`
-	Stdout     string `json:"stdout"      example:""`
-	Stderr     string `json:"stderr"      example:""`
-	DurationMs int64  `json:"duration_ms" example:"412"`
+	Status     string `json:"status"`
+	Stdout     string `json:"stdout"`
+	Stderr     string `json:"stderr"`
+	DurationMs int64  `json:"duration_ms"`
 }
 
-// TestResult is one test-case result embedded in RunResponse.
 type TestResult struct {
-	Status       string `json:"status"        enums:"accepted,wrong_output,output_whitespace_mismatch,time_exceeded,memory_exceeded,runtime_error,not_executed,internal_error" example:"wrong_output"`
-	Stdout       string `json:"stdout"        example:"HI"`
-	Stderr       string `json:"stderr"        example:""`
-	DurationMs   int64  `json:"duration_ms"   example:"38"`
-	MemoryPeakKB int64  `json:"memory_peak_kb" example:"8192"`
+	Status       string `json:"status"`
+	Stdout       string `json:"stdout"`
+	Stderr       string `json:"stderr"`
+	DurationMs   int64  `json:"duration_ms"`
+	MemoryPeakKB int64  `json:"memory_peak_kb"`
 }
 
 // ErrorResponse is returned for 4xx/5xx errors.
@@ -57,78 +52,65 @@ type ErrorResponse struct {
 	Error ErrorDetail `json:"error"`
 }
 
-// ErrorDetail carries the machine-readable error code and human-readable message.
+// ErrorDetail carries a stable machine-readable code and a human-readable message.
 type ErrorDetail struct {
-	// Code is a stable machine-readable identifier.
-	Code    string `json:"code"    enums:"invalid_json,unknown_language,source_too_large,missing_source_filename,missing_artifact_filename,invalid_filename,invalid_flag,invalid_limits,invalid_test_count,stdin_too_large,expected_too_large,internal_error" example:"unknown_language"`
-	Message string `json:"message" example:"language \"cobol\" is not registered"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
-// ── Health endpoints ──────────────────────────────────────────────────────────
-
-// HealthzResponse is returned by GET /healthz.
 type HealthzResponse struct {
-	Status string `json:"status" example:"ok"`
+	Status string `json:"status"`
 }
 
-// ProbeInfo is a runtime probe result for one binary (nsjail or a language runtime).
 type ProbeInfo struct {
-	OK      bool   `json:"ok"               example:"true"`
-	Version string `json:"version,omitempty" example:"Python 3.11.9"`
-	Error   string `json:"error,omitempty"   example:""`
+	OK      bool   `json:"ok"`
+	Version string `json:"version,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
-// ReadyzResponse is returned by GET /readyz.
 type ReadyzResponse struct {
-	// Status is "ok" when all probes pass; "degraded" when any probe fails.
-	Status    string               `json:"status"    enums:"ok,degraded" example:"ok"`
+	Status    string               `json:"status"`
 	Nsjail    ProbeInfo            `json:"nsjail"`
 	Languages map[string]ProbeInfo `json:"languages"`
 }
 
-// BuildInfo holds version metadata returned by GET /info.
 type BuildInfo struct {
-	Version   string `json:"version"    example:"0.1.0"`
-	Commit    string `json:"commit"     example:"abc1234"`
-	GoVersion string `json:"go_version" example:"go1.23.0"`
+	Version   string `json:"version"`
+	Commit    string `json:"commit"`
+	GoVersion string `json:"go_version"`
 }
 
-// NsjailInfo holds nsjail path and version for GET /info.
 type NsjailInfo struct {
-	Path    string `json:"path"    example:"/usr/local/bin/nsjail"`
-	Version string `json:"version" example:"nsjail version: 3.4"`
+	Path    string `json:"path"`
+	Version string `json:"version"`
 }
 
-// LanguageRunLimits holds the default run-phase limits for one language in GET /info.
 type LanguageRunLimits struct {
-	WallTimeS    int `json:"wall_time_s"   example:"10"`
-	MemoryKB     int `json:"memory_kb"     example:"102400"`
-	MaxProcesses int `json:"max_processes" example:"100"`
+	WallTimeS    int `json:"wall_time_s"`
+	MemoryKB     int `json:"memory_kb"`
+	MaxProcesses int `json:"max_processes"`
 }
 
-// LanguageInfo is one language entry in InfoResponse.
 type LanguageInfo struct {
-	ID               string            `json:"id"                 example:"py3"`
-	Name             string            `json:"name"               example:"Python 3"`
-	Version          string            `json:"version"            example:"Python 3.11.9"`
+	ID               string            `json:"id"`
+	Name             string            `json:"name"`
+	Version          string            `json:"version"`
 	DefaultRunLimits LanguageRunLimits `json:"default_run_limits"`
 }
 
-// ServiceLimits holds server-wide enforcement limits for GET /info.
 type ServiceLimits struct {
-	MaxSourceBytes    int `json:"max_source_bytes"    example:"262144"`
-	MaxTests          int `json:"max_tests"           example:"50"`
-	MaxConcurrentJobs int `json:"max_concurrent_jobs" example:"8"`
+	MaxSourceBytes    int `json:"max_source_bytes"`
+	MaxTests          int `json:"max_tests"`
+	MaxConcurrentJobs int `json:"max_concurrent_jobs"`
 }
 
-// ServiceStats holds runtime counters for GET /info.
 type ServiceStats struct {
-	InFlightJobs        int64   `json:"in_flight_jobs"           example:"2"`
-	QueueSize           int64   `json:"queue_size"               example:"0"`
-	JobsTotal           int64   `json:"jobs_total"               example:"1042"`
-	JobsFailedInternal  int64   `json:"jobs_failed_internal"     example:"0"`
-	LastInternalErrorAt *string `json:"last_internal_error_at"   example:"2024-01-15T10:30:00Z"`
-	DiskFreeByteJailDir int64   `json:"disk_free_bytes_jail_dir" example:"10737418240"`
+	InFlightJobs        int64   `json:"in_flight_jobs"`
+	QueueSize           int64   `json:"queue_size"`
+	JobsTotal           int64   `json:"jobs_total"`
+	JobsFailedInternal  int64   `json:"jobs_failed_internal"`
+	LastInternalErrorAt *string `json:"last_internal_error_at"`
+	DiskFreeByteJailDir int64   `json:"disk_free_bytes_jail_dir"`
 }
 
 // InfoResponse is returned by GET /info.
