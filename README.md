@@ -1,60 +1,101 @@
 # goboxd
 
-goboxd is an HTTP service that accepts source code, compiles or interprets it inside an [nsjail](https://github.com/google/nsjail) sandbox, runs it against test cases, and returns per-test execution results. Each job runs in a Linux namespace jail with cgroup resource limits, seccomp syscall filtering, and a [Kafel](https://github.com/google/kafel) policy that blocks dangerous syscalls (`ptrace`, `bpf`, `io_uring`, clock manipulation, kernel module ops).
+An HTTP service that accepts source code, compiles or interprets it inside an `nsjail` sandbox, runs it against test cases, and returns per-test execution results. Built for the goboxd hackathon at Paradox IIT Madras 2026.
 
-HTTP routing uses [chi](https://github.com/go-chi/chi) because its handlers are plain `net/http`-compatible functions with no framework-specific context types, and middleware composition is explicit. Gin and Echo were considered but both require wrapping requests in framework types that complicate handler testing.
+**Playground:** http://localhost:8080/playground/
 
-## Running
+---
 
-Docker with Compose v2 is the only prerequisite. nsjail is compiled from source inside the build stage; the container must run with `--privileged` (set in docker-compose.yml) for namespace support.
+## Overview
 
-```
-make build        # build the image (~5 min first time; nsjail compiled from source)
-make run          # start the service on :8080
-make test         # unit tests (no Docker required)
-make integration  # end-to-end tests (requires make run in another terminal)
+`goboxd` safely executes untrusted code using Linux namespaces, cgroups, seccomp, and Kafel sandbox policies. Each execution runs inside an isolated `nsjail` sandbox with strict resource and syscall limits.
+
+Blocked syscalls include: `ptrace`, `bpf`, `io_uring`, clock manipulation, and kernel module operations.
+
+## Why `chi`?
+
+`chi` uses plain `net/http` handlers, explicit middleware composition, and avoids framework-specific request wrappers, making handler testing simpler and cleaner.
+
+---
+
+# Running
+
+## Requirements
+
+* Docker with Compose v2
+* Container must run with `--privileged` (already configured)
+* `nsjail` is compiled from source during image build
+
+## Commands
+
+```bash id="3n6w9v"
+make build        # build the image
+make run          # start service on :8080
+make test         # unit tests
+make integration  # end-to-end tests
 make lint         # golangci-lint
-make load         # load-test benchmark (requires hey or k6 in PATH)
+make load         # load benchmarks
 ```
 
-Open `http://localhost:8080/playground/` once the container is running for an interactive browser UI.
+`make integration` requires `make run`. `make load` requires `hey` or `k6`.
 
-## API
+---
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/healthz` | Liveness — 200 if the process is up |
-| `GET`  | `/readyz`  | Readiness — probes nsjail and every language binary |
-| `GET`  | `/info`    | Build info, language list, limits, live stats |
-| `POST` | `/run`     | Execute source code against test cases |
+# API
 
-HTTP 200 for all valid requests; execution outcomes in the response body. 400 for validation errors, 5xx only for server faults. See [docs/swagger.yaml](docs/swagger.yaml) for the full schema.
+| Method | Path       | Description               |
+| ------ | ---------- | ------------------------- |
+| `GET`  | `/healthz` | Liveness probe            |
+| `GET`  | `/readyz`  | Runtime readiness checks  |
+| `GET`  | `/info`    | Build info and live stats |
+| `POST` | `/run`     | Execute source code       |
 
-## Languages
+Structurally valid requests always return `HTTP 200`. Execution results are returned in the response body.
 
-| Language | ID |
-|---|---|
-| Python 3 | `py3` |
-| Bash | `bash` |
-| JavaScript (Node) | `js` |
-| C | `c` |
-| C++ | `cpp` |
-| Java | `java` |
-| Verilog | `verilog` |
-| Ruby | `ruby` |
-| Lua | `lua` |
-| OCaml | `ocaml` |
+HTTP-level errors: `400` validation, `500` internal error, `503` cancelled/unavailable.
 
-Adding a language is one YAML block in `configs/languages.yaml` plus a toolchain install in the Dockerfile. No Go code change. See [docs/languages.md](docs/languages.md).
+See `docs/swagger.yaml` for the complete API schema.
 
-## Docs
+---
 
-- [docs/swagger.yaml](docs/swagger.yaml) — full API schema (Swagger/OpenAPI)
-- [docs/architecture.md](docs/architecture.md) — package layout, request lifecycle, concurrency model
-- [docs/security.md](docs/security.md) — seven security holes, their fixes, and seccomp hardening
-- [docs/languages.md](docs/languages.md) — language registry schema and demo-day add flow
-- [docs/benchmarks.md](docs/benchmarks.md) — load-test results at 1/10/50/100 concurrent clients
+# Supported Languages
 
-## License
+`py3` `bash` `js` `c` `cpp` `java` `verilog` `ruby` `lua` `ocaml`
 
-GPL v3. See [LICENSE](LICENSE).
+Adding a language only requires:
+
+1. A YAML block in `configs/languages.yaml`
+2. Installing the toolchain in the Dockerfile
+
+No Go code changes are required.
+
+---
+
+# Sandbox Model
+
+Each execution runs inside `nsjail` with process isolation, filesystem isolation, resource limits, and restricted syscalls enforced using namespaces, cgroups, seccomp, and Kafel.
+
+---
+
+# Documentation
+
+| File                   | Description                       |
+| ---------------------- | --------------------------------- |
+| `docs/swagger.yaml`    | OpenAPI schema                    |
+| `docs/architecture.md` | Request lifecycle and concurrency |
+| `docs/security.md`     | Sandbox hardening and security    |
+| `docs/languages.md`    | Language registry                 |
+| `docs/benchmarks.md`   | Load-test benchmarks              |
+
+---
+
+# Playground
+
+Browser playground for manual testing and demonstrations:
+http://localhost:8080/playground/
+
+---
+
+# License
+
+Licensed under GPL v3. See `LICENSE`.
