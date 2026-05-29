@@ -6,6 +6,7 @@ COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 # Build the runtime Docker image.
 build:
+	git submodule update --init --recursive
 	$(COMPOSE) build --build-arg COMMIT=$(COMMIT) goboxd
 
 # Start the service locally (requires Docker).
