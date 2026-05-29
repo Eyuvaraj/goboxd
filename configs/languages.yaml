@@ -117,6 +117,7 @@ languages:
     name: Verilog
     source_filename: solution.v
     artifact_filename: solution.vvp
+    probe_args: ["-V"]
     build:
       cmd: /usr/bin/iverilog
       args: ["{{flags}}", "-o", "{{artifact}}", "{{source}}"]
@@ -149,6 +150,7 @@ languages:
   - id: lua
     name: Lua
     source_filename: solution.lua
+    probe_args: ["-v"]
     run:
       cmd: /usr/bin/lua5.4
       args: ["{{source}}"]
