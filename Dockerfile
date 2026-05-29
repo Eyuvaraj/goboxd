@@ -39,18 +39,16 @@ FROM debian:${DEBIAN_VERSION}-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates libnl-route-3-200 libprotobuf32 \
         wget \
-        # In-scope language runtimes and compilers
+        # Language runtimes and compilers
         python3 \
         nodejs \
         gcc g++ \
         default-jdk-headless \
         iverilog \
         bash \
-        # Bonus languages — active
         ruby \
         lua5.4 \
         ocaml \
-        # Demo day: uncomment to add Rust, Kotlin, Go (one apt line each)
         # rustc \
         # kotlin \
         # golang-go \

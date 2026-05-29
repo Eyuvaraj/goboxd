@@ -11,14 +11,12 @@ import (
 	"github.com/thesouldev/goboxd/internal/validate"
 )
 
-// Response is the full response returned by Runner.Submit.
 type Response struct {
 	Status string       `json:"status"`
 	Build  BuildResult  `json:"build"`
 	Tests  []TestResult `json:"tests"`
 }
 
-// Runner manages the bounded concurrency semaphore and dispatches jobs.
 type Runner struct {
 	sem      chan struct{}
 	reg      *registry.Registry
@@ -27,10 +25,9 @@ type Runner struct {
 	jailDir  string
 }
 
-// New creates a Runner with at most maxConcurrent jobs running simultaneously.
 func New(maxConcurrent int, reg *registry.Registry, cfg config.Server, counters *stats.Counters) *Runner {
 	sem := make(chan struct{}, maxConcurrent)
-	for i := 0; i < maxConcurrent; i++ {
+	for range maxConcurrent {
 		sem <- struct{}{}
 	}
 	return &Runner{
@@ -45,27 +42,20 @@ func New(maxConcurrent int, reg *registry.Registry, cfg config.Server, counters 
 	}
 }
 
-// Submit acquires the semaphore (blocking until a slot is available), runs the
-// job, releases the slot, and returns the result. Requests queue rather than
-// fail when the limit is reached.
+// Submit blocks until a concurrency slot is free, runs the job, then returns.
 func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 	lang := r.reg.Get(req.Language)
 	if lang == nil {
 		return Response{}, fmt.Errorf("unknown language: %s", req.Language)
 	}
 
-	// Count as queued while waiting for a semaphore slot.
 	r.counters.IncQueued()
-
-	// Block until a slot is available (fixes bounded concurrency requirement).
 	select {
 	case <-r.sem:
-		// got a slot
 	case <-ctx.Done():
 		r.counters.DecQueued()
 		return Response{}, ctx.Err()
 	}
-
 	r.counters.DecQueued()
 	r.counters.IncInFlight()
 	r.counters.IncTotal()
@@ -79,7 +69,7 @@ func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 		r.counters.IncFailed()
 		return Response{}, fmt.Errorf("creating workspace: %w", err)
 	}
-	defer ws.Cleanup() // always runs — fixes hole #7
+	defer ws.Cleanup()
 
 	job := newJob(req, lang, ws, r.jobCfg)
 
@@ -92,8 +82,6 @@ func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 		Tests:  testResults,
 	}
 
-	// Count job-level internal errors (sandbox failure, disk error, etc.)
-	// beyond the workspace-creation failure already counted above.
 	if resp.Build.Status == validate.BuildStatusInternalError {
 		r.counters.IncFailed()
 	} else {

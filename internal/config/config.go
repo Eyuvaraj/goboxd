@@ -6,7 +6,6 @@ import (
 	"strconv"
 )
 
-// Server holds all runtime configuration for goboxd.
 type Server struct {
 	Port              string
 	NsjailPath        string
@@ -20,7 +19,6 @@ type Server struct {
 	OrphanMaxAge      int // minutes
 }
 
-// Load reads configuration from environment variables with built-in defaults.
 func Load() Server {
 	return Server{
 		Port:              env("PORT", "8080"),

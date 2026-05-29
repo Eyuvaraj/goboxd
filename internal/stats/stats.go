@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// Counters tracks global job statistics for the /info endpoint.
 type Counters struct {
 	jobsTotal          atomic.Int64
 	jobsFailedInternal atomic.Int64
@@ -29,7 +28,6 @@ func (c *Counters) JobsFailed() int64 { return c.jobsFailedInternal.Load() }
 func (c *Counters) InFlight() int64   { return c.inFlight.Load() }
 func (c *Counters) QueueSize() int64  { return c.queueSize.Load() }
 
-// LastInternalErrorAt returns the timestamp of the last internal error, or zero time.
 func (c *Counters) LastInternalErrorAt() time.Time {
 	ns := c.lastInternalErrAt.Load()
 	if ns == 0 {
@@ -38,8 +36,7 @@ func (c *Counters) LastInternalErrorAt() time.Time {
 	return time.Unix(0, ns)
 }
 
-// DiskFreeBytes returns the available bytes on the filesystem containing path.
-// Returns -1 on error.
+// DiskFreeBytes returns available bytes on the filesystem at path, or -1 on error.
 func DiskFreeBytes(path string) int64 {
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(path, &stat); err != nil {

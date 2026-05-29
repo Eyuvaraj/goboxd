@@ -3,10 +3,7 @@ package runner
 import "github.com/thesouldev/goboxd/internal/validate"
 
 // TopLevelStatus derives the overall request status from build and test results.
-// Rules from the spec:
-//   - If build failed → "build_failed" (all tests will be "not_executed")
-//   - Accepted only if every test is accepted
-//   - Otherwise the first non-accepted test status wins
+// build_failed if build not ok; accepted if all tests pass; otherwise first failing test status.
 func TopLevelStatus(buildStatus string, tests []TestResult) string {
 	if buildStatus != validate.BuildStatusOK {
 		return validate.StatusBuildFailed

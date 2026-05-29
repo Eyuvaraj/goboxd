@@ -1,9 +1,5 @@
 # Architecture
 
-`goboxd` is a lightweight HTTP service that securely accepts untrusted source code, compiles or interprets it inside an `nsjail` sandbox, and returns per-test execution results.
-
----
-
 ## Request Lifecycle
 
 ```mermaid
@@ -58,59 +54,49 @@ flowchart TD
 
 ## Package Layout
 
-- **`cmd/goboxd/`** — entry point; wires config → registry → probe cache → runner → chi router.
-- **`internal/config/`** — environment variable parsing, `LanguageDef` and `LimitsDef` types.
-- **`internal/registry/`** — YAML loading, language lookup (`Get`/`All`), startup validation, 30s TTL probe cache.
-- **`internal/validate/`** — filename, flag, source-size, stdin-size, limit, and test-count validation. Single source of truth for all status constant strings.
-- **`internal/sandbox/`** — nsjail argv builder, workspace (`MkdirTemp`), limits merge, output capping, status parsing.
-- **`internal/runner/`** — bounded semaphore (`chan struct{}`), job lifecycle (compile + runTests), status aggregation.
-- **`internal/handler/`** — `/run`, `/healthz`, `/readyz`, `/info` handlers; `BodyLimit` and `StructuredLogger` middleware.
-- **`internal/stats/`** — atomic counters for in-flight jobs, queue size, totals, and internal error tracking.
-- **`internal/logctx/`** — typed context key for per-request log fields written by the handler and read by the middleware after `ServeHTTP`.
-- **`internal/playground/`** — embeds the playground SPA (`index.html`) served at `/playground/`.
-- **`configs/languages.yaml`** — all 13 language definitions (7 required + 6 bonus).
-- **`tests/integration/`** — end-to-end tests (build tag: `integration`).
+| Package | Role |
+|---------|------|
+| `cmd/goboxd/` | Entry point: wires config → registry → probe cache → runner → chi router |
+| `internal/config/` | Environment variable parsing, `LanguageDef` and `LimitsDef` types |
+| `internal/registry/` | YAML loading, language lookup (`Get`/`All`), startup validation, 30s TTL probe cache |
+| `internal/validate/` | Filename, flag, source-size, stdin-size, limit, and test-count validation; single source of truth for all status constants |
+| `internal/sandbox/` | nsjail argv builder, workspace (`MkdirTemp`), limits merge, output capping, status parsing |
+| `internal/runner/` | Bounded semaphore (`chan struct{}`), job lifecycle (compile + runTests), status aggregation |
+| `internal/handler/` | `/run`, `/healthz`, `/readyz`, `/info` handlers; `BodyLimit` and `StructuredLogger` middleware |
+| `internal/stats/` | Atomic counters for in-flight jobs, queue size, totals, and internal error tracking |
+| `internal/logctx/` | Typed context key for per-request log fields written by the handler, read by middleware after `ServeHTTP` |
+| `internal/playground/` | Embeds the playground SPA served at `/playground/` |
+| `configs/languages.yaml` | All 13 language definitions (7 required + 6 bonus) |
+| `tests/integration/` | End-to-end tests (build tag: `integration`) |
 
 ---
 
 ## Concurrency Model
 
-`goboxd` uses a buffered channel as a counting semaphore.
+Requests are bounded by a buffered channel used as a counting semaphore.
 
-- **Capacity** — `MAX_CONCURRENT_JOBS` (default: `runtime.NumCPU()`).
-- **Behaviour** — `runner.Submit()` blocks on send until a slot is free; the slot is released on function return. Requests queue, they never fail due to backpressure.
-- **Why not a worker pool** — a pool requires a persistent goroutine per slot and a job channel. A semaphore is simpler: each request goroutine drives its own job and blocks on the semaphore. The effect on throughput is identical.
-- **Per-test execution is sequential** within a job. Parallel execution was considered and rejected: nsjail process startup (not goroutines) is the bottleneck, sequential execution gives deterministic file layout, and it avoids workspace races.
+- **Capacity** is `MAX_CONCURRENT_JOBS`, defaulting to `runtime.NumCPU()`.
+- **Blocking:** `runner.Submit()` sends to the channel, blocking until a slot is free. The slot is released on return. Requests queue; they never fail due to backpressure.
+- **Semaphore over worker pool:** a pool requires persistent goroutines and a job channel. With the semaphore, each request goroutine drives its own job and blocks until a slot is available. Throughput is identical; complexity is lower.
+- **Sequential tests:** parallel test execution within a job was rejected. nsjail process startup is the bottleneck, not goroutines. Sequential execution gives deterministic file layout and avoids workspace races.
 
 ---
 
-## Adding a New Language
+## Adding a Language
 
-No Go code change is required when the language fits the existing templates (`{{source}}`, `{{artifact}}`, `{{flags}}`).
+No Go code change is required for languages that fit the existing templates (`{{source}}`, `{{artifact}}`, `{{flags}}`).
 
 1. Add an entry to `configs/languages.yaml`.
-2. Add `apt-get install` for the toolchain in the Dockerfile's runtime stage.
-3. `make build` — the registry loads at startup and `/readyz` reports the new language automatically.
+2. Add `apt-get install` for the toolchain in the Dockerfile runtime stage.
+3. Run `make build`. The registry loads at startup and `/readyz` reports the new language automatically.
+
+See `docs/languages.md` for the full YAML schema and template variable reference.
 
 ---
 
-## Security Model
+## nsjail Invocation
 
-Seven known vulnerabilities from the reference implementation are closed. Full details: [security.md](security.md).
-
-| Layer | Protection |
-|-------|-----------|
-| HTTP middleware | `MaxBytesReader` body cap before JSON parse |
-| Handler | Filename validation, flag allowlist, source/stdin/expected-size caps, limit cap |
-| Workspace | `os.MkdirTemp` (atomic, no collision), pure-Go cleanup, startup orphan sweep |
-| Sandbox | `io.LimitReader` output cap, pure `[]string` argv (no shell), seccomp deny-list |
-| Runner | `defer ws.Cleanup()` on every exit path |
-
----
-
-## `nsjail` Invocation
-
-`goboxd` invokes `nsjail` as a pure `[]string` slice — no shell at any point. Below is a representative invocation for running a compiled C++ binary:
+`goboxd` invokes `nsjail` as a pure `[]string` slice, with no shell and no string interpolation. Representative invocation for a compiled C++ binary:
 
 ```
 /usr/local/bin/nsjail
@@ -141,8 +127,9 @@ Seven known vulnerabilities from the reference implementation are closed. Full d
   /solution
 ```
 
-Key design points:
-- `--rlimit_as` is set to `max(memory_kb × 4 / 1024, 4096)` MiB. The JVM pre-allocates ~1 GiB of virtual address space at startup, so the floor prevents false OOM kills on Java and Kotlin.
-- `--cgroup_mem_max` is the real RSS guard. After `cmd.Wait()`, `memory.peak` is read from the cgroup path to populate `memory_peak_kb` in the response.
+**Key design decisions:**
+
+- `--rlimit_as` is set to `max(memory_kb × 4 / 1024, 4096)` MiB. The JVM pre-allocates ~1 GiB of virtual address space at startup; the 4096 MiB floor prevents false OOM kills on Java and Kotlin.
+- `--cgroup_mem_max` enforces real RSS. After `cmd.Wait()`, `memory.peak` is read from the cgroup path to populate `memory_peak_kb` in the response.
 - `--cgroup_mem_swap_max 0` disables swap so memory limits are exact.
-- The nsjail log is captured on fd 3. `ParseBuildStatus` and `ParseRunStatus` read it to distinguish `internal_error` (`[E][` prefix lines) from normal exit codes.
+- The nsjail log is captured on fd 3. `ParseBuildStatus` and `ParseRunStatus` distinguish `internal_error` (lines with `[E][` prefix) from normal compiler/runtime exit codes.

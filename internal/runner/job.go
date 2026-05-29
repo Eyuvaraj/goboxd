@@ -13,7 +13,6 @@ import (
 	"github.com/thesouldev/goboxd/internal/validate"
 )
 
-// BuildResult matches the spec's build object.
 type BuildResult struct {
 	Status     string `json:"status"`
 	Stdout     string `json:"stdout"`
@@ -21,7 +20,6 @@ type BuildResult struct {
 	DurationMs int64  `json:"duration_ms"`
 }
 
-// TestResult matches the spec's per-test result object.
 type TestResult struct {
 	Status       string `json:"status"`
 	Stdout       string `json:"stdout"`
@@ -30,7 +28,6 @@ type TestResult struct {
 	MemoryPeakKB int64  `json:"memory_peak_kb"`
 }
 
-// JobRequest is the validated, parsed input to a job.
 type JobRequest struct {
 	Language         string
 	Source           string
@@ -43,13 +40,11 @@ type JobRequest struct {
 	Tests            []TestCase
 }
 
-// TestCase is one stdin/expected_stdout pair.
 type TestCase struct {
 	Stdin          string
 	ExpectedStdout string
 }
 
-// Job orchestrates one code execution: build (optional) + all tests.
 type Job struct {
 	req  JobRequest
 	lang *config.LanguageDef
@@ -57,26 +52,22 @@ type Job struct {
 	cfg  JobConfig
 }
 
-// JobConfig holds server-level settings needed by the job.
 type JobConfig struct {
 	NsjailPath     string
 	MaxOutputBytes int64
-	// BindMounts are additional read-only bind mounts passed to every nsjail call.
-	// Typically the compiler/runtime binaries and system libs.
-	BindMounts []string
+	BindMounts     []string
 }
 
 func newJob(req JobRequest, lang *config.LanguageDef, ws *sandbox.Workspace, cfg JobConfig) *Job {
 	return &Job{req: req, lang: lang, ws: ws, cfg: cfg}
 }
 
-// compile runs the build phase. For interpreted languages this is a no-op.
+// compile runs the build phase; returns ok immediately for interpreted languages.
 func (j *Job) compile(ctx context.Context) BuildResult {
 	if !j.lang.IsCompiled() {
 		return BuildResult{Status: validate.BuildStatusOK}
 	}
 
-	// Write source into workspace.
 	srcPath := j.ws.SourcePath(j.req.SourceFilename)
 	if err := os.WriteFile(srcPath, []byte(j.req.Source), 0o644); err != nil {
 		return BuildResult{Status: validate.BuildStatusInternalError, Stderr: err.Error()}
@@ -115,7 +106,6 @@ func (j *Job) compile(ctx context.Context) BuildResult {
 	}
 }
 
-// runTests executes each test case. If build failed, returns not_executed for all.
 func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 	results := make([]TestResult, len(j.req.Tests))
 
@@ -196,10 +186,11 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 	return results
 }
 
-// compareOutput determines the test status by comparing actual to expected stdout.
-// Sandbox-level errors (TLE, OOM, signal) take precedence over output comparison.
+// compareOutput returns the test status. Sandbox failures (TLE, OOM, signal) take
+// precedence over output comparison. Whitespace mismatch fires when outputs match
+// after stripping trailing whitespace but not before — catches the common trailing-
+// newline case without masking leading-whitespace differences.
 func compareOutput(result sandbox.RunResult, expected string) string {
-	// Surface sandbox failures first: a TLE/OOM/signal masks whether output matched.
 	sandboxStatus := sandbox.ParseRunStatus(result.Log, result.ExitCode)
 	if sandboxStatus != validate.StatusAccepted {
 		return sandboxStatus
@@ -210,38 +201,25 @@ func compareOutput(result sandbox.RunResult, expected string) string {
 	if bytes.Equal(actual, exp) {
 		return validate.StatusAccepted
 	}
-	// Per spec: whitespace mismatch fires when outputs match after stripping trailing
-	// whitespace only (not leading). This catches the common print-adds-newline case
-	// without masking leading-whitespace differences (which are wrong_output).
 	if bytes.Equal(bytes.TrimRight(actual, " \t\r\n"), bytes.TrimRight(exp, " \t\r\n")) {
 		return validate.StatusWhitespaceMismatch
 	}
 	return validate.StatusWrongOutput
 }
 
-// buildBindMounts derives the read-only bind mounts needed for a language.
-// --rw in buildArgv remounts the chroot root as writable so compilers can
-// write artifacts into the workspace; the bind mounts themselves stay -R.
-//
-// Overlap rule: never include a path whose parent is already in the set.
-// nsjail bind-mounts each path individually and then remounts it read-only.
-// If both /usr/bin and /usr are passed, /usr is mounted on top of the
-// /usr/bin bind mount inside the jail, and the subsequent MS_RDONLY remount
-// of /usr/bin fails with EINVAL because the kernel sees a different mount ID.
+// buildBindMounts returns the read-only host directories to bind-mount into the jail.
+// Never include a path whose parent is already in the set: nsjail mounts each path
+// then remounts it read-only; a child mount on top of a parent mount causes an
+// EINVAL on the MS_RDONLY remount because the kernel sees a different mount ID.
 func buildBindMounts(lang *config.LanguageDef) []string {
 	dirs := map[string]struct{}{}
 
-	// Broad mounts cover all standard toolchain locations.
-	//   /usr  — binaries + shared libraries (includes /usr/lib, /usr/bin, etc.)
-	//   /etc  — ld.so.cache, nsswitch.conf, passwd (required by many runtimes)
-	//   /dev  — /dev/null, /dev/urandom, /dev/tty (Python/Java read these at start)
-	//   /var  — some runtimes write lock/log files here
+	// Base set covers toolchain binaries, shared libs, and runtime necessities.
 	for _, d := range []string{"/bin", "/usr", "/lib", "/etc", "/dev", "/var"} {
 		dirs[d] = struct{}{}
 	}
 
-	// addIfNotCovered adds d only when no existing entry is a parent of d.
-	// This prevents redundant sub-mounts that trigger the EINVAL remount bug.
+	// addIfNotCovered skips cmd's directory if a parent is already in dirs.
 	addIfNotCovered := func(cmd string) {
 		if cmd == "" {
 			return
@@ -249,7 +227,7 @@ func buildBindMounts(lang *config.LanguageDef) []string {
 		d := filepath.Dir(cmd)
 		for existing := range dirs {
 			if d == existing || strings.HasPrefix(d, existing+"/") {
-				return // already covered by a parent mount
+				return
 			}
 		}
 		dirs[d] = struct{}{}
@@ -258,10 +236,8 @@ func buildBindMounts(lang *config.LanguageDef) []string {
 	if lang.Build != nil {
 		addIfNotCovered(lang.Build.Cmd)
 	}
-	// For compiled languages, Run.Cmd is a per-job artifact path (e.g. /solution)
-	// that lives inside the chroot workspace, not on the host filesystem.
-	// Its filepath.Dir is "/", and bind-mounting "/" into the chroot causes an
-	// nsjail [E][ error (cannot mount the root over itself). Skip it.
+	// For compiled languages, Run.Cmd is the artifact path (e.g. /solution) inside
+	// the workspace — not a host binary. Its Dir is "/", which cannot be bind-mounted.
 	if !lang.IsCompiled() {
 		addIfNotCovered(lang.Run.Cmd)
 	}

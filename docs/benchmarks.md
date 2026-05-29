@@ -4,10 +4,9 @@ Results from a clean Docker container (`make build && make run`) on the measurem
 
 ---
 
-## Python 3 — interpreted, no compile step
+## Python 3 (interpreted, no compile step)
 
-### Test Payload
-
+**Test payload:**
 ```json
 {
   "language": "py3",
@@ -23,14 +22,13 @@ Results from a clean Docker container (`make build && make run`) on the measurem
 | 50                 | 200      | 212.3 | 223.6    | 289.0    | 303.6    | 0      |
 | 100                | 200      | 203.0 | 451.0    | 521.7    | 539.2    | 0      |
 
-All responses returned HTTP 200 at every concurrency level. Requests queue (not fail) when all `MAX_CONCURRENT_JOBS` slots are busy — the semaphore holds correctly under load.
+All responses returned HTTP 200 at every concurrency level. Requests queue when all `MAX_CONCURRENT_JOBS` slots are busy; the semaphore holds correctly under load.
 
 ---
 
-## C++ — compiled (g++), single test case
+## C++ (compiled with g++), single test case
 
-### Test Payload
-
+**Test payload:**
 ```json
 {
   "language": "cpp",
@@ -48,25 +46,27 @@ All responses returned HTTP 200 at every concurrency level. Requests queue (not 
 | 50                 | 100      | 14.6  | 3017.6   | 3649.3   | 3829.8    | 0      |
 | 100                | 100      | 14.0  | 3304.8   | 6673.0   | 7123.8    | 0      |
 
-Each request includes a full compile + run cycle (g++ invoked inside nsjail per request). At 1 client, per-request latency is dominated by the ~240 ms g++ compile time. At 10+ clients, requests queue on the semaphore once all `MAX_CONCURRENT_JOBS` slots are held by in-progress compile jobs — p95/p99 grows proportionally with concurrency while req/s plateaus, which is the expected bounded-queue behaviour.
+Each request includes a full compile + run cycle. At 1 client, latency is dominated by the ~240 ms `g++` compile time. At 10+ clients, requests queue on the semaphore as slots fill with in-progress compile jobs. Throughput plateaus while p95/p99 grows proportionally, which is the expected bounded-queue behaviour.
 
 ---
 
 ## Test Environment
 
-- **Host:** MacBook Air (Apple M4, 10-core CPU, 16 GB RAM)
-- **Docker resource limits:** None (default)
-- **`MAX_CONCURRENT_JOBS`:** 10
-- **Load tool:** [hey](https://github.com/rakyll/hey)
+| Parameter | Value |
+|-----------|-------|
+| Host | MacBook Air (Apple M4, 10-core CPU, 16 GB RAM) |
+| Docker resource limits | None (default) |
+| `MAX_CONCURRENT_JOBS` | 10 |
+| Load tool | [hey](https://github.com/rakyll/hey) |
 
 ---
 
-## How to Reproduce
+## Reproduce
 
 ```bash
 make build
-make run          # in one terminal
-bash scripts/load_test.sh   # in another terminal (requires hey or k6 in PATH)
+make run                      # in one terminal
+bash scripts/load_test.sh     # in another terminal (requires hey or k6)
 ```
 
-Install hey: `go install github.com/rakyll/hey@latest`
+Install `hey`: `go install github.com/rakyll/hey@latest`

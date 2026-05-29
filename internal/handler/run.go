@@ -14,12 +14,11 @@ import (
 	"github.com/thesouldev/goboxd/internal/validate"
 )
 
-// Submitter abstracts runner.Runner.Submit to allow dependency injection in tests.
+// Submitter allows dependency injection in tests.
 type Submitter interface {
 	Submit(ctx context.Context, req runner.JobRequest) (runner.Response, error)
 }
 
-// RunHandler handles POST /run.
 type RunHandler struct {
 	runner Submitter
 	reg    *registry.Registry
@@ -30,61 +29,6 @@ func NewRunHandler(r Submitter, reg *registry.Registry, cfg config.Server) *RunH
 	return &RunHandler{runner: r, reg: reg, cfg: cfg}
 }
 
-// ServeHTTP godoc
-//
-//	@Summary		Execute code in a sandbox
-//	@Description	Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.
-//	@Description
-//	@Description	**Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the `status` fields of the response body — not as HTTP error codes.
-//	@Description
-//	@Description	**Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The `strategy` field in the language definition controls this.
-//	@Description
-//	@Description	**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.
-//	@Description
-//	@Description	**Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 `invalid_limits`.
-//	@Description
-//	@Description	---
-//	@Description
-//	@Description	**Sample request (C++, one test case):**
-//	@Description	```json
-//	@Description	{
-//	@Description	  "language": "cpp",
-//	@Description	  "source": "#include <iostream>\nint main(){std::cout<<\"hi\";}",
-//	@Description	  "source_filename": "solution.cpp",
-//	@Description	  "artifact_filename": "solution",
-//	@Description	  "build": {
-//	@Description	    "limits": { "wall_time_s": 5, "memory_kb": 1048576, "max_processes": 100 },
-//	@Description	    "flags": ["-O2"]
-//	@Description	  },
-//	@Description	  "run": {
-//	@Description	    "limits": { "wall_time_s": 3, "memory_kb": 524288, "max_processes": 64 },
-//	@Description	    "flags": []
-//	@Description	  },
-//	@Description	  "tests": [
-//	@Description	    { "stdin": "1\n", "expected_stdout": "hi" }
-//	@Description	  ]
-//	@Description	}
-//	@Description	```
-//	@Description
-//	@Description	**Sample response** (code printed `"HI"` instead of `"hi"` — wrong_output):
-//	@Description	```json
-//	@Description	{
-//	@Description	  "status": "wrong_output",
-//	@Description	  "build": { "status": "ok", "stdout": "", "stderr": "", "duration_ms": 412 },
-//	@Description	  "tests": [
-//	@Description	    { "status": "wrong_output", "stdout": "HI", "stderr": "", "duration_ms": 38, "memory_peak_kb": 8192 }
-//	@Description	  ]
-//	@Description	}
-//	@Description	```
-//	@Tags			execution
-//	@Accept			json
-//	@Produce		json
-//	@Param			body	body		RunRequest		true	"Code execution request"
-//	@Success		200		{object}	RunResponse		"Execution completed (check body status fields for pass/fail)"
-//	@Failure		400		{object}	ErrorResponse	"Validation error — see error.code for the specific cause"
-//	@Failure		500		{object}	ErrorResponse	"Internal server error (nsjail fault, disk full, etc.)"
-//	@Failure		503		{string}	string			"Server at capacity or request cancelled by client"
-//	@Router			/run [post]
 func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req RunRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -92,52 +36,29 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// --- Validate language ---
 	lang := h.reg.Get(req.Language)
 	if lang == nil {
 		writeError(w, http.StatusBadRequest, "unknown_language",
-			"language "+strQ(req.Language)+" is not registered")
+			"language "+strconv.Quote(req.Language)+" is not registered")
 		return
 	}
 
-	// --- Validate source ---
 	if err := validate.SourceSize(req.Source, h.cfg.MaxSourceBytes); err != nil {
 		writeError(w, http.StatusBadRequest, "source_too_large", err.Error())
 		return
 	}
 
-	// --- Validate filenames (security hole #1) ---
-	srcFilename := req.SourceFilename
-	if lang.SourceFilenameStrategy == "from_request" {
-		if srcFilename == "" {
-			writeError(w, http.StatusBadRequest, "missing_source_filename",
-				"source_filename is required for this language")
-			return
-		}
-		if err := validate.Filename(srcFilename); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_filename", err.Error())
-			return
-		}
-	} else {
-		srcFilename = lang.SourceFilename
+	srcFilename, aerr := resolveFilename("source", lang.SourceFilenameStrategy, req.SourceFilename, lang.SourceFilename)
+	if aerr != nil {
+		writeError(w, http.StatusBadRequest, aerr.code, aerr.message)
+		return
+	}
+	artFilename, aerr := resolveFilename("artifact", lang.ArtifactFilenameStrategy, req.ArtifactFilename, lang.ArtifactFilename)
+	if aerr != nil {
+		writeError(w, http.StatusBadRequest, aerr.code, aerr.message)
+		return
 	}
 
-	artFilename := req.ArtifactFilename
-	if lang.ArtifactFilenameStrategy == "from_request" {
-		if artFilename == "" {
-			writeError(w, http.StatusBadRequest, "missing_artifact_filename",
-				"artifact_filename is required for this language")
-			return
-		}
-		if err := validate.Filename(artFilename); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_filename", err.Error())
-			return
-		}
-	} else {
-		artFilename = lang.ArtifactFilename
-	}
-
-	// --- Validate flags (security hole #3) ---
 	var buildFlags, runFlags []string
 	if req.Build != nil {
 		buildFlags = req.Build.Flags
@@ -158,7 +79,6 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// --- Validate tests ---
 	if err := validate.TestCount(len(req.Tests), h.cfg.MaxTests); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_test_count", err.Error())
 		return
@@ -181,8 +101,6 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// --- Validate and merge per-request limits ---
-	// Clients may not exceed the language's configured defaults (prevents semaphore starvation).
 	var buildLimits, runLimits config.LimitsDef
 	if req.Build != nil {
 		buildLimits = req.Build.Limits
@@ -201,7 +119,6 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// --- Submit job ---
 	jobReq := runner.JobRequest{
 		Language:         req.Language,
 		Source:           req.Source,
@@ -224,7 +141,6 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Write execution fields into context so StructuredLogger can include them.
 	accepted := 0
 	for _, t := range resp.Tests {
 		if t.Status == validate.StatusAccepted {
@@ -239,7 +155,6 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		TestsAccepted:   accepted,
 	}))
 
-	// Map runner response to HTTP response types.
 	out := RunResponse{
 		Status: resp.Status,
 		Build: BuildResult{
@@ -263,10 +178,32 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+type apiErr struct {
+	code    string
+	message string
+}
+
+// resolveFilename returns the filename for a phase. If strategy is "from_request",
+// the client must supply a non-empty, valid name; otherwise the language's fixed
+// filename is used.
+func resolveFilename(field, strategy, requested, fixed string) (string, *apiErr) {
+	if strategy != "from_request" {
+		return fixed, nil
+	}
+	if requested == "" {
+		return "", &apiErr{
+			code:    "missing_" + field + "_filename",
+			message: field + "_filename is required for this language",
+		}
+	}
+	if err := validate.Filename(requested); err != nil {
+		return "", &apiErr{code: "invalid_filename", message: err.Error()}
+	}
+	return requested, nil
+}
+
 func writeError(w http.ResponseWriter, code int, errCode, msg string) {
 	writeJSON(w, code, ErrorResponse{
 		Error: ErrorDetail{Code: errCode, Message: msg},
 	})
 }
-
-func strQ(s string) string { return `"` + s + `"` }

@@ -168,8 +168,6 @@ languages:
         memory_kb: 131072
         max_processes: 100
 
-  # Demo day — uncomment block + matching apt line in Dockerfile to activate.
-
   # - id: rust
   #   name: Rust
   #   source_filename: solution.rs
@@ -243,4 +241,3 @@ languages:
   #       wall_time_s: 5
   #       memory_kb: 262144
   #       max_processes: 64
-
