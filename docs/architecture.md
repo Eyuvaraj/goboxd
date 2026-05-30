@@ -71,6 +71,30 @@ flowchart TD
 
 ---
 
+## Endpoints and Execution Modes
+
+Two run endpoints share one validation and execution path:
+
+- **`POST /run`** — the strict contract. `tests` is required and the response carries no `exit_code`. This is the only endpoint judged against the competition schema.
+- **`POST /v1/run`** — a superset. It adds `exit_code` to each test result and selects an execution mode from the payload shape:
+  - **raw** — `tests` is empty: the program runs once against the top-level `stdin` and the outcome is reported without grading.
+  - **verifier** — `tests` is present: each test's stdout is compared to its `expected_stdout` (exact → trailing-whitespace → wrong).
+  - **evaluator** — an `evaluator` block is present: each test is graded by a custom program instead of by comparison.
+
+### Evaluator contract
+
+The evaluator is a program in any registered language, compiled once and run per test in its own jail. Its working directory holds three files:
+
+| File | Contents |
+|------|----------|
+| `input` | the test's `stdin` |
+| `expected` | the test's `expected_stdout` |
+| `output` | the candidate's actual stdout |
+
+It writes a single JSON object to stdout: `{"verdict": "accepted"|"rejected", "score": <0..1>, "message": "..."}`. `accepted` maps to test status `accepted`; anything else maps to `wrong_output`. A candidate crash/timeout is reported as-is and never reaches the evaluator; an evaluator that fails to run or emits invalid JSON yields `internal_error` for that test. The evaluator runs only on `/v1/run`; `/run` ignores the block.
+
+---
+
 ## Concurrency Model
 
 Requests are bounded by a buffered channel used as a counting semaphore.

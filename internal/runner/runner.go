@@ -36,6 +36,7 @@ func New(maxConcurrent int, reg *registry.Registry, cfg config.Server, counters 
 		jobCfg: JobConfig{
 			NsjailPath:     cfg.NsjailPath,
 			MaxOutputBytes: int64(cfg.MaxOutputBytes),
+			JailDir:        cfg.JailDir,
 		},
 		counters: counters,
 		jailDir:  cfg.JailDir,
@@ -47,6 +48,13 @@ func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 	lang := r.reg.Get(req.Language)
 	if lang == nil {
 		return Response{}, fmt.Errorf("unknown language: %s", req.Language)
+	}
+
+	var evalLang *config.LanguageDef
+	if req.Evaluator != nil {
+		if evalLang = r.reg.Get(req.Evaluator.Language); evalLang == nil {
+			return Response{}, fmt.Errorf("unknown evaluator language: %s", req.Evaluator.Language)
+		}
 	}
 
 	r.counters.IncQueued()
@@ -71,7 +79,7 @@ func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 	}
 	defer ws.Cleanup()
 
-	job := newJob(req, lang, ws, r.jobCfg)
+	job := newJob(req, lang, evalLang, ws, r.jobCfg)
 
 	buildResult := job.compile(ctx)
 	testResults := job.runTests(ctx, buildResult.Status)

@@ -356,6 +356,73 @@ func TestExitCodeSchemaDiffers(t *testing.T) {
 	}
 }
 
+// /v1/run with an evaluator block grades each test with a custom program: the
+// handler resolves the evaluator language and forwards it to the runner.
+func TestV1Handler_EvaluatorMode(t *testing.T) {
+	sub := &mockSubmitter{resp: runner.Response{
+		Status: validate.StatusAccepted,
+		Build:  runner.BuildResult{Status: validate.BuildStatusOK},
+		Tests:  []runner.TestResult{{Status: validate.StatusAccepted, Verdict: "accepted"}},
+	}}
+	h := newTestV1Handler(t, sub)
+	w := postJSON(t, h, map[string]any{
+		"language": "py3",
+		"source":   "print(input())",
+		"tests":    []map[string]any{{"stdin": "5\n", "expected_stdout": ""}},
+		"evaluator": map[string]any{
+			"language": "py3",
+			"source":   "print('{\"verdict\":\"accepted\"}')",
+		},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if sub.gotReq.Evaluator == nil {
+		t.Fatal("expected evaluator forwarded to the runner")
+	}
+	if sub.gotReq.Evaluator.Language != "py3" || sub.gotReq.Evaluator.SourceFilename != "solution.py" {
+		t.Fatalf("evaluator not resolved correctly: %+v", sub.gotReq.Evaluator)
+	}
+	if sub.gotReq.Raw {
+		t.Fatal("evaluator mode must not be raw")
+	}
+}
+
+// An unknown evaluator language is a request error caught before submission.
+func TestV1Handler_EvaluatorUnknownLanguage(t *testing.T) {
+	h := newTestV1Handler(t, nil)
+	w := postJSON(t, h, map[string]any{
+		"language":  "py3",
+		"source":    "print('hi')",
+		"tests":     []map[string]any{{"stdin": "", "expected_stdout": ""}},
+		"evaluator": map[string]any{"language": "cobol", "source": "x"},
+	})
+	assertErrorCode(t, w, http.StatusBadRequest, "unknown_language")
+}
+
+// /run is strict to the competition schema: an evaluator block is ignored, not
+// processed, so the request is treated as an ordinary verifier run.
+func TestRunHandler_IgnoresEvaluator(t *testing.T) {
+	sub := &mockSubmitter{resp: runner.Response{
+		Status: validate.StatusAccepted,
+		Build:  runner.BuildResult{Status: validate.BuildStatusOK},
+		Tests:  []runner.TestResult{{Status: validate.StatusAccepted}},
+	}}
+	h := newTestRunHandler(t, sub)
+	w := postJSON(t, h, map[string]any{
+		"language":  "py3",
+		"source":    "print('hi')",
+		"tests":     []map[string]any{{"stdin": "", "expected_stdout": "hi\n"}},
+		"evaluator": map[string]any{"language": "cobol", "source": "x"},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if sub.gotReq.Evaluator != nil {
+		t.Fatal("/run must ignore the evaluator block")
+	}
+}
+
 func TestRunHandler_TooManyTests(t *testing.T) {
 	h := newTestRunHandler(t, nil)
 	tests := make([]map[string]any, 51)

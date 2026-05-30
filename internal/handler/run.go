@@ -92,8 +92,18 @@ func (h *RunHandler) serve(w http.ResponseWriter, r *http.Request, v1 bool) {
 		}
 	}
 
+	// Evaluator mode is /v1/run only and requires tests to grade.
+	var evaluator *runner.EvaluatorJob
+	if v1 && req.Evaluator != nil {
+		evaluator, aerr = h.buildEvaluator(&req)
+		if aerr != nil {
+			writeError(w, http.StatusBadRequest, aerr.code, aerr.message)
+			return
+		}
+	}
+
 	// Raw execution is /v1/run only: an empty tests array runs once against stdin.
-	raw := v1 && len(req.Tests) == 0
+	raw := v1 && len(req.Tests) == 0 && evaluator == nil
 	tests, aerr := h.buildTests(&req, raw)
 	if aerr != nil {
 		writeError(w, http.StatusBadRequest, aerr.code, aerr.message)
@@ -129,6 +139,7 @@ func (h *RunHandler) serve(w http.ResponseWriter, r *http.Request, v1 bool) {
 		RunLimits:        runLimits,
 		Tests:            tests,
 		Raw:              raw,
+		Evaluator:        evaluator,
 	}
 
 	resp, err := h.runner.Submit(r.Context(), jobReq)
@@ -189,6 +200,66 @@ func (h *RunHandler) buildTests(req *RunRequest, raw bool) ([]runner.TestCase, *
 	return tests, nil
 }
 
+// buildEvaluator validates the evaluator spec and resolves it into a job. It
+// reuses the same filename/flag/limit checks as the candidate program.
+func (h *RunHandler) buildEvaluator(req *RunRequest) (*runner.EvaluatorJob, *apiErr) {
+	e := req.Evaluator
+	lang := h.reg.Get(e.Language)
+	if lang == nil {
+		return nil, &apiErr{"unknown_language", "evaluator language " + strconv.Quote(e.Language) + " is not registered"}
+	}
+	if err := validate.SourceSize(e.Source, h.cfg.MaxSourceBytes); err != nil {
+		return nil, &apiErr{"source_too_large", "evaluator: " + err.Error()}
+	}
+
+	srcFilename, aerr := resolveFilename("source", lang.SourceFilenameStrategy, e.SourceFilename, lang.SourceFilename)
+	if aerr != nil {
+		return nil, aerr
+	}
+	artFilename, aerr := resolveFilename("artifact", lang.ArtifactFilenameStrategy, e.ArtifactFilename, lang.ArtifactFilename)
+	if aerr != nil {
+		return nil, aerr
+	}
+
+	var buildFlags, runFlags []string
+	var buildLimits, runLimits config.LimitsDef
+	if e.Build != nil && lang.Build != nil {
+		buildFlags = e.Build.Flags
+		buildLimits = e.Build.Limits
+		if len(buildFlags) > 0 {
+			if err := validate.Flags(buildFlags, lang.Build.FlagAllowlist); err != nil {
+				return nil, &apiErr{"invalid_flag", "evaluator build: " + err.Error()}
+			}
+		}
+		if err := validate.Limits(buildLimits, lang.Build.Limits); err != nil {
+			return nil, &apiErr{"invalid_limits", "evaluator build.limits: " + err.Error()}
+		}
+	}
+	if e.Run != nil {
+		runFlags = e.Run.Flags
+		runLimits = e.Run.Limits
+		if len(runFlags) > 0 {
+			if err := validate.Flags(runFlags, lang.Run.FlagAllowlist); err != nil {
+				return nil, &apiErr{"invalid_flag", "evaluator run: " + err.Error()}
+			}
+		}
+		if err := validate.Limits(runLimits, lang.Run.Limits); err != nil {
+			return nil, &apiErr{"invalid_limits", "evaluator run.limits: " + err.Error()}
+		}
+	}
+
+	return &runner.EvaluatorJob{
+		Language:         e.Language,
+		Source:           e.Source,
+		SourceFilename:   srcFilename,
+		ArtifactFilename: artFilename,
+		BuildFlags:       buildFlags,
+		RunFlags:         runFlags,
+		BuildLimits:      buildLimits,
+		RunLimits:        runLimits,
+	}, nil
+}
+
 func toBuildResult(b runner.BuildResult) BuildResult {
 	return BuildResult{
 		Status:     b.Status,
@@ -230,6 +301,9 @@ func toV1Response(resp runner.Response) V1RunResponse {
 			ExitCode:     t.ExitCode,
 			DurationMs:   t.DurationMs,
 			MemoryPeakKB: t.MemoryPeakKB,
+			Verdict:      t.Verdict,
+			Score:        t.Score,
+			Message:      t.Message,
 		}
 	}
 	return out
