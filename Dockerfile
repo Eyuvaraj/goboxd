@@ -51,8 +51,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ocaml \
         # rustc \
         # kotlin \
-        # golang-go \
     && rm -rf /var/lib/apt/lists/*
+
+# Copy the Go toolchain from the builder stage (same version, avoids stale apt package).
+COPY --from=builder /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}"
 
 COPY --from=nsjail-builder /usr/local/bin/nsjail /usr/local/bin/nsjail
 COPY --from=builder        /out/goboxd           /usr/local/bin/goboxd
@@ -68,10 +71,10 @@ RUN python3 --version \
     && bash --version \
     && ruby --version \
     && lua5.4 -e 'print("ok")' \
-    && ocaml -version
+    && ocaml -version \
     # && rustc --version \
     # && kotlinc -version \
-    # && go version
+    && go version
 
 RUN mkdir -p /tmp/goboxd
 
