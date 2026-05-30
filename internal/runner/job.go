@@ -24,6 +24,7 @@ type TestResult struct {
 	Status       string `json:"status"`
 	Stdout       string `json:"stdout"`
 	Stderr       string `json:"stderr"`
+	ExitCode     int    `json:"exit_code"`
 	DurationMs   int64  `json:"duration_ms"`
 	MemoryPeakKB int64  `json:"memory_peak_kb"`
 }
@@ -38,6 +39,9 @@ type JobRequest struct {
 	BuildLimits      config.LimitsDef
 	RunLimits        config.LimitsDef
 	Tests            []TestCase
+	// Raw reports execution outcome only, without comparing stdout to an
+	// expected value. Set when the request carries no test cases.
+	Raw bool
 }
 
 type TestCase struct {
@@ -98,6 +102,12 @@ func (j *Job) compile(ctx context.Context) BuildResult {
 	}
 
 	status := sandbox.ParseBuildStatus(result.Log, result.ExitCode)
+	if status == validate.BuildStatusOK && j.req.ArtifactFilename != "" {
+		// Lock down the compiled artifact and source to prevent test[i] from
+		// overwriting the binary before test[i+1] runs (shared workspace).
+		_ = os.Chmod(j.ws.SourcePath(j.req.ArtifactFilename), 0o555)
+		_ = os.Chmod(j.ws.SourcePath(j.req.SourceFilename), 0o444)
+	}
 	return BuildResult{
 		Status:     status,
 		Stdout:     string(result.Stdout),
@@ -174,11 +184,15 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 			continue
 		}
 
-		status := compareOutput(result, tc.ExpectedStdout)
+		status := sandbox.ParseRunStatus(result.Log, result.ExitCode)
+		if !j.req.Raw {
+			status = compareOutput(result, tc.ExpectedStdout)
+		}
 		results[i] = TestResult{
 			Status:       status,
 			Stdout:       string(result.Stdout),
 			Stderr:       string(result.Stderr),
+			ExitCode:     result.ExitCode,
 			DurationMs:   result.DurationMs,
 			MemoryPeakKB: result.MemoryPeakKB,
 		}
@@ -186,10 +200,9 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 	return results
 }
 
-// compareOutput returns the test status. Sandbox failures (TLE, OOM, signal) take
-// precedence over output comparison. Whitespace mismatch fires when outputs match
-// after stripping trailing whitespace but not before — catches the common trailing-
-// newline case without masking leading-whitespace differences.
+// compareOutput returns test status. Sandbox failures take precedence.
+// Strips trailing whitespace to catch common newline differences without
+// masking leading-whitespace differences.
 func compareOutput(result sandbox.RunResult, expected string) string {
 	sandboxStatus := sandbox.ParseRunStatus(result.Log, result.ExitCode)
 	if sandboxStatus != validate.StatusAccepted {
@@ -207,14 +220,13 @@ func compareOutput(result sandbox.RunResult, expected string) string {
 	return validate.StatusWrongOutput
 }
 
-// buildBindMounts returns the read-only host directories to bind-mount into the jail.
-// Never include a path whose parent is already in the set: nsjail mounts each path
-// then remounts it read-only; a child mount on top of a parent mount causes an
-// EINVAL on the MS_RDONLY remount because the kernel sees a different mount ID.
+// buildBindMounts returns read-only host directories to bind-mount into the jail.
+// Never add a path whose parent is already in the set: nsjail's MS_RDONLY remount
+// of a child mount over its parent fails with EINVAL.
 func buildBindMounts(lang *config.LanguageDef) []string {
 	dirs := map[string]struct{}{}
 
-	// Base set covers toolchain binaries, shared libs, and runtime necessities.
+	// /dev is needed for /dev/null and /dev/urandom; bound read-only via -R.
 	for _, d := range []string{"/bin", "/usr", "/lib", "/etc", "/dev", "/var"} {
 		dirs[d] = struct{}{}
 	}

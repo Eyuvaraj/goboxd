@@ -83,21 +83,30 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_test_count", err.Error())
 		return
 	}
-	tests := make([]runner.TestCase, len(req.Tests))
-	for i, tc := range req.Tests {
-		if err := validate.StdinSize(tc.Stdin, h.cfg.MaxStdinBytes); err != nil {
-			writeError(w, http.StatusBadRequest, "stdin_too_large",
-				"test "+strconv.Itoa(i)+": "+err.Error())
+	var tests []runner.TestCase
+	if len(req.Tests) == 0 {
+		if err := validate.StdinSize(req.Stdin, h.cfg.MaxStdinBytes); err != nil {
+			writeError(w, http.StatusBadRequest, "stdin_too_large", err.Error())
 			return
 		}
-		if err := validate.ExpectedSize(tc.ExpectedStdout, h.cfg.MaxStdinBytes); err != nil {
-			writeError(w, http.StatusBadRequest, "expected_too_large",
-				"test "+strconv.Itoa(i)+": "+err.Error())
-			return
-		}
-		tests[i] = runner.TestCase{
-			Stdin:          tc.Stdin,
-			ExpectedStdout: tc.ExpectedStdout,
+		tests = []runner.TestCase{{Stdin: req.Stdin}}
+	} else {
+		tests = make([]runner.TestCase, len(req.Tests))
+		for i, tc := range req.Tests {
+			if err := validate.StdinSize(tc.Stdin, h.cfg.MaxStdinBytes); err != nil {
+				writeError(w, http.StatusBadRequest, "stdin_too_large",
+					"test "+strconv.Itoa(i)+": "+err.Error())
+				return
+			}
+			if err := validate.ExpectedSize(tc.ExpectedStdout, h.cfg.MaxStdinBytes); err != nil {
+				writeError(w, http.StatusBadRequest, "expected_too_large",
+					"test "+strconv.Itoa(i)+": "+err.Error())
+				return
+			}
+			tests[i] = runner.TestCase{
+				Stdin:          tc.Stdin,
+				ExpectedStdout: tc.ExpectedStdout,
+			}
 		}
 	}
 
@@ -129,6 +138,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		BuildLimits:      buildLimits,
 		RunLimits:        runLimits,
 		Tests:            tests,
+		Raw:              len(req.Tests) == 0,
 	}
 
 	resp, err := h.runner.Submit(r.Context(), jobReq)
@@ -170,6 +180,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Status:       t.Status,
 			Stdout:       t.Stdout,
 			Stderr:       t.Stderr,
+			ExitCode:     t.ExitCode,
 			DurationMs:   t.DurationMs,
 			MemoryPeakKB: t.MemoryPeakKB,
 		}

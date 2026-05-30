@@ -10,6 +10,7 @@ type RunRequest struct {
 	ArtifactFilename string         `json:"artifact_filename"`
 	Build            *PhaseOverride `json:"build"`
 	Run              *PhaseOverride `json:"run"`
+	Stdin            string         `json:"stdin"` // raw mode: single stdin when tests is empty
 	Tests            []TestCase     `json:"tests"`
 }
 
@@ -43,6 +44,7 @@ type TestResult struct {
 	Status       string `json:"status"`
 	Stdout       string `json:"stdout"`
 	Stderr       string `json:"stderr"`
+	ExitCode     int    `json:"exit_code"`
 	DurationMs   int64  `json:"duration_ms"`
 	MemoryPeakKB int64  `json:"memory_peak_kb"`
 }

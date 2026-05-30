@@ -90,11 +90,13 @@ languages:
 
 // mockSubmitter satisfies handler.Submitter for unit tests.
 type mockSubmitter struct {
-	resp runner.Response
-	err  error
+	resp   runner.Response
+	err    error
+	gotReq runner.JobRequest
 }
 
-func (m *mockSubmitter) Submit(_ context.Context, _ runner.JobRequest) (runner.Response, error) {
+func (m *mockSubmitter) Submit(_ context.Context, req runner.JobRequest) (runner.Response, error) {
+	m.gotReq = req
 	return m.resp, m.err
 }
 
@@ -275,14 +277,28 @@ func TestRunHandler_DisallowedRunFlag(t *testing.T) {
 	assertErrorCode(t, w, http.StatusBadRequest, "invalid_flag")
 }
 
-func TestRunHandler_NoTests(t *testing.T) {
-	h := newTestRunHandler(t, nil)
+// No tests means raw execution mode: run once, report the outcome without grading.
+func TestRunHandler_RawMode(t *testing.T) {
+	sub := &mockSubmitter{resp: runner.Response{
+		Status: validate.StatusAccepted,
+		Build:  runner.BuildResult{Status: validate.BuildStatusOK},
+		Tests:  []runner.TestResult{{Status: validate.StatusAccepted, Stdout: "hi\n", ExitCode: 0}},
+	}}
+	h := newTestRunHandler(t, sub)
 	w := postJSON(t, h, map[string]any{
 		"language": "py3",
 		"source":   "print('hi')",
-		"tests":    []map[string]any{},
+		"stdin":    "ignored\n",
 	})
-	assertErrorCode(t, w, http.StatusBadRequest, "invalid_test_count")
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if !sub.gotReq.Raw {
+		t.Fatal("expected Raw=true when no tests are supplied")
+	}
+	if len(sub.gotReq.Tests) != 1 || sub.gotReq.Tests[0].Stdin != "ignored\n" {
+		t.Fatalf("raw mode should forward a single stdin, got %+v", sub.gotReq.Tests)
+	}
 }
 
 func TestRunHandler_TooManyTests(t *testing.T) {

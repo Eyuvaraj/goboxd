@@ -74,14 +74,6 @@ func TestCounters_QueueSize(t *testing.T) {
 	}
 }
 
-func TestDiskFreeBytes_ValidPath(t *testing.T) {
-	dir := t.TempDir()
-	free := stats.DiskFreeBytes(dir)
-	if free <= 0 {
-		t.Errorf("DiskFreeBytes(%q): want > 0, got %d", dir, free)
-	}
-}
-
 func TestDiskFreeBytes_InvalidPath(t *testing.T) {
 	free := stats.DiskFreeBytes(os.DevNull + "/nonexistent")
 	if free != -1 {

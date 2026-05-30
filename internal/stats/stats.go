@@ -2,7 +2,6 @@ package stats
 
 import (
 	"sync/atomic"
-	"syscall"
 	"time"
 )
 
@@ -34,13 +33,4 @@ func (c *Counters) LastInternalErrorAt() time.Time {
 		return time.Time{}
 	}
 	return time.Unix(0, ns)
-}
-
-// DiskFreeBytes returns available bytes on the filesystem at path, or -1 on error.
-func DiskFreeBytes(path string) int64 {
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(path, &stat); err != nil {
-		return -1
-	}
-	return int64(stat.Bavail) * int64(stat.Bsize)
 }
