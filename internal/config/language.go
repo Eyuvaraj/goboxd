@@ -25,6 +25,10 @@ type LanguageDef struct {
 	ArtifactFilename         string `yaml:"artifact_filename"`
 	ArtifactFilenameStrategy string `yaml:"artifact_filename_strategy"`
 
+	// ProbeArgs overrides the arguments used for the readiness probe (default: ["--version"]).
+	// Set this for runtimes that use a different flag, e.g. lua5.4 uses ["-v"].
+	ProbeArgs []string `yaml:"probe_args"`
+
 	Env   []string  `yaml:"env"`   // extra KEY=VALUE vars injected into every nsjail invocation
 	Build *PhaseDef `yaml:"build"` // nil for interpreted languages
 	Run   PhaseDef  `yaml:"run"`

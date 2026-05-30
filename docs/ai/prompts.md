@@ -53,7 +53,7 @@ Tracks AI interactions during the development of goboxd, as required by the hack
 
 ---
 
-## 2026-05-24: Adding five bonus languages
+## 2026-05-24: Adding five additional languages
 
 **Prompt:** The competition gives bonus points for extra languages beyond the required seven. I want to add Ruby, Lua, Rust, Kotlin, and OCaml. Can you write the YAML config blocks, the Dockerfile install lines, and the install shell scripts for each one?
 

@@ -38,6 +38,15 @@ func main() {
 
 	// First probe runs synchronously; background refresh every 30s.
 	probes := registry.NewProbeCache(reg, cfg.NsjailPath)
+	if r := probes.Nsjail(); !r.OK {
+		slog.Error("nsjail probe failed at startup", "error", r.Error)
+		os.Exit(1)
+	}
+	for id, r := range probes.Languages() {
+		if !r.OK {
+			slog.Warn("language probe failed at startup", "language", id, "error", r.Error)
+		}
+	}
 
 	counters := &stats.Counters{}
 	jobRunner := runner.New(cfg.MaxConcurrentJobs, reg, cfg, counters)

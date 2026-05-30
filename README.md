@@ -39,7 +39,7 @@ Validation failures return `400`; infrastructure errors return `5xx`.
 
 ## Languages
 
-`py3` · `bash` · `js` · `c` · `cpp` · `java` · `verilog` · `ruby` · `lua` · `rust` · `kotlin` · `ocaml` · `go`
+`py3` · `bash` · `js` · `c` · `cpp` · `java` · `verilog` · `ruby` · `lua` · `ocaml`
 
 Adding a language takes one YAML block in [`configs/languages.yaml`](configs/languages.yaml)
 and one `apt-get install` in the [`Dockerfile`](Dockerfile), with no Go code changes.
@@ -49,7 +49,7 @@ and one `apt-get install` in the [`Dockerfile`](Dockerfile), with no Go code cha
 ## Design
 
 We use `chi` as the HTTP router because it wraps plain `net/http` handlers without abstraction overhead.
-We chose `nsjail` for sandboxing: it handles namespaces, cgroups, seccomp, and filesystem isolation so we could focus on orchestration.
+Each request runs inside an `nsjail` sandbox — namespaces, cgroups, seccomp, and filesystem isolation are handled by the kernel; goboxd only manages the job lifecycle.
 Concurrency is a `chan struct{}` semaphore; requests queue under load, they never fail.
 Languages live in YAML and the engine expands `{{source}}`, `{{artifact}}`, `{{flags}}` generically.
 Adding a language is two file edits with no Go code change.

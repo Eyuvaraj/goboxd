@@ -18,7 +18,7 @@ The entire language catalog lives in `configs/languages.yaml`. No Go code change
 | `java` | Java | Compiled | `javac` / `java` |
 | `verilog` | Verilog | Compiled | `iverilog` / `vvp` |
 
-### Bonus
+### Additional (all pass `/readyz`)
 
 | ID | Language | Type | Toolchain |
 |----|----------|------|-----------|
