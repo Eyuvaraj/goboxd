@@ -38,40 +38,17 @@ RUN CGO_ENABLED=0 go build \
 FROM debian:${DEBIAN_VERSION}-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates libnl-route-3-200 libprotobuf32 \
-        wget \
-        # Language runtimes and compilers
-        python3 \
-        nodejs \
-        gcc g++ \
-        default-jdk-headless \
-        iverilog \
-        bash \
-        ruby \
-        lua5.4 \
-        ocaml \
-        # rustc \
-        # kotlin \
-        # golang-go \
+        wget bash \
     && rm -rf /var/lib/apt/lists/*
+
+COPY scripts/lang_install /install
+RUN for s in /install/*.sh; do bash "$s"; done && rm -rf /var/lib/apt/lists/*
 
 COPY --from=nsjail-builder /usr/local/bin/nsjail /usr/local/bin/nsjail
 COPY --from=builder        /out/goboxd           /usr/local/bin/goboxd
 COPY configs/languages.yaml /etc/goboxd/languages.yaml
 
-# Smoke-test each language at image-build time to catch missing toolchains early.
-RUN python3 --version \
-    && node --version \
-    && gcc --version \
-    && g++ --version \
-    && java -version \
-    && iverilog -V \
-    && bash --version \
-    && ruby --version \
-    && lua5.4 -e 'print("ok")' \
-    && ocaml -version
-    # && rustc --version \
-    # && kotlinc -version \
-    # && go version
+	# Language smoke tests are performed by their respective install scripts.
 
 RUN mkdir -p /tmp/goboxd
 

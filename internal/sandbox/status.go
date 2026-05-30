@@ -41,7 +41,7 @@ func ParseBuildStatus(log []byte, exitCode int) string {
 	switch {
 	case exitCode == 0:
 		return validate.BuildStatusOK
-	case bytes.Contains(log, []byte("[E][")):
+	case bytes.Contains(log, []byte("[E][")) || (exitCode != 0 && len(log) == 0):
 		return validate.BuildStatusInternalError
 	default:
 		return validate.BuildStatusFailed

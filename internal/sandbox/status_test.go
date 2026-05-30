@@ -56,4 +56,10 @@ func TestParseBuildStatus(t *testing.T) {
 	if s := sandbox.ParseBuildStatus([]byte("error: syntax error"), 1); s != validate.BuildStatusFailed {
 		t.Errorf("plain compiler error: got %q", s)
 	}
+
+	// Non-zero exit with an empty log means nsjail never produced diagnostics —
+	// it never ran the build, so this is infrastructure failure, not a compile error.
+	if s := sandbox.ParseBuildStatus([]byte(""), 1); s != validate.BuildStatusInternalError {
+		t.Errorf("non-zero exit with empty log: got %q, want %q", s, validate.BuildStatusInternalError)
+	}
 }

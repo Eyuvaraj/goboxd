@@ -98,11 +98,11 @@ See `docs/languages.md` for the full YAML schema and template variable reference
 
 `goboxd` invokes `nsjail` as a pure `[]string` slice, with no shell and no string interpolation. Representative invocation for a compiled C++ binary:
 
-```
+```text
 /usr/local/bin/nsjail
   --mode o
-  --chroot /tmp/goboxd/goboxd-<id>
-  --user 65534 --group 65534
+  --chroot /tmp/goboxd/goboxd-42
+  --user 60042 --group 60042
   --log_fd 3
   --max_cpus 1
   --rw
@@ -110,13 +110,14 @@ See `docs/languages.md` for the full YAML schema and template variable reference
   --hostname goboxd
   --detect_cgroupv2
   --cgroupv2_mount /sys/fs/cgroup
-  --cgroup_mem_parent goboxd-<timestamp>
+  --cgroup_mem_parent goboxd-42
   --rlimit_nofile 1000
   --rlimit_core 0
   --rlimit_stack 8
   --env TMP=/ --env TMPDIR=/ --env HOME=/
   --env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-  --time_limit 5   --rlimit_cpu 5
+  --iface_no_lo
+  --time_limit 5   --rlimit_cpu 6
   --cgroup_mem_max 268435456   --cgroup_mem_swap_max 0
   --rlimit_as 4096
   --cgroup_pids_max 64   --rlimit_nproc 64
