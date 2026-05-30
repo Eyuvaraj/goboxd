@@ -100,7 +100,8 @@ It writes a single JSON object to stdout: `{"verdict": "accepted"|"rejected", "s
 Requests are bounded by a buffered channel used as a counting semaphore.
 
 - **Capacity** is `MAX_CONCURRENT_JOBS`, defaulting to `runtime.NumCPU()`.
-- **Blocking:** `runner.Submit()` sends to the channel, blocking until a slot is free. The slot is released on return. Requests queue; they never fail due to backpressure.
+- **Blocking:** `runner.Submit()` sends to the channel, blocking until a slot is free. The slot is released on return. By default requests queue and never fail due to backpressure.
+- **Optional load shedding:** when `MAX_QUEUE_DEPTH` is set, a request that arrives while at least that many are already waiting is rejected with `503` and a `Retry-After` header instead of queueing. The default (`0`) leaves the queue unbounded.
 - **Semaphore over worker pool:** a pool requires persistent goroutines and a job channel. With the semaphore, each request goroutine drives its own job and blocks until a slot is available. Throughput is identical; complexity is lower.
 - **Sequential tests:** parallel test execution within a job was rejected. nsjail process startup is the bottleneck, not goroutines. Sequential execution gives deterministic file layout and avoids workspace races.
 

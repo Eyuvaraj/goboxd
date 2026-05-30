@@ -551,6 +551,24 @@ func TestRunHandler_ContextCancelled(t *testing.T) {
 	}
 }
 
+// When the runner sheds load, the handler returns 503 with a Retry-After hint.
+func TestRunHandler_Overloaded(t *testing.T) {
+	sub := &mockSubmitter{err: runner.ErrOverloaded}
+	h := newTestRunHandler(t, sub)
+	w := postJSON(t, h, map[string]any{
+		"language": "py3",
+		"source":   "print('hi')",
+		"tests":    []map[string]any{{"stdin": "", "expected_stdout": "hi\n"}},
+	})
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("want 503, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if w.Header().Get("Retry-After") == "" {
+		t.Error("overload response must set a Retry-After header")
+	}
+	assertErrorCode(t, w, http.StatusServiceUnavailable, "overloaded")
+}
+
 func TestRunHandler_BuildFailed(t *testing.T) {
 	sub := &mockSubmitter{resp: runner.Response{
 		Status: validate.StatusBuildFailed,

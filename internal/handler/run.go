@@ -144,6 +144,11 @@ func (h *RunHandler) serve(w http.ResponseWriter, r *http.Request, v1 bool) {
 
 	resp, err := h.runner.Submit(r.Context(), jobReq)
 	if err != nil {
+		if errors.Is(err, runner.ErrOverloaded) {
+			w.Header().Set("Retry-After", "1")
+			writeError(w, http.StatusServiceUnavailable, "overloaded", "server is at capacity, retry shortly")
+			return
+		}
 		if errors.Is(err, r.Context().Err()) {
 			http.Error(w, "request cancelled", http.StatusServiceUnavailable)
 			return
