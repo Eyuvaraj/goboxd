@@ -68,6 +68,7 @@ func main() {
 	r.Get("/readyz", healthH.Readyz)
 	r.Get("/info", healthH.Info)
 	r.Post("/run", runH.ServeHTTP)
+	r.Post("/v1/run", runH.ServeHTTPV1)
 
 	r.Handle("/", http.RedirectHandler("/playground/", http.StatusFound))
 	r.Mount("/playground/", http.StripPrefix("/playground/", playground.Handler()))
@@ -76,7 +77,7 @@ func main() {
 	r.Get("/docs/", docs.UIHandler)
 	r.Get("/docs/swagger.json", docs.JSONHandler)
 
-	// WriteTimeout covers the worst-case job duration across all registered languages.
+	// WriteTimeout covers the worst-case job duration across all languages.
 	writeTimeout := reg.MaxJobDuration(cfg.MaxTests)
 
 	srv := &http.Server{
@@ -100,7 +101,11 @@ func main() {
 
 	<-ctx.Done()
 	slog.Info("shutting down")
-	shutCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// Stop the probe cache background refresh goroutine cleanly.
+	probes.Stop()
+	// Set shutdown timeout to max job duration to allow in-flight jobs to complete.
+	shutTimeout := reg.MaxJobDuration(cfg.MaxTests) + 5*time.Second
+	shutCtx, cancel := context.WithTimeout(context.Background(), shutTimeout)
 	defer cancel()
 	_ = srv.Shutdown(shutCtx)
 }

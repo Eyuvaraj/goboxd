@@ -10,7 +10,7 @@ type RunRequest struct {
 	ArtifactFilename string         `json:"artifact_filename"`
 	Build            *PhaseOverride `json:"build"`
 	Run              *PhaseOverride `json:"run"`
-	Stdin            string         `json:"stdin"` // raw mode: single stdin when tests is empty
+	Stdin            string         `json:"stdin"` // /v1/run raw mode: single stdin when tests is empty
 	Tests            []TestCase     `json:"tests"`
 }
 
@@ -26,7 +26,7 @@ type TestCase struct {
 	ExpectedStdout string `json:"expected_stdout"`
 }
 
-// RunResponse is the JSON body returned by POST /run.
+// RunResponse is the JSON body returned by POST /run (COMPETITION.md §4.2).
 type RunResponse struct {
 	Status string       `json:"status"`
 	Build  BuildResult  `json:"build"`
@@ -41,6 +41,22 @@ type BuildResult struct {
 }
 
 type TestResult struct {
+	Status       string `json:"status"`
+	Stdout       string `json:"stdout"`
+	Stderr       string `json:"stderr"`
+	DurationMs   int64  `json:"duration_ms"`
+	MemoryPeakKB int64  `json:"memory_peak_kb"`
+}
+
+// V1RunResponse is the JSON body returned by POST /v1/run. It mirrors
+// RunResponse but adds exit_code to each test result.
+type V1RunResponse struct {
+	Status string         `json:"status"`
+	Build  BuildResult    `json:"build"`
+	Tests  []V1TestResult `json:"tests"`
+}
+
+type V1TestResult struct {
 	Status       string `json:"status"`
 	Stdout       string `json:"stdout"`
 	Stderr       string `json:"stderr"`

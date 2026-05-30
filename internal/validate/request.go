@@ -96,6 +96,9 @@ func SourceSize(src string, max int) error {
 }
 
 func TestCount(n, max int) error {
+	if n == 0 {
+		return errors.New("at least one test case is required")
+	}
 	if n > max {
 		return fmt.Errorf("test count %d exceeds maximum of %d", n, max)
 	}

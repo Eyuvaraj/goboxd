@@ -29,7 +29,20 @@ func NewRunHandler(r Submitter, reg *registry.Registry, cfg config.Server) *RunH
 	return &RunHandler{runner: r, reg: reg, cfg: cfg}
 }
 
+// ServeHTTP handles POST /run — the competition contract (COMPETITION.md §4.2),
+// where tests is required and the response has no exit_code.
 func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.serve(w, r, false)
+}
+
+// ServeHTTPV1 handles POST /v1/run. It adds raw execution — an empty tests
+// array runs the program once against req.Stdin and reports the outcome
+// without grading — and an exit_code on each test result.
+func (h *RunHandler) ServeHTTPV1(w http.ResponseWriter, r *http.Request) {
+	h.serve(w, r, true)
+}
+
+func (h *RunHandler) serve(w http.ResponseWriter, r *http.Request, v1 bool) {
 	var req RunRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json", err.Error())
@@ -79,35 +92,12 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := validate.TestCount(len(req.Tests), h.cfg.MaxTests); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_test_count", err.Error())
+	// Raw execution is /v1/run only: an empty tests array runs once against stdin.
+	raw := v1 && len(req.Tests) == 0
+	tests, aerr := h.buildTests(&req, raw)
+	if aerr != nil {
+		writeError(w, http.StatusBadRequest, aerr.code, aerr.message)
 		return
-	}
-	var tests []runner.TestCase
-	if len(req.Tests) == 0 {
-		if err := validate.StdinSize(req.Stdin, h.cfg.MaxStdinBytes); err != nil {
-			writeError(w, http.StatusBadRequest, "stdin_too_large", err.Error())
-			return
-		}
-		tests = []runner.TestCase{{Stdin: req.Stdin}}
-	} else {
-		tests = make([]runner.TestCase, len(req.Tests))
-		for i, tc := range req.Tests {
-			if err := validate.StdinSize(tc.Stdin, h.cfg.MaxStdinBytes); err != nil {
-				writeError(w, http.StatusBadRequest, "stdin_too_large",
-					"test "+strconv.Itoa(i)+": "+err.Error())
-				return
-			}
-			if err := validate.ExpectedSize(tc.ExpectedStdout, h.cfg.MaxStdinBytes); err != nil {
-				writeError(w, http.StatusBadRequest, "expected_too_large",
-					"test "+strconv.Itoa(i)+": "+err.Error())
-				return
-			}
-			tests[i] = runner.TestCase{
-				Stdin:          tc.Stdin,
-				ExpectedStdout: tc.ExpectedStdout,
-			}
-		}
 	}
 
 	var buildLimits, runLimits config.LimitsDef
@@ -138,7 +128,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		BuildLimits:      buildLimits,
 		RunLimits:        runLimits,
 		Tests:            tests,
-		Raw:              len(req.Tests) == 0,
+		Raw:              raw,
 	}
 
 	resp, err := h.runner.Submit(r.Context(), jobReq)
@@ -165,18 +155,75 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		TestsAccepted:   accepted,
 	}))
 
+	if v1 {
+		writeJSON(w, http.StatusOK, toV1Response(resp))
+	} else {
+		writeJSON(w, http.StatusOK, toRunResponse(resp))
+	}
+}
+
+// buildTests validates and converts the request's test cases. In raw mode it
+// returns a single case fed from req.Stdin; otherwise at least one test is
+// required and each stdin/expected_stdout pair is size-checked.
+func (h *RunHandler) buildTests(req *RunRequest, raw bool) ([]runner.TestCase, *apiErr) {
+	if raw {
+		if err := validate.StdinSize(req.Stdin, h.cfg.MaxStdinBytes); err != nil {
+			return nil, &apiErr{"stdin_too_large", err.Error()}
+		}
+		return []runner.TestCase{{Stdin: req.Stdin}}, nil
+	}
+
+	if err := validate.TestCount(len(req.Tests), h.cfg.MaxTests); err != nil {
+		return nil, &apiErr{"invalid_test_count", err.Error()}
+	}
+	tests := make([]runner.TestCase, len(req.Tests))
+	for i, tc := range req.Tests {
+		if err := validate.StdinSize(tc.Stdin, h.cfg.MaxStdinBytes); err != nil {
+			return nil, &apiErr{"stdin_too_large", "test " + strconv.Itoa(i) + ": " + err.Error()}
+		}
+		if err := validate.ExpectedSize(tc.ExpectedStdout, h.cfg.MaxStdinBytes); err != nil {
+			return nil, &apiErr{"expected_too_large", "test " + strconv.Itoa(i) + ": " + err.Error()}
+		}
+		tests[i] = runner.TestCase{Stdin: tc.Stdin, ExpectedStdout: tc.ExpectedStdout}
+	}
+	return tests, nil
+}
+
+func toBuildResult(b runner.BuildResult) BuildResult {
+	return BuildResult{
+		Status:     b.Status,
+		Stdout:     b.Stdout,
+		Stderr:     b.Stderr,
+		DurationMs: b.DurationMs,
+	}
+}
+
+func toRunResponse(resp runner.Response) RunResponse {
 	out := RunResponse{
 		Status: resp.Status,
-		Build: BuildResult{
-			Status:     resp.Build.Status,
-			Stdout:     resp.Build.Stdout,
-			Stderr:     resp.Build.Stderr,
-			DurationMs: resp.Build.DurationMs,
-		},
-		Tests: make([]TestResult, len(resp.Tests)),
+		Build:  toBuildResult(resp.Build),
+		Tests:  make([]TestResult, len(resp.Tests)),
 	}
 	for i, t := range resp.Tests {
 		out.Tests[i] = TestResult{
+			Status:       t.Status,
+			Stdout:       t.Stdout,
+			Stderr:       t.Stderr,
+			DurationMs:   t.DurationMs,
+			MemoryPeakKB: t.MemoryPeakKB,
+		}
+	}
+	return out
+}
+
+func toV1Response(resp runner.Response) V1RunResponse {
+	out := V1RunResponse{
+		Status: resp.Status,
+		Build:  toBuildResult(resp.Build),
+		Tests:  make([]V1TestResult, len(resp.Tests)),
+	}
+	for i, t := range resp.Tests {
+		out.Tests[i] = V1TestResult{
 			Status:       t.Status,
 			Stdout:       t.Stdout,
 			Stderr:       t.Stderr,
@@ -185,8 +232,7 @@ func (h *RunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			MemoryPeakKB: t.MemoryPeakKB,
 		}
 	}
-
-	writeJSON(w, http.StatusOK, out)
+	return out
 }
 
 type apiErr struct {

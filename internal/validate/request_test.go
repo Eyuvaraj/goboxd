@@ -69,8 +69,8 @@ func TestSourceSize(t *testing.T) {
 }
 
 func TestTestCount(t *testing.T) {
-	if err := validate.TestCount(0, 50); err != nil {
-		t.Errorf("0 tests is valid (raw mode): %v", err)
+	if err := validate.TestCount(0, 50); err == nil {
+		t.Error("expected error for 0 tests (/run requires at least one)")
 	}
 	if err := validate.TestCount(1, 50); err != nil {
 		t.Errorf("unexpected error: %v", err)
