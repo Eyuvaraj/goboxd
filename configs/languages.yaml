@@ -219,27 +219,28 @@ languages:
   #       memory_kb: 524288
   #       max_processes: 100
 
-  # - id: go
-  #   name: Go
-  #   source_filename: solution.go
-  #   artifact_filename: solution
-  #   env:
-  #     - GO111MODULE=off
-  #     - CGO_ENABLED=0
-  #     - GOPATH=/
-  #     - GOCACHE=/.cache/go-build
-  #   build:
-  #     cmd: /usr/bin/go
-  #     args: ["build", "-o", "{{artifact}}", "{{source}}"]
-  #     limits:
-  #       wall_time_s: 20
-  #       memory_kb: 524288
-  #       max_processes: 100
-  #     flag_allowlist: []
-  #   run:
-  #     cmd: /solution
-  #     args: []
-  #     limits:
-  #       wall_time_s: 5
-  #       memory_kb: 262144
-  #       max_processes: 64
+  - id: go
+    name: Go
+    source_filename: solution.go
+    artifact_filename: solution
+    probe_args: ["version"]
+    env:
+      - GO111MODULE=off
+      - CGO_ENABLED=0
+      - GOPATH=/
+      - GOCACHE=/.cache/go-build
+    build:
+      cmd: /usr/local/go/bin/go
+      args: ["build", "-o", "{{artifact}}", "{{source}}"]
+      limits:
+        wall_time_s: 20
+        memory_kb: 524288
+        max_processes: 100
+      flag_allowlist: []
+    run:
+      cmd: /solution
+      args: []
+      limits:
+        wall_time_s: 5
+        memory_kb: 262144
+        max_processes: 64
