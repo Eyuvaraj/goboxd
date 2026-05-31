@@ -81,15 +81,25 @@ func main() {
 	writeTimeout := reg.MaxJobDuration(cfg.MaxTests)
 
 	srv := &http.Server{
-		Addr:         ":" + cfg.Port,
-		Handler:      r,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: writeTimeout,
-		IdleTimeout:  60 * time.Second,
+		Addr:        ":" + cfg.Port,
+		Handler:     r,
+		ReadTimeout: 30 * time.Second,
+		// ReadHeaderTimeout drops slowloris connections that dribble request
+		// headers to hold a connection open. Tighter than ReadTimeout, which
+		// also covers the (legitimately large) body.
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// Sweep orphaned jail directories periodically, not just at startup, so a
+	// long-running server cannot accumulate leaked sandboxes (e.g. from a crash
+	// between MkdirTemp and cleanup) until the next restart. SweepOrphans is
+	// age-gated, so it never touches an in-flight job's workspace.
+	go sweepOrphansLoop(ctx, cfg.JailDir, time.Duration(cfg.OrphanMaxAge)*time.Minute)
 
 	go func() {
 		slog.Info("server starting", "addr", srv.Addr)
@@ -108,4 +118,27 @@ func main() {
 	shutCtx, cancel := context.WithTimeout(context.Background(), shutTimeout)
 	defer cancel()
 	_ = srv.Shutdown(shutCtx)
+}
+
+// sweepOrphansLoop runs SweepOrphans on a ticker until ctx is cancelled. The
+// interval tracks maxAge (a leaked dir is removed within roughly one maxAge of
+// going stale) but is floored at one minute so a small or zero OrphanMaxAge
+// cannot spin the goroutine. The startup sweep already ran before this is
+// called, so the first tick is a follow-up, not the first cleanup.
+func sweepOrphansLoop(ctx context.Context, jailDir string, maxAge time.Duration) {
+	interval := maxAge
+	if interval < time.Minute {
+		interval = time.Minute
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sandbox.SweepOrphans(jailDir, maxAge)
+		}
+	}
 }
