@@ -19,6 +19,12 @@ import (
 
 const truncationMarker = "\n[output truncated]"
 
+// cgroupRoot is the cgroup v2 hierarchy root inside the container. Each job gets
+// its own sub-cgroup under it; nsjail nests NSJAIL.<pid> beneath that, so the
+// per-job directory's hierarchical memory.peak / memory.events survive nsjail
+// tearing the child down (see Run).
+const cgroupRoot = "/sys/fs/cgroup"
+
 // runCounter provides collision-free cgroup names and sandbox UIDs across concurrent runs.
 var runCounter atomic.Uint64
 
@@ -76,6 +82,7 @@ type RunConfig struct {
 	BindMounts     []string // read-only host paths to bind-mount into the jail
 	Env            []string // extra KEY=VALUE vars for this invocation
 	CgroupParent   string   // cgroup v2 directory name for this run
+	CgroupV2Mount  string   // absolute per-job cgroup dir; set by Run(), not callers
 	SandboxUID     string   // per-run uid/gid inside the jail; set by Run(), not callers
 }
 
@@ -87,6 +94,7 @@ type RunResult struct {
 	DurationMs   int64
 	Truncated    bool
 	MemoryPeakKB int64
+	OOMKilled    bool // cgroup memory.events recorded an oom_kill for this run
 }
 
 // Run executes cmd inside an nsjail sandbox.
@@ -96,7 +104,12 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	cfg.CgroupParent = "goboxd-" + strconv.FormatUint(runID, 10)
 	cfg.SandboxUID = strconv.FormatUint(uidBase+runID%uidPoolSize, 10)
 
-	cgroupPath := filepath.Join("/sys/fs/cgroup", cfg.CgroupParent)
+	// nsjail (cgroup v2) hardcodes its cgroup as <cgroupv2_mount>/NSJAIL.<pid>
+	// and removes it on exit, ignoring --cgroup_mem_parent. Point its mount at
+	// our own per-job dir so NSJAIL.<pid> nests beneath it; the parent's
+	// hierarchical memory.peak / memory.events then outlive the child teardown.
+	cgroupPath := filepath.Join(cgroupRoot, cfg.CgroupParent)
+	cfg.CgroupV2Mount = cgroupPath
 	_ = os.Mkdir(cgroupPath, 0o755)
 	defer func() {
 		// nsjail may leave a child cgroup behind; clean sub-dirs first.
@@ -175,12 +188,15 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 		stdout = append(stdout, []byte(truncationMarker)...)
 	}
 
+	// Read accounting from our per-job cgroup before the deferred cleanup removes
+	// it. Values are hierarchical, so they include nsjail's NSJAIL.<pid> child.
 	var peakKB int64
 	if peakBytes, err := os.ReadFile(filepath.Join(cgroupPath, "memory.peak")); err == nil {
 		if peak, err := strconv.ParseInt(string(bytes.TrimSpace(peakBytes)), 10, 64); err == nil {
 			peakKB = peak / 1024
 		}
 	}
+	oomKilled := cgroupOOMKilled(cgroupPath)
 
 	return RunResult{
 		Stdout:       stdout,
@@ -190,7 +206,25 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 		DurationMs:   durationMs,
 		Truncated:    truncated,
 		MemoryPeakKB: peakKB,
+		OOMKilled:    oomKilled,
 	}, nil
+}
+
+// cgroupOOMKilled reports whether the cgroup's memory.events recorded an
+// oom_kill. nsjail surfaces a cgroup OOM only as a SIGKILL, so this file is the
+// one reliable way to tell memory_exceeded apart from an ordinary runtime crash.
+func cgroupOOMKilled(cgroupPath string) bool {
+	data, err := os.ReadFile(filepath.Join(cgroupPath, "memory.events"))
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		field, val, ok := strings.Cut(line, " ")
+		if ok && field == "oom_kill" {
+			return strings.TrimSpace(val) != "0"
+		}
+	}
+	return false
 }
 
 // buildArgv constructs the nsjail command-line as a pure []string (no shell).
@@ -209,8 +243,10 @@ func buildArgv(cfg RunConfig) []string {
 		"--cwd", "/",
 		"--hostname", "goboxd",
 		"--detect_cgroupv2",
-		"--cgroupv2_mount", "/sys/fs/cgroup",
-		"--cgroup_mem_parent", cfg.CgroupParent,
+		// Mount at our own per-job dir, not the root: nsjail creates NSJAIL.<pid>
+		// under it. --cgroup_mem_parent is intentionally omitted — nsjail's v2 code
+		// path ignores it (it always names the leaf NSJAIL.<pid>).
+		"--cgroupv2_mount", cfg.CgroupV2Mount,
 		"--rlimit_nofile", "1000", // javac and Python open many fds at startup
 		"--rlimit_core", "0",
 		"--rlimit_stack", "8", // container envs can inherit unlimited stack

@@ -9,24 +9,26 @@ import (
 
 func TestParseRunStatus(t *testing.T) {
 	tests := []struct {
-		name     string
-		stderr   string
-		exitCode int
-		want     string
+		name      string
+		stderr    string
+		exitCode  int
+		oomKilled bool
+		want      string
 	}{
-		{"time exceeded", "run time >= time limit", 1, validate.StatusTimeExceeded},
-		{"memory exceeded cgroup v1", "memory limit exceeded", 1, validate.StatusMemoryExceeded},
-		{"oom", "out of memory", 137, validate.StatusMemoryExceeded},
-		{"signal segfault", "killed by signal 11", 139, validate.StatusRuntimeError},
-		// Cgroup v2: nsjail logs "Setting 'memory.max' to '<n>'" then SIGKILL.
-		{"cgroupv2 oom", "[I] Setting 'memory.max' to '104857600'\n[I] killed by signal 9", 9, validate.StatusMemoryExceeded},
-		{"signal 9 no cgroup", "killed by signal 9", 9, validate.StatusRuntimeError},
-		{"exit zero", "exited with status: 0", 0, validate.StatusAccepted},
-		{"exit nonzero", "exited with status: 1", 1, validate.StatusRuntimeError},
+		{"time exceeded", "run time >= time limit", 1, false, validate.StatusTimeExceeded},
+		// A cgroup v2 OOM reaches us only as SIGKILL; memory.events oom_kill is the
+		// authoritative signal, so oomKilled wins over the bare "killed by signal".
+		{"cgroupv2 oom", "killed by signal 9", 9, true, validate.StatusMemoryExceeded},
+		{"sigxcpu", "killed by signal 24 (SIGXCPU)", 24, false, validate.StatusTimeExceeded},
+		{"signal segfault", "killed by signal 11", 139, false, validate.StatusRuntimeError},
+		// SIGKILL with no oom_kill recorded is an ordinary kill, not memory_exceeded.
+		{"signal 9 no oom", "killed by signal 9", 9, false, validate.StatusRuntimeError},
+		{"exit zero", "exited with status: 0", 0, false, validate.StatusAccepted},
+		{"exit nonzero", "exited with status: 1", 1, false, validate.StatusRuntimeError},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := sandbox.ParseRunStatus([]byte(tc.stderr), tc.exitCode)
+			got := sandbox.ParseRunStatus([]byte(tc.stderr), tc.exitCode, tc.oomKilled)
 			if got != tc.want {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}

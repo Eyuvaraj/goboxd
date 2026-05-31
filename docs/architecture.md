@@ -134,8 +134,7 @@ See `docs/languages.md` for the full YAML schema and template variable reference
   --cwd /
   --hostname goboxd
   --detect_cgroupv2
-  --cgroupv2_mount /sys/fs/cgroup
-  --cgroup_mem_parent goboxd-42
+  --cgroupv2_mount /sys/fs/cgroup/goboxd-42
   --rlimit_nofile 1000
   --rlimit_core 0
   --rlimit_stack 8
@@ -156,6 +155,7 @@ See `docs/languages.md` for the full YAML schema and template variable reference
 **Key design decisions:**
 
 - `--rlimit_as` is set to `max(memory_kb × 4 / 1024, 4096)` MiB. The JVM pre-allocates ~1 GiB of virtual address space at startup; the 4096 MiB floor prevents false OOM kills on Java and Kotlin.
-- `--cgroup_mem_max` enforces real RSS. After `cmd.Wait()`, `memory.peak` is read from the cgroup path to populate `memory_peak_kb` in the response.
+- `--cgroup_mem_max` enforces real RSS. `--cgroupv2_mount` is pointed at goboxd's own per-job directory (`/sys/fs/cgroup/goboxd-42`), not the cgroup root: nsjail's cgroup-v2 code hardcodes its leaf as `<mount>/NSJAIL.<pid>` and removes it on exit, ignoring `--cgroup_mem_parent`. Nesting it under our own directory keeps the parent's hierarchical `memory.peak` and `memory.events` readable after the child is torn down. After `cmd.Wait()`, `memory.peak` populates `memory_peak_kb`.
 - `--cgroup_mem_swap_max 0` disables swap so memory limits are exact.
+- A cgroup-v2 OOM kill reaches the parent only as a bare `SIGKILL` with no distinguishing log line, so `memory_exceeded` is decided by reading `memory.events` `oom_kill > 0` — not by string-matching the nsjail log.
 - The nsjail log is captured on fd 3. `ParseBuildStatus` and `ParseRunStatus` distinguish `internal_error` (lines with `[E][` prefix) from normal compiler/runtime exit codes.

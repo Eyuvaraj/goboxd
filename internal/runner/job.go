@@ -232,7 +232,7 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 			DurationMs:   result.DurationMs,
 			MemoryPeakKB: result.MemoryPeakKB,
 		}
-		sandboxStatus := sandbox.ParseRunStatus(result.Log, result.ExitCode)
+		sandboxStatus := sandbox.ParseRunStatus(result.Log, result.ExitCode, result.OOMKilled)
 		switch {
 		case ec != nil:
 			// Only grade output the candidate actually produced; a crash or
@@ -325,7 +325,7 @@ func (j *Job) gradeWithEvaluator(ctx context.Context, ec *evalContext, tc TestCa
 		BindMounts:     buildBindMounts(j.evalLang),
 		Env:            j.evalLang.Env,
 	})
-	if err != nil || sandbox.ParseRunStatus(res.Log, res.ExitCode) != validate.StatusAccepted {
+	if err != nil || sandbox.ParseRunStatus(res.Log, res.ExitCode, res.OOMKilled) != validate.StatusAccepted {
 		return validate.StatusInternalError, "", nil, "evaluator did not complete: " + strings.TrimSpace(string(res.Stderr))
 	}
 
@@ -349,7 +349,7 @@ func (j *Job) gradeWithEvaluator(ctx context.Context, ec *evalContext, tc TestCa
 // Strips trailing whitespace to catch common newline differences without
 // masking leading-whitespace differences.
 func compareOutput(result sandbox.RunResult, expected string) string {
-	sandboxStatus := sandbox.ParseRunStatus(result.Log, result.ExitCode)
+	sandboxStatus := sandbox.ParseRunStatus(result.Log, result.ExitCode, result.OOMKilled)
 	if sandboxStatus != validate.StatusAccepted {
 		return sandboxStatus
 	}

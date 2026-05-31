@@ -12,6 +12,19 @@ services:
       - SYS_PTRACE
     security_opt:
       - seccomp:unconfined
+      # Docker masks paths inside /proc (e.g. /dev/null over /proc/kcore) by
+      # default on every host OS. nsjail mounts a fresh procfs inside its mount
+      # namespace, which the kernel refuses while those overmounts exist
+      # ("Couldn't mount '/proc'"). Unconfining the system paths removes the
+      # masks so nsjail can mount /proc. Without this, every /run fails.
+      - systempaths=unconfined
+    # Docker mounts /sys/fs/cgroup read-only by default (all host OSes). nsjail
+    # needs to create child cgroups under it to enforce memory.max / pids.max and
+    # read memory.peak, so mount it read-write. Combined with cgroup: host below
+    # this gives nsjail the root cgroup-v2 hierarchy it requires (it errors with
+    # "run the container with --cgroupns=host" otherwise).
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
     cgroup: host
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
