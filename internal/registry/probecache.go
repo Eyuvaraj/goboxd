@@ -17,13 +17,24 @@ type ProbeCache struct {
 
 	reg        *Registry
 	nsjailPath string
+	done       chan struct{} // closed by Stop() to terminate the background loop
+	stopOnce   sync.Once
 }
 
 func NewProbeCache(reg *Registry, nsjailPath string) *ProbeCache {
-	pc := &ProbeCache{reg: reg, nsjailPath: nsjailPath}
+	pc := &ProbeCache{
+		reg:        reg,
+		nsjailPath: nsjailPath,
+		done:       make(chan struct{}),
+	}
 	pc.refresh()
 	go pc.loop()
 	return pc
+}
+
+// Stop terminates the background refresh goroutine. Safe to call multiple times.
+func (pc *ProbeCache) Stop() {
+	pc.stopOnce.Do(func() { close(pc.done) })
 }
 
 // Nsjail returns the cached nsjail probe result.
@@ -62,8 +73,13 @@ func (pc *ProbeCache) AllOK() bool {
 func (pc *ProbeCache) loop() {
 	ticker := time.NewTicker(probeTTL)
 	defer ticker.Stop()
-	for range ticker.C {
-		pc.refresh()
+	for {
+		select {
+		case <-ticker.C:
+			pc.refresh()
+		case <-pc.done:
+			return
+		}
 	}
 }
 

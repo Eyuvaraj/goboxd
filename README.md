@@ -8,7 +8,7 @@ Built for the goboxd hackathon at Paradox IIT Madras 2026.
 
 ## Running
 
-**Requirements:** Docker with Compose v2 · container runs with `--privileged` · `nsjail` compiles from source at image build time.
+**Requirements:** Docker with Compose v2 · `nsjail` compiles from source at image build time. The container runs unprivileged with two added capabilities (`SYS_ADMIN`, `SYS_PTRACE`), `seccomp`/`systempaths` unconfined, and the cgroup-v2 hierarchy mounted read-write so nsjail can create per-job cgroups — all wired in `docker-compose.yml`.
 
 ```bash
 make build        # build the image (~5 min cold)

@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/thesouldev/goboxd/internal/config"
@@ -11,6 +12,10 @@ import (
 	"github.com/thesouldev/goboxd/internal/validate"
 )
 
+// ErrOverloaded is returned by Submit when the queue is already at MaxQueueDepth.
+// The handler maps it to 503 + Retry-After. Disabled when MaxQueueDepth is 0.
+var ErrOverloaded = errors.New("server overloaded: queue full")
+
 type Response struct {
 	Status string       `json:"status"`
 	Build  BuildResult  `json:"build"`
@@ -18,11 +23,12 @@ type Response struct {
 }
 
 type Runner struct {
-	sem      chan struct{}
-	reg      *registry.Registry
-	jobCfg   JobConfig
-	counters *stats.Counters
-	jailDir  string
+	sem           chan struct{}
+	reg           *registry.Registry
+	jobCfg        JobConfig
+	counters      *stats.Counters
+	jailDir       string
+	maxQueueDepth int
 }
 
 func New(maxConcurrent int, reg *registry.Registry, cfg config.Server, counters *stats.Counters) *Runner {
@@ -36,9 +42,11 @@ func New(maxConcurrent int, reg *registry.Registry, cfg config.Server, counters 
 		jobCfg: JobConfig{
 			NsjailPath:     cfg.NsjailPath,
 			MaxOutputBytes: int64(cfg.MaxOutputBytes),
+			JailDir:        cfg.JailDir,
 		},
-		counters: counters,
-		jailDir:  cfg.JailDir,
+		counters:      counters,
+		jailDir:       cfg.JailDir,
+		maxQueueDepth: cfg.MaxQueueDepth,
 	}
 }
 
@@ -47,6 +55,19 @@ func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 	lang := r.reg.Get(req.Language)
 	if lang == nil {
 		return Response{}, fmt.Errorf("unknown language: %s", req.Language)
+	}
+
+	var evalLang *config.LanguageDef
+	if req.Evaluator != nil {
+		if evalLang = r.reg.Get(req.Evaluator.Language); evalLang == nil {
+			return Response{}, fmt.Errorf("unknown evaluator language: %s", req.Evaluator.Language)
+		}
+	}
+
+	// Shed load only once the queue is genuinely backed up. With MaxQueueDepth
+	// at 0 the queue is unbounded and requests always wait their turn.
+	if r.maxQueueDepth > 0 && r.counters.QueueSize() >= int64(r.maxQueueDepth) {
+		return Response{}, ErrOverloaded
 	}
 
 	r.counters.IncQueued()
@@ -71,7 +92,7 @@ func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 	}
 	defer ws.Cleanup()
 
-	job := newJob(req, lang, ws, r.jobCfg)
+	job := newJob(req, lang, evalLang, ws, r.jobCfg)
 
 	buildResult := job.compile(ctx)
 	testResults := job.runTests(ctx, buildResult.Status)

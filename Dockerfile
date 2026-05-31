@@ -1,5 +1,8 @@
 ARG GO_VERSION=1.26
 ARG DEBIAN_VERSION=bookworm
+# Must match the external/nsjail submodule tag; surfaced at runtime in /readyz
+# and /info because nsjail itself exposes no --version flag.
+ARG NSJAIL_VERSION=3.4
 
 # ---- Build nsjail 3.4 from source ----
 # nsjail is included as a git submodule at external/nsjail (pinned to tag 3.4).
@@ -38,43 +41,21 @@ RUN CGO_ENABLED=0 go build \
 FROM debian:${DEBIAN_VERSION}-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates libnl-route-3-200 libprotobuf32 \
-        wget \
-        # Language runtimes and compilers
-        python3 \
-        nodejs \
-        gcc g++ \
-        default-jdk-headless \
-        iverilog \
-        bash \
-        ruby \
-        lua5.4 \
-        ocaml \
-        # rustc \
-        # kotlin \
+        wget bash \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the Go toolchain from the builder stage (same version, avoids stale apt package).
-COPY --from=builder /usr/local/go /usr/local/go
-ENV PATH="/usr/local/go/bin:${PATH}"
+COPY scripts/lang_install /install
+RUN for s in /install/*.sh; do bash "$s"; done && rm -rf /var/lib/apt/lists/*
 
 COPY --from=nsjail-builder /usr/local/bin/nsjail /usr/local/bin/nsjail
 COPY --from=builder        /out/goboxd           /usr/local/bin/goboxd
 COPY configs/languages.yaml /etc/goboxd/languages.yaml
 
-# Smoke-test each language at image-build time to catch missing toolchains early.
-RUN python3 --version \
-    && node --version \
-    && gcc --version \
-    && g++ --version \
-    && java -version \
-    && iverilog -V \
-    && bash --version \
-    && ruby --version \
-    && lua5.4 -e 'print("ok")' \
-    && ocaml -version \
-    # && rustc --version \
-    # && kotlinc -version \
-    && go version
+# nsjail has no --version flag, so the probe reads its version from here.
+ARG NSJAIL_VERSION=3.4
+ENV NSJAIL_VERSION=${NSJAIL_VERSION}
+
+	# Language smoke tests are performed by their respective install scripts.
 
 RUN mkdir -p /tmp/goboxd
 

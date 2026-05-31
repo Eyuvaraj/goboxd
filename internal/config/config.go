@@ -17,6 +17,7 @@ type Server struct {
 	MaxOutputBytes    int
 	MaxStdinBytes     int
 	OrphanMaxAge      int // minutes
+	MaxQueueDepth     int // waiting requests before shedding with 503; 0 = unbounded queue
 }
 
 func Load() Server {
@@ -31,6 +32,7 @@ func Load() Server {
 		MaxOutputBytes:    envInt("MAX_OUTPUT_BYTES", 256*1024),
 		MaxStdinBytes:     envInt("MAX_STDIN_BYTES", 64*1024),
 		OrphanMaxAge:      envInt("ORPHAN_MAX_AGE_MINUTES", 30),
+		MaxQueueDepth:     envInt("MAX_QUEUE_DEPTH", 0),
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/thesouldev/goboxd/internal/config"
@@ -18,25 +19,24 @@ import (
 
 const truncationMarker = "\n[output truncated]"
 
-// seccompPolicy is a Kafel deny-list applied via --seccomp_string.
-// DEFAULT ALLOW keeps all language runtimes working without enumerating needed syscalls.
-// KILL_PROCESS (not KILL) kills the whole sandboxed process on a violation — KILL only
-// kills the calling thread, leaving other threads running.
-//
-// Denied categories and rationale:
-//   - sandbox escape: ptrace, process_vm_readv/writev, chroot, pivot_root, unshare, setns
-//   - kernel/module loading: init_module, finit_module, delete_module, kexec_load, bpf
-//   - device creation: mknodat  (mknod is absent from ARM64 Kafel; mknodat suffices)
-//   - clock manipulation: settimeofday, adjtimex, clock_adjtime
-//   - privilege escalation: capset, userfaultfd, acct, mount
-//   - file-handle bypass: name_to_handle_at, open_by_handle_at
-//   - information leaks: syslog, fanotify_init, add_key, request_key, keyctl
-//   - obvious: reboot
-//
-// Intentionally NOT denied: perf_event_open (JVM profiling), socket/connect/bind
-// (already isolated by nsjail's network namespace).
-// io_uring_* and kexec_file_load are absent from the ARM64 Kafel syscall table and
-// are omitted to avoid "Undefined identifier" compile errors.
+// cgroupRoot is the cgroup v2 hierarchy root inside the container. Each job gets
+// its own sub-cgroup under it; nsjail nests NSJAIL.<pid> beneath that, so the
+// per-job directory's hierarchical memory.peak / memory.events survive nsjail
+// tearing the child down (see Run).
+const cgroupRoot = "/sys/fs/cgroup"
+
+// runCounter provides collision-free cgroup names and sandbox UIDs across concurrent runs.
+var runCounter atomic.Uint64
+
+// Sandbox UIDs are drawn from [uidBase, uidBase+uidPoolSize).
+const (
+	uidBase     = 60000
+	uidPoolSize = 1024
+)
+
+// seccompPolicy is a Kafel deny-list passed to nsjail via --seccomp_string.
+// DEFAULT ALLOW keeps all runtimes working. KILL_PROCESS terminates the whole
+// process group on a violation. See docs/security.md for the full rationale.
 const seccompPolicy = `POLICY goboxd_safe {
     KILL_PROCESS {
         ptrace,
@@ -82,6 +82,8 @@ type RunConfig struct {
 	BindMounts     []string // read-only host paths to bind-mount into the jail
 	Env            []string // extra KEY=VALUE vars for this invocation
 	CgroupParent   string   // cgroup v2 directory name for this run
+	CgroupV2Mount  string   // absolute per-job cgroup dir; set by Run(), not callers
+	SandboxUID     string   // per-run uid/gid inside the jail; set by Run(), not callers
 }
 
 type RunResult struct {
@@ -92,17 +94,25 @@ type RunResult struct {
 	DurationMs   int64
 	Truncated    bool
 	MemoryPeakKB int64
+	OOMKilled    bool // cgroup memory.events recorded an oom_kill for this run
 }
 
-// Run executes cmd inside an nsjail sandbox. argv is a pure []string — no shell.
+// Run executes cmd inside an nsjail sandbox.
 func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
-	cfg.CgroupParent = "goboxd-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	// Monotonic counter gives each run a unique cgroup name and sandbox UID.
+	runID := runCounter.Add(1)
+	cfg.CgroupParent = "goboxd-" + strconv.FormatUint(runID, 10)
+	cfg.SandboxUID = strconv.FormatUint(uidBase+runID%uidPoolSize, 10)
 
-	cgroupPath := filepath.Join("/sys/fs/cgroup", cfg.CgroupParent)
+	// nsjail (cgroup v2) hardcodes its cgroup as <cgroupv2_mount>/NSJAIL.<pid>
+	// and removes it on exit, ignoring --cgroup_mem_parent. Point its mount at
+	// our own per-job dir so NSJAIL.<pid> nests beneath it; the parent's
+	// hierarchical memory.peak / memory.events then outlive the child teardown.
+	cgroupPath := filepath.Join(cgroupRoot, cfg.CgroupParent)
+	cfg.CgroupV2Mount = cgroupPath
 	_ = os.Mkdir(cgroupPath, 0o755)
 	defer func() {
-		// If nsjail was killed before cleaning up its own child cgroup, the parent
-		// dir is non-empty and os.Remove would fail. Remove sub-dirs first.
+		// nsjail may leave a child cgroup behind; clean sub-dirs first.
 		if entries, err := os.ReadDir(cgroupPath); err == nil {
 			for _, e := range entries {
 				if e.IsDir() {
@@ -127,7 +137,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	var stderrBuf bytes.Buffer
 	cmd.Stderr = &stderrBuf
 
-	// ExtraFiles[0] becomes fd 3 in the child (nsjail --log_fd 3).
+	// ExtraFiles[0] becomes fd 3 inside nsjail (--log_fd 3).
 	logR, logW, err := os.Pipe()
 	if err != nil {
 		return RunResult{}, fmt.Errorf("log pipe: %w", err)
@@ -142,7 +152,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	}
 	_ = logW.Close() // parent closes write end so logR gets EOF when nsjail exits
 
-	// Drain nsjail log in a goroutine so it can't deadlock stdout.
+	// Drain nsjail's log fd in a goroutine so it never blocks stdout reads.
 	var logBuf bytes.Buffer
 	logDone := make(chan struct{})
 	go func() {
@@ -158,8 +168,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	if int64(len(raw)) > cfg.MaxOutputBytes {
 		raw = raw[:cfg.MaxOutputBytes]
 		truncated = true
-		// drain remaining stdout so the process isn't blocked on write
-		_, _ = io.Copy(io.Discard, stdoutPipe)
+		_, _ = io.Copy(io.Discard, stdoutPipe) // drain so the process isn't blocked
 	}
 
 	<-logDone
@@ -179,12 +188,15 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 		stdout = append(stdout, []byte(truncationMarker)...)
 	}
 
+	// Read accounting from our per-job cgroup before the deferred cleanup removes
+	// it. Values are hierarchical, so they include nsjail's NSJAIL.<pid> child.
 	var peakKB int64
 	if peakBytes, err := os.ReadFile(filepath.Join(cgroupPath, "memory.peak")); err == nil {
 		if peak, err := strconv.ParseInt(string(bytes.TrimSpace(peakBytes)), 10, 64); err == nil {
 			peakKB = peak / 1024
 		}
 	}
+	oomKilled := cgroupOOMKilled(cgroupPath)
 
 	return RunResult{
 		Stdout:       stdout,
@@ -194,7 +206,25 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 		DurationMs:   durationMs,
 		Truncated:    truncated,
 		MemoryPeakKB: peakKB,
+		OOMKilled:    oomKilled,
 	}, nil
+}
+
+// cgroupOOMKilled reports whether the cgroup's memory.events recorded an
+// oom_kill. nsjail surfaces a cgroup OOM only as a SIGKILL, so this file is the
+// one reliable way to tell memory_exceeded apart from an ordinary runtime crash.
+func cgroupOOMKilled(cgroupPath string) bool {
+	data, err := os.ReadFile(filepath.Join(cgroupPath, "memory.events"))
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		field, val, ok := strings.Cut(line, " ")
+		if ok && field == "oom_kill" {
+			return strings.TrimSpace(val) != "0"
+		}
+	}
+	return false
 }
 
 // buildArgv constructs the nsjail command-line as a pure []string (no shell).
@@ -204,24 +234,27 @@ func buildArgv(cfg RunConfig) []string {
 	argv = append(argv,
 		"--mode", "o",
 		"--chroot", cfg.WorkspaceDir,
-		"--user", "65534",
-		"--group", "65534",
-		"--log_fd", "3", // nsjail diagnostic log → fd 3
+		"--user", cfg.SandboxUID,
+		"--group", cfg.SandboxUID,
+		"--log_fd", "3",
 		"--max_cpus", "1",
-		"--rw", // remount chroot r/w so compilers can write artifacts
+		"--rw",
+		// CLONE_NEWPID is on by default in nsjail 3.4; do not pass --disable_clone_newpid.
 		"--cwd", "/",
-		"--hostname", "goboxd", // prevents host hostname leaking via gethostname(2)
+		"--hostname", "goboxd",
 		"--detect_cgroupv2",
-		"--cgroupv2_mount", "/sys/fs/cgroup",
-		"--cgroup_mem_parent", cfg.CgroupParent,
-		"--rlimit_nofile", "1000", // Python and javac open many fds at startup
-		"--rlimit_core", "0", // no core dumps — saves disk and prevents source leakage
-		// Hard stack ceiling: container environments sometimes inherit unlimited rlimit_stack.
-		"--rlimit_stack", "8",
+		// Mount at our own per-job dir, not the root: nsjail creates NSJAIL.<pid>
+		// under it. --cgroup_mem_parent is intentionally omitted — nsjail's v2 code
+		// path ignores it (it always names the leaf NSJAIL.<pid>).
+		"--cgroupv2_mount", cfg.CgroupV2Mount,
+		"--rlimit_nofile", "1000", // javac and Python open many fds at startup
+		"--rlimit_core", "0",
+		"--rlimit_stack", "8", // container envs can inherit unlimited stack
 		"--env", "TMP=/",
 		"--env", "TMPDIR=/",
 		"--env", "HOME=/",
 		"--env", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"--iface_no_lo",
 	)
 
 	for _, e := range cfg.Env {
@@ -230,17 +263,15 @@ func buildArgv(cfg RunConfig) []string {
 
 	if cfg.Limits.WallTimeS > 0 {
 		argv = append(argv, "--time_limit", strconv.Itoa(cfg.Limits.WallTimeS))
-		// rlimit_cpu is set one second above --time_limit so nsjail's wall-time check
-		// always fires first. Equal values cause SIGXCPU before nsjail's poll loop wakes,
-		// making the status parse as runtime_error instead of time_exceeded.
+		// rlimit_cpu is 1s above --time_limit so nsjail's wall-time check fires first.
+		// Equal values let SIGXCPU arrive before nsjail polls, misclassifying it as runtime_error.
 		argv = append(argv, "--rlimit_cpu", strconv.Itoa(cfg.Limits.WallTimeS+1))
 	}
 	if cfg.Limits.MemoryKB > 0 {
 		cgroupMemBytes := int64(cfg.Limits.MemoryKB) * 1024
 		argv = append(argv, "--cgroup_mem_max", strconv.FormatInt(cgroupMemBytes, 10))
-		argv = append(argv, "--cgroup_mem_swap_max", "0") // disable swap so OOM fires at exactly memory.max
-		// RLIMIT_AS caps virtual space separately from RSS. The JVM pre-allocates
-		// ~1 GiB of virtual space on ARM64, so floor at 4096 MiB.
+		argv = append(argv, "--cgroup_mem_swap_max", "0")
+		// RLIMIT_AS must be large enough for the JVM (~1 GiB virtual on ARM64).
 		virtMiB := cfg.Limits.MemoryKB * 4 / 1024
 		if virtMiB < 4096 {
 			virtMiB = 4096
@@ -252,7 +283,7 @@ func buildArgv(cfg RunConfig) []string {
 		argv = append(argv, "--rlimit_nproc", strconv.Itoa(cfg.Limits.MaxProcesses))
 	}
 
-	argv = append(argv, "--rlimit_fsize", "100") // 100 MB per-file cap
+	argv = append(argv, "--rlimit_fsize", "100") // 100 MB per-file write cap
 
 	for _, bm := range cfg.BindMounts {
 		argv = append(argv, "-R", bm)
@@ -266,7 +297,7 @@ func buildArgv(cfg RunConfig) []string {
 	return argv
 }
 
-// ExpandArgs replaces {{source}}, {{artifact}}, and {{flags}} template tokens per-element.
+// ExpandArgs replaces {{source}}, {{artifact}}, and {{flags}} tokens in a YAML args list.
 func ExpandArgs(tmplArgs []string, source, artifact string, flags []string) []string {
 	expanded := make([]string, 0, len(tmplArgs)+len(flags))
 	for _, a := range tmplArgs {
@@ -278,7 +309,7 @@ func ExpandArgs(tmplArgs []string, source, artifact string, flags []string) []st
 		case "{{artifact}}":
 			expanded = append(expanded, artifact)
 		default:
-			// Replace inline occurrences (e.g. "./{{artifact}}")
+			// Handle inline occurrences like "./{{artifact}}".
 			a = strings.ReplaceAll(a, "{{source}}", source)
 			a = strings.ReplaceAll(a, "{{artifact}}", artifact)
 			expanded = append(expanded, a)

@@ -17,10 +17,10 @@ Results from a clean Docker container (`make build && make run`) on the measurem
 
 | Concurrent Clients | Requests | Req/s | p50 (ms) | p95 (ms) | p99 (ms) | Errors |
 |--------------------|----------|-------|----------|----------|----------|--------|
-| 1                  | 200      | 50.3  | 18.0     | 37.4     | 44.9     | 0      |
-| 10                 | 200      | 201.2 | 42.2     | 93.5     | 121.9    | 0      |
-| 50                 | 200      | 212.3 | 223.6    | 289.0    | 303.6    | 0      |
-| 100                | 200      | 203.0 | 451.0    | 521.7    | 539.2    | 0      |
+| 1                  | 200      | 129.2 | 7.2      | 9.5      | 14.5     | 0      |
+| 10                 | 200      | 486.1 | 18.5     | 32.3     | 43.5     | 0      |
+| 50                 | 200      | 503.1 | 93.8     | 108.7    | 114.4    | 0      |
+| 100                | 200      | 437.4 | 202.5    | 258.8    | 277.5    | 0      |
 
 All responses returned HTTP 200 at every concurrency level. Requests queue when all `MAX_CONCURRENT_JOBS` slots are busy; the semaphore holds correctly under load.
 
@@ -41,12 +41,12 @@ All responses returned HTTP 200 at every concurrency level. Requests queue when 
 
 | Concurrent Clients | Requests | Req/s | p50 (ms) | p95 (ms) | p99 (ms)  | Errors |
 |--------------------|----------|-------|----------|----------|-----------|--------|
-| 1                  | 100      | 4.1   | 242.0    | 260.0    | 300.4     | 0      |
-| 10                 | 100      | 14.1  | 426.5    | 1705.8   | 1791.3    | 0      |
-| 50                 | 100      | 14.6  | 3017.6   | 3649.3   | 3829.8    | 0      |
-| 100                | 100      | 14.0  | 3304.8   | 6673.0   | 7123.8    | 0      |
+| 1                  | 100      | 7.7   | 127.8    | 147.1    | 163.3     | 0      |
+| 10                 | 100      | 32.0  | 222.8    | 459.3    | 847.2     | 0      |
+| 50                 | 100      | 30.9  | 1428.6   | 1946.8   | 2001.5    | 0      |
+| 100                | 100      | 31.8  | 1749.0   | 3081.8   | 3148.3    | 0      |
 
-Each request includes a full compile + run cycle. At 1 client, latency is dominated by the ~240 ms `g++` compile time. At 10+ clients, requests queue on the semaphore as slots fill with in-progress compile jobs. Throughput plateaus while p95/p99 grows proportionally, which is the expected bounded-queue behaviour.
+Each request includes a full compile + run cycle. At 1 client, latency is dominated by the ~130 ms `g++` compile time. At 10+ clients, requests queue on the semaphore as slots fill with in-progress compile jobs. Throughput plateaus while p95/p99 grows proportionally, which is the expected bounded-queue behaviour.
 
 ---
 

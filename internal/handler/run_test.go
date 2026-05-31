@@ -90,11 +90,13 @@ languages:
 
 // mockSubmitter satisfies handler.Submitter for unit tests.
 type mockSubmitter struct {
-	resp runner.Response
-	err  error
+	resp   runner.Response
+	err    error
+	gotReq runner.JobRequest
 }
 
-func (m *mockSubmitter) Submit(_ context.Context, _ runner.JobRequest) (runner.Response, error) {
+func (m *mockSubmitter) Submit(_ context.Context, req runner.JobRequest) (runner.Response, error) {
+	m.gotReq = req
 	return m.resp, m.err
 }
 
@@ -120,6 +122,17 @@ func newTestRunHandler(t *testing.T, sub handler.Submitter) http.Handler {
 		MaxTests:       50,
 		MaxStdinBytes:  64 * 1024,
 	})
+}
+
+// newTestV1Handler returns the /v1/run entrypoint of a RunHandler.
+func newTestV1Handler(t *testing.T, sub handler.Submitter) http.Handler {
+	t.Helper()
+	rh := handler.NewRunHandler(sub, newTestRegistry(t), config.Server{
+		MaxSourceBytes: 256 * 1024,
+		MaxTests:       50,
+		MaxStdinBytes:  64 * 1024,
+	})
+	return http.HandlerFunc(rh.ServeHTTPV1)
 }
 
 // postJSON sends a JSON POST to the handler and returns the recorder.
@@ -275,6 +288,7 @@ func TestRunHandler_DisallowedRunFlag(t *testing.T) {
 	assertErrorCode(t, w, http.StatusBadRequest, "invalid_flag")
 }
 
+// /run requires tests (COMPETITION.md §4.2): an empty array is rejected.
 func TestRunHandler_NoTests(t *testing.T) {
 	h := newTestRunHandler(t, nil)
 	w := postJSON(t, h, map[string]any{
@@ -283,6 +297,130 @@ func TestRunHandler_NoTests(t *testing.T) {
 		"tests":    []map[string]any{},
 	})
 	assertErrorCode(t, w, http.StatusBadRequest, "invalid_test_count")
+}
+
+// /v1/run with no tests is raw execution: run once against stdin, no grading.
+func TestV1Handler_RawMode(t *testing.T) {
+	sub := &mockSubmitter{resp: runner.Response{
+		Status: validate.StatusAccepted,
+		Build:  runner.BuildResult{Status: validate.BuildStatusOK},
+		Tests:  []runner.TestResult{{Status: validate.StatusAccepted, Stdout: "hi\n"}},
+	}}
+	h := newTestV1Handler(t, sub)
+	w := postJSON(t, h, map[string]any{
+		"language": "py3",
+		"source":   "print('hi')",
+		"stdin":    "ignored\n",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if !sub.gotReq.Raw {
+		t.Fatal("expected Raw=true when no tests are supplied to /v1/run")
+	}
+	if len(sub.gotReq.Tests) != 1 || sub.gotReq.Tests[0].Stdin != "ignored\n" {
+		t.Fatalf("raw mode should forward a single stdin, got %+v", sub.gotReq.Tests)
+	}
+}
+
+// The two endpoints differ only in the response schema: /v1/run carries
+// exit_code, /run does not.
+func TestExitCodeSchemaDiffers(t *testing.T) {
+	resp := runner.Response{
+		Status: validate.StatusRuntimeError,
+		Build:  runner.BuildResult{Status: validate.BuildStatusOK},
+		Tests:  []runner.TestResult{{Status: validate.StatusRuntimeError, ExitCode: 3}},
+	}
+	body := map[string]any{
+		"language": "py3",
+		"source":   "x",
+		"tests":    []map[string]any{{"stdin": "", "expected_stdout": ""}},
+	}
+
+	firstTest := func(w *httptest.ResponseRecorder) map[string]any {
+		var decoded map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &decoded); err != nil {
+			t.Fatalf("decode: %v (body=%s)", err, w.Body.String())
+		}
+		return decoded["tests"].([]any)[0].(map[string]any)
+	}
+
+	runTest := firstTest(postJSON(t, newTestRunHandler(t, &mockSubmitter{resp: resp}), body))
+	if _, ok := runTest["exit_code"]; ok {
+		t.Error("/run response must not include exit_code")
+	}
+
+	v1Test := firstTest(postJSON(t, newTestV1Handler(t, &mockSubmitter{resp: resp}), body))
+	if ec, ok := v1Test["exit_code"]; !ok || ec.(float64) != 3 {
+		t.Errorf("/v1/run must include exit_code=3, got %v", v1Test["exit_code"])
+	}
+}
+
+// /v1/run with an evaluator block grades each test with a custom program: the
+// handler resolves the evaluator language and forwards it to the runner.
+func TestV1Handler_EvaluatorMode(t *testing.T) {
+	sub := &mockSubmitter{resp: runner.Response{
+		Status: validate.StatusAccepted,
+		Build:  runner.BuildResult{Status: validate.BuildStatusOK},
+		Tests:  []runner.TestResult{{Status: validate.StatusAccepted, Verdict: "accepted"}},
+	}}
+	h := newTestV1Handler(t, sub)
+	w := postJSON(t, h, map[string]any{
+		"language": "py3",
+		"source":   "print(input())",
+		"tests":    []map[string]any{{"stdin": "5\n", "expected_stdout": ""}},
+		"evaluator": map[string]any{
+			"language": "py3",
+			"source":   "print('{\"verdict\":\"accepted\"}')",
+		},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if sub.gotReq.Evaluator == nil {
+		t.Fatal("expected evaluator forwarded to the runner")
+	}
+	if sub.gotReq.Evaluator.Language != "py3" || sub.gotReq.Evaluator.SourceFilename != "solution.py" {
+		t.Fatalf("evaluator not resolved correctly: %+v", sub.gotReq.Evaluator)
+	}
+	if sub.gotReq.Raw {
+		t.Fatal("evaluator mode must not be raw")
+	}
+}
+
+// An unknown evaluator language is a request error caught before submission.
+func TestV1Handler_EvaluatorUnknownLanguage(t *testing.T) {
+	h := newTestV1Handler(t, nil)
+	w := postJSON(t, h, map[string]any{
+		"language":  "py3",
+		"source":    "print('hi')",
+		"tests":     []map[string]any{{"stdin": "", "expected_stdout": ""}},
+		"evaluator": map[string]any{"language": "cobol", "source": "x"},
+	})
+	assertErrorCode(t, w, http.StatusBadRequest, "unknown_language")
+}
+
+// /run is strict to the competition schema: an evaluator block is ignored, not
+// processed, so the request is treated as an ordinary verifier run.
+func TestRunHandler_IgnoresEvaluator(t *testing.T) {
+	sub := &mockSubmitter{resp: runner.Response{
+		Status: validate.StatusAccepted,
+		Build:  runner.BuildResult{Status: validate.BuildStatusOK},
+		Tests:  []runner.TestResult{{Status: validate.StatusAccepted}},
+	}}
+	h := newTestRunHandler(t, sub)
+	w := postJSON(t, h, map[string]any{
+		"language":  "py3",
+		"source":    "print('hi')",
+		"tests":     []map[string]any{{"stdin": "", "expected_stdout": "hi\n"}},
+		"evaluator": map[string]any{"language": "cobol", "source": "x"},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if sub.gotReq.Evaluator != nil {
+		t.Fatal("/run must ignore the evaluator block")
+	}
 }
 
 func TestRunHandler_TooManyTests(t *testing.T) {
@@ -411,6 +549,24 @@ func TestRunHandler_ContextCancelled(t *testing.T) {
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("want 503, got %d (body: %s)", w.Code, w.Body.String())
 	}
+}
+
+// When the runner sheds load, the handler returns 503 with a Retry-After hint.
+func TestRunHandler_Overloaded(t *testing.T) {
+	sub := &mockSubmitter{err: runner.ErrOverloaded}
+	h := newTestRunHandler(t, sub)
+	w := postJSON(t, h, map[string]any{
+		"language": "py3",
+		"source":   "print('hi')",
+		"tests":    []map[string]any{{"stdin": "", "expected_stdout": "hi\n"}},
+	})
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("want 503, got %d (body: %s)", w.Code, w.Body.String())
+	}
+	if w.Header().Get("Retry-After") == "" {
+		t.Error("overload response must set a Retry-After header")
+	}
+	assertErrorCode(t, w, http.StatusServiceUnavailable, "overloaded")
 }
 
 func TestRunHandler_BuildFailed(t *testing.T) {
