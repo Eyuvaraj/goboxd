@@ -1,5 +1,8 @@
 ARG GO_VERSION=1.26
 ARG DEBIAN_VERSION=bookworm
+# Must match the external/nsjail submodule tag; surfaced at runtime in /readyz
+# and /info because nsjail itself exposes no --version flag.
+ARG NSJAIL_VERSION=3.4
 
 # ---- Build nsjail 3.4 from source ----
 # nsjail is included as a git submodule at external/nsjail (pinned to tag 3.4).
@@ -47,6 +50,10 @@ RUN for s in /install/*.sh; do bash "$s"; done && rm -rf /var/lib/apt/lists/*
 COPY --from=nsjail-builder /usr/local/bin/nsjail /usr/local/bin/nsjail
 COPY --from=builder        /out/goboxd           /usr/local/bin/goboxd
 COPY configs/languages.yaml /etc/goboxd/languages.yaml
+
+# nsjail has no --version flag, so the probe reads its version from here.
+ARG NSJAIL_VERSION=3.4
+ENV NSJAIL_VERSION=${NSJAIL_VERSION}
 
 	# Language smoke tests are performed by their respective install scripts.
 
