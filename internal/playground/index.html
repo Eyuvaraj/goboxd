@@ -317,6 +317,33 @@
       cursor: not-allowed;
     }
 
+    /* ── API version toggle ── */
+    .api-ver {
+      display: flex;
+      flex-shrink: 0;
+      height: 32px;
+      border: 1px solid var(--b1);
+      overflow: hidden;
+      user-select: none;
+    }
+    .av-opt {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      padding: 0 10px;
+      background: var(--bg);
+      color: var(--t2);
+      border: none;
+      font-family: var(--mono);
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.1s, color 0.1s;
+    }
+    .av-opt + .av-opt { border-left: 1px solid var(--b1); }
+    .av-opt:hover:not(.selected) { background: var(--s1); color: var(--t1); }
+    .av-opt.selected { background: var(--accent); color: #fff; font-weight: 600; }
+
     /* ── Workspace ── */
     .workspace { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 
@@ -590,6 +617,31 @@
     .sb-sep   { color: var(--b1); }
     .sb-space { flex: 1; }
 
+    /* ── Status bar: last-run cluster ── */
+    .sb-run {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .sb-idle { color: var(--t4); }
+    .sb-pill {
+      font-weight: 600;
+      font-size: 10px;
+      letter-spacing: 0.03em;
+      padding: 1px 7px;
+      flex-shrink: 0;
+    }
+    .sb-pill--ok   { background: var(--green-bg);  color: var(--green); }
+    .sb-pill--fail { background: var(--red-bg);    color: var(--red); }
+    .sb-pill--warn { background: var(--yellow-bg); color: var(--yellow); }
+    .sb-metric { color: var(--t2); flex-shrink: 0; }
+    .sb-metric b { color: var(--t1); font-weight: 600; }
+    .sb-k { color: var(--t3); }
+    .sb-mid-dot { color: var(--b2); flex-shrink: 0; }
+
     /* ── Scrollbars ── */
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -666,6 +718,11 @@
     </a>
 
     <div class="vbar"></div>
+
+    <div class="api-ver" id="apiVer" role="group" aria-label="run API version">
+      <button class="av-opt selected" type="button" data-ep="/run" title="Strict contract — tests required, no exit_code">/run</button>
+      <button class="av-opt" type="button" data-ep="/v1/run" title="Extended — adds exit_code, raw execution, evaluator">/v1/run</button>
+    </div>
 
     <button id="runBtn" class="run-btn" type="button">
       <!-- Lucide: play -->
@@ -772,6 +829,8 @@
     <span id="sysStatus">connecting…</span>
     <span class="sb-sep">│</span>
     <span id="sysVersion">v—</span>
+    <span class="sb-sep">│</span>
+    <span class="sb-run" id="sbRun"><span class="sb-idle">no runs yet</span></span>
     <span class="sb-space"></span>
     <span>jobs&thinsp;<span id="sysJobs">0</span>/<span id="sysMaxJobs">—</span></span>
     <span class="sb-sep">│</span>
@@ -983,6 +1042,7 @@ let monacoReady    = false;
 let selectedLangId = '';
 let allLanguages   = [];
 let pickerOpen     = false;
+let selectedEndpoint = '/run';   // toggled by the /run · /v1/run switch
 
 const monacoTimer = setTimeout(initFallback, 4500);
 
@@ -1189,11 +1249,47 @@ async function fetchInfo() {
 setInterval(fetchInfo, 5000);
 fetchInfo();
 
+/* ── API version toggle ── */
+const apiVer = $('apiVer');
+apiVer.addEventListener('click', e => {
+  const btn = e.target.closest('.av-opt');
+  if (!btn) return;
+  selectedEndpoint = btn.dataset.ep;
+  apiVer.querySelectorAll('.av-opt').forEach(b => b.classList.toggle('selected', b === btn));
+});
+
 /* ── Output rendering ── */
 function verdictCls(s) {
   if (s === 'accepted' || s === 'ok') return 'verdict--ok';
   if (['time_exceeded','output_whitespace_mismatch'].includes(s)) return 'verdict--warn';
   return 'verdict--fail';
+}
+
+/* pill class (status-bar variant) from a status string */
+function pillCls(s) { return verdictCls(s).replace('verdict--', 'sb-pill--'); }
+
+/* Render the last-run summary into the status bar's bottom row. */
+function setLastRun(data, endpoint) {
+  const el = $('sbRun');
+  const t  = data.tests && data.tests[0];
+  const parts = [
+    `<span class="sb-pill ${pillCls(data.status)}">${esc(data.status.replace(/_/g,' '))}</span>`,
+  ];
+  if (data.build && data.build.duration_ms != null)
+    parts.push(`<span class="sb-metric"><span class="sb-k">build</span> <b>${data.build.duration_ms}</b>ms</span>`);
+  if (t) {
+    if (t.duration_ms != null)
+      parts.push(`<span class="sb-metric"><span class="sb-k">run</span> <b>${t.duration_ms}</b>ms</span>`);
+    if (t.memory_peak_kb > 0)
+      parts.push(`<span class="sb-metric"><span class="sb-k">mem</span> <b>${t.memory_peak_kb}</b>kb</span>`);
+    if (endpoint === '/v1/run' && t.exit_code != null)
+      parts.push(`<span class="sb-metric"><span class="sb-k">exit</span> <b>${t.exit_code}</b></span>`);
+  }
+  el.innerHTML = parts.join('<span class="sb-mid-dot">·</span>');
+}
+
+function setLastRunText(txt) {
+  $('sbRun').innerHTML = `<span class="sb-idle">${esc(txt)}</span>`;
 }
 
 function setBadge(cls, text) {
@@ -1204,7 +1300,7 @@ function setBadge(cls, text) {
 
 function setOut(html) { $('outBody').innerHTML = html; }
 
-function renderResult(data, ms) {
+function renderResult(data, ms, endpoint) {
   let h = '<div class="result-wrap"><div class="result-head">';
   h += `<span class="verdict ${verdictCls(data.status)}">${esc(data.status.replace(/_/g,' '))}</span>`;
   h += '<div class="result-stats">';
@@ -1217,6 +1313,8 @@ function renderResult(data, ms) {
       h += `<span class="stat"><span class="stat-k">run</span>${t.duration_ms}&thinsp;ms</span>`;
     if (t.memory_peak_kb > 0)
       h += `<span class="stat"><span class="stat-k">mem</span>${t.memory_peak_kb}&thinsp;kb</span>`;
+    if (endpoint === '/v1/run' && t.exit_code != null)
+      h += `<span class="stat"><span class="stat-k">exit</span>${t.exit_code}</span>`;
   }
   h += '</div></div>';
 
@@ -1230,7 +1328,15 @@ function renderResult(data, ms) {
     if (i > 0) h += '<div class="res-sep"></div>';
     const vc = verdictCls(test.status);
     h += '<div class="res-block">';
-    h += `<div class="res-block-label"><span class="verdict ${vc}" style="font-size:9px;padding:2px 7px;">${esc(test.status.replace(/_/g,' '))}</span>test ${i + 1}</div>`;
+    h += `<div class="res-block-label"><span class="verdict ${vc}" style="font-size:9px;padding:2px 7px;">${esc(test.status.replace(/_/g,' '))}</span>test ${i + 1}`;
+    const meta = [];
+    if (endpoint === '/v1/run' && test.exit_code != null) meta.push(`exit ${test.exit_code}`);
+    if (test.verdict)        meta.push(`verdict ${esc(test.verdict)}`);
+    if (test.score != null)  meta.push(`score ${test.score}`);
+    if (meta.length) h += `<span style="margin-left:auto;color:var(--t3);font-size:10px;text-transform:none;letter-spacing:0;">${meta.join(' · ')}</span>`;
+    h += '</div>';
+    if (test.message)
+      h += `<div class="res-pre res-pre--dim" style="margin-bottom:7px;">${esc(test.message)}</div>`;
     h += test.stdout
       ? `<div class="res-pre">${esc(test.stdout)}</div>`
       : `<div class="res-pre res-pre--dim">[no stdout]</div>`;
@@ -1250,7 +1356,9 @@ $('runBtn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.innerHTML = '<svg class="spin" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>&nbsp;Running';
 
+  const endpoint = selectedEndpoint;
   setBadge('badge--running', 'executing');
+  setLastRunText('executing…');
   setOut('<div class="idle-wrap pulse"><div class="idle-hint">running in sandbox…</div></div>');
 
   const src = getSource();
@@ -1268,7 +1376,7 @@ $('runBtn').addEventListener('click', async () => {
 
   try {
     const t0  = performance.now();
-    const res = await fetch('/run', {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -1278,17 +1386,20 @@ $('runBtn').addEventListener('click', async () => {
 
     if (!res.ok) {
       setBadge('badge--fail', 'api error');
+      setLastRunText('error: ' + (data.error?.code || res.status));
       setOut(`<div class="result-wrap"><div class="res-block-label">api error</div><div class="res-pre res-pre--err">${esc(JSON.stringify(data,null,2))}</div></div>`);
       return;
     }
 
     setBadge(data.status === 'accepted' ? 'badge--ok' : 'badge--fail',
              data.status.replace(/_/g,' '));
-    setOut(renderResult(data, ms));
+    setOut(renderResult(data, ms, endpoint));
+    setLastRun(data, endpoint);
     fetchInfo();
 
   } catch (err) {
     setBadge('badge--fail', 'network error');
+    setLastRunText('network error');
     setOut(`<div class="result-wrap"><div class="res-pre res-pre--err">${esc(String(err))}</div></div>`);
   } finally {
     btn.disabled = false;

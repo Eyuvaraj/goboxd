@@ -1,6 +1,9 @@
 {
     "swagger": "2.0",
     "info": {
+        "title": "goboxd API",
+        "description": "HTTP service that compiles or interprets untrusted source code inside an nsjail sandbox and runs it against test cases, returning structured per-test results.\n\n**Two execution endpoints:**\n- `POST /run` — the strict contract: `tests` is required, and each test result carries no `exit_code`.\n- `POST /v1/run` — a superset that adds a per-test `exit_code`, raw execution (empty `tests` runs once against `stdin`), and evaluator mode (grade with a custom program).\n\nValidation, security, resource limits, and status semantics are identical across both.",
+        "version": "1.0",
         "contact": {}
     },
     "paths": {
@@ -72,7 +75,7 @@
         },
         "/run": {
             "post": {
-                "description": "Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.\n\n**Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the `status` fields of the response body — not as HTTP error codes.\n\n**Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The `strategy` field in the language definition controls this.\n\n**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.\n\n**Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 `invalid_limits`.\n\n---\n\n**Sample request (C++, one test case):**\n```json\n{\n\"language\": \"cpp\",\n\"source\": \"#include \u003ciostream\u003e\\nint main(){std::cout\u003c\u003c\\\"hi\\\";}\",\n\"source_filename\": \"solution.cpp\",\n\"artifact_filename\": \"solution\",\n\"build\": {\n\"limits\": { \"wall_time_s\": 5, \"memory_kb\": 1048576, \"max_processes\": 100 },\n\"flags\": [\"-O2\"]\n},\n\"run\": {\n\"limits\": { \"wall_time_s\": 3, \"memory_kb\": 524288, \"max_processes\": 64 },\n\"flags\": []\n},\n\"tests\": [\n{ \"stdin\": \"1\\n\", \"expected_stdout\": \"hi\" }\n]\n}\n```\n\n**Sample response** (code printed `\"HI\"` instead of `\"hi\"` — wrong_output):\n```json\n{\n\"status\": \"wrong_output\",\n\"build\": { \"status\": \"ok\", \"stdout\": \"\", \"stderr\": \"\", \"duration_ms\": 412 },\n\"tests\": [\n{ \"status\": \"wrong_output\", \"stdout\": \"HI\", \"stderr\": \"\", \"duration_ms\": 38, \"memory_peak_kb\": 8192 }\n]\n}\n```",
+                "description": "Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.\n\n**Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the `status` fields of the response body — not as HTTP error codes.\n\n**Test cases:** `tests` is required and must contain at least one entry (up to the server's `max_tests`). Each `stdin` feeds the program; `expected_stdout` is compared against its stdout.\n\n**Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The language definition's strategy controls this.\n\n**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.\n\n**Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 `invalid_limits`.\n\n---\n\n**Sample request (C++, one test case):**\n```json\n{\n\"language\": \"cpp\",\n\"source\": \"#include <iostream>\\nint main(){std::cout<<\\\"hi\\\";}\",\n\"source_filename\": \"solution.cpp\",\n\"artifact_filename\": \"solution\",\n\"build\": {\n\"limits\": { \"wall_time_s\": 5, \"memory_kb\": 1048576, \"max_processes\": 100 },\n\"flags\": [\"-O2\"]\n},\n\"run\": {\n\"limits\": { \"wall_time_s\": 3, \"memory_kb\": 524288, \"max_processes\": 64 },\n\"flags\": []\n},\n\"tests\": [\n{ \"stdin\": \"1\\n\", \"expected_stdout\": \"hi\" }\n]\n}\n```\n\n**Sample response** (code printed `\"HI\"` instead of `\"hi\"` — wrong_output):\n```json\n{\n\"status\": \"wrong_output\",\n\"build\": { \"status\": \"ok\", \"stdout\": \"\", \"stderr\": \"\", \"duration_ms\": 412 },\n\"tests\": [\n{ \"status\": \"wrong_output\", \"stdout\": \"HI\", \"stderr\": \"\", \"duration_ms\": 38, \"memory_peak_kb\": 8192 }\n]\n}\n```",
                 "consumes": [
                     "application/json"
                 ],
@@ -99,6 +102,58 @@
                         "description": "Execution completed (check body status fields for pass/fail)",
                         "schema": {
                             "$ref": "#/definitions/handler.RunResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error — see error.code for the specific cause",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error (nsjail fault, disk full, etc.)",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Server at capacity or request cancelled by client",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/run": {
+            "post": {
+                "description": "Superset of `POST /run` for richer clients. The contest endpoint is `/run`; `/v1/run` keeps the same request shape and all the same validation, security, limits, and status semantics, and adds three things:\n\n1. **`exit_code`** — every test result includes the process exit code.\n2. **Raw execution** — submit an empty (or omitted) `tests` array to run the program once against `stdin` with no output grading. The single result reports the raw outcome (and `exit_code`).\n3. **Evaluator mode** — supply an `evaluator` program (in any registered language) to grade each test's output instead of comparing it to `expected_stdout`. Each test result then also carries `verdict`, `score`, and `message`.\n\n---\n\n**Sample request (raw execution — no tests, just stdin):**\n```json\n{\n\"language\": \"py3\",\n\"source\": \"import sys; print(sys.stdin.read().upper())\",\n\"stdin\": \"hello\\n\"\n}\n```\n\n**Sample response:**\n```json\n{\n\"status\": \"accepted\",\n\"build\": { \"status\": \"ok\", \"stdout\": \"\", \"stderr\": \"\", \"duration_ms\": 0 },\n\"tests\": [\n{ \"status\": \"accepted\", \"stdout\": \"HELLO\\n\", \"stderr\": \"\", \"exit_code\": 0, \"duration_ms\": 41, \"memory_peak_kb\": 7508 }\n]\n}\n```",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "execution"
+                ],
+                "summary": "Execute code (extended: exit_code, raw, evaluator)",
+                "parameters": [
+                    {
+                        "description": "Code execution request. `tests` may be empty for raw execution; `evaluator` enables custom grading.",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.RunRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Execution completed (check body status fields for pass/fail)",
+                        "schema": {
+                            "$ref": "#/definitions/handler.V1RunResponse"
                         }
                     },
                     "400": {
@@ -150,11 +205,11 @@
                 },
                 "go_version": {
                     "type": "string",
-                    "example": "go1.23.0"
+                    "example": "go1.26.3"
                 },
                 "version": {
                     "type": "string",
-                    "example": "0.1.0"
+                    "example": "dev"
                 }
             }
         },
@@ -193,7 +248,6 @@
                     "enum": [
                         "invalid_json",
                         "unknown_language",
-                        "missing_source",
                         "source_too_large",
                         "missing_source_filename",
                         "missing_artifact_filename",
@@ -203,6 +257,7 @@
                         "invalid_test_count",
                         "stdin_too_large",
                         "expected_too_large",
+                        "overloaded",
                         "internal_error"
                     ],
                     "example": "unknown_language"
@@ -218,6 +273,34 @@
             "properties": {
                 "error": {
                     "$ref": "#/definitions/handler.ErrorDetail"
+                }
+            }
+        },
+        "handler.EvaluatorSpec": {
+            "type": "object",
+            "description": "/v1/run only. A scoring program that grades each test's output instead of comparing it to expected_stdout. Reuses a registered language and accepts the same per-phase flag/limit overrides as the candidate.",
+            "properties": {
+                "artifact_filename": {
+                    "type": "string",
+                    "example": "checker"
+                },
+                "build": {
+                    "$ref": "#/definitions/handler.PhaseOverride"
+                },
+                "language": {
+                    "type": "string",
+                    "example": "py3"
+                },
+                "run": {
+                    "$ref": "#/definitions/handler.PhaseOverride"
+                },
+                "source": {
+                    "type": "string",
+                    "example": "import json,sys; print(json.dumps({\"verdict\":\"accepted\",\"score\":1.0}))"
+                },
+                "source_filename": {
+                    "type": "string",
+                    "example": "checker.py"
                 }
             }
         },
@@ -269,7 +352,7 @@
                 },
                 "version": {
                     "type": "string",
-                    "example": "Python 3.11.9"
+                    "example": "Python 3.11.2"
                 }
             }
         },
@@ -299,7 +382,7 @@
                 },
                 "version": {
                     "type": "string",
-                    "example": "nsjail version: 3.4"
+                    "example": "3.4"
                 }
             }
         },
@@ -331,7 +414,7 @@
                 },
                 "version": {
                     "type": "string",
-                    "example": "Python 3.11.9"
+                    "example": "Python 3.11.2"
                 }
             }
         },
@@ -368,6 +451,10 @@
                 "build": {
                     "$ref": "#/definitions/handler.PhaseOverride"
                 },
+                "evaluator": {
+                    "description": "/v1/run only. Custom grading program; ignored by /run.",
+                    "$ref": "#/definitions/handler.EvaluatorSpec"
+                },
                 "language": {
                     "type": "string",
                     "example": "cpp"
@@ -377,11 +464,16 @@
                 },
                 "source": {
                     "type": "string",
-                    "example": "#include \u003ciostream\u003e\nint main(){std::cout\u003c\u003c\"hi\";}"
+                    "example": "#include <iostream>\nint main(){std::cout<<\"hi\";}"
                 },
                 "source_filename": {
                     "type": "string",
                     "example": "solution.cpp"
+                },
+                "stdin": {
+                    "description": "/v1/run raw mode only: stdin fed to the single run when tests is empty. Ignored by /run.",
+                    "type": "string",
+                    "example": ""
                 },
                 "tests": {
                     "type": "array",
@@ -425,7 +517,7 @@
             "properties": {
                 "max_concurrent_jobs": {
                     "type": "integer",
-                    "example": 8
+                    "example": 10
                 },
                 "max_source_bytes": {
                     "type": "integer",
@@ -511,6 +603,89 @@
                 "stdout": {
                     "type": "string",
                     "example": "HI"
+                }
+            }
+        },
+        "handler.V1RunResponse": {
+            "type": "object",
+            "description": "Response body for POST /v1/run. Mirrors RunResponse but each test carries exit_code (and verdict/score/message in evaluator mode).",
+            "properties": {
+                "build": {
+                    "$ref": "#/definitions/handler.BuildResult"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "accepted",
+                        "build_failed",
+                        "wrong_output",
+                        "output_whitespace_mismatch",
+                        "time_exceeded",
+                        "memory_exceeded",
+                        "runtime_error",
+                        "internal_error"
+                    ],
+                    "example": "accepted"
+                },
+                "tests": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.V1TestResult"
+                    }
+                }
+            }
+        },
+        "handler.V1TestResult": {
+            "type": "object",
+            "properties": {
+                "duration_ms": {
+                    "type": "integer",
+                    "example": 41
+                },
+                "exit_code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "memory_peak_kb": {
+                    "type": "integer",
+                    "example": 7508
+                },
+                "message": {
+                    "description": "Evaluator mode only.",
+                    "type": "string",
+                    "example": ""
+                },
+                "score": {
+                    "description": "Evaluator mode only.",
+                    "type": "number",
+                    "example": 1.0
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "accepted",
+                        "wrong_output",
+                        "output_whitespace_mismatch",
+                        "time_exceeded",
+                        "memory_exceeded",
+                        "runtime_error",
+                        "not_executed",
+                        "internal_error"
+                    ],
+                    "example": "accepted"
+                },
+                "stderr": {
+                    "type": "string",
+                    "example": ""
+                },
+                "stdout": {
+                    "type": "string",
+                    "example": "HELLO\n"
+                },
+                "verdict": {
+                    "description": "Evaluator mode only.",
+                    "type": "string",
+                    "example": "accepted"
                 }
             }
         }
