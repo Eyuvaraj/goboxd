@@ -1,11 +1,12 @@
 definitions:
   config.LimitsDef:
+    description: Per-request limit override. Each value may only REDUCE the language's configured maximum for that phase; exceeding it returns 400 invalid_limits. These example values are kept low enough to be valid for every registered language (the smallest run caps are memory_kb 65536, max_processes 50, wall_time_s 5).
     properties:
       max_processes:
-        example: 64
+        example: 50
         type: integer
       memory_kb:
-        example: 262144
+        example: 65536
         type: integer
       wall_time_s:
         example: 5
@@ -476,7 +477,7 @@ paths:
 
         "build": {
 
-        "limits": { "wall_time_s": 5, "memory_kb": 1048576, "max_processes": 100 },
+        "limits": { "wall_time_s": 5, "memory_kb": 524288, "max_processes": 100 },
 
         "flags": ["-O2"]
 
@@ -484,7 +485,7 @@ paths:
 
         "run": {
 
-        "limits": { "wall_time_s": 3, "memory_kb": 524288, "max_processes": 64 },
+        "limits": { "wall_time_s": 3, "memory_kb": 262144, "max_processes": 64 },
 
         "flags": []
 

@@ -75,7 +75,7 @@
         },
         "/run": {
             "post": {
-                "description": "Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.\n\n**Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the `status` fields of the response body — not as HTTP error codes.\n\n**Test cases:** `tests` is required and must contain at least one entry (up to the server's `max_tests`). Each `stdin` feeds the program; `expected_stdout` is compared against its stdout.\n\n**Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The language definition's strategy controls this.\n\n**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.\n\n**Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 `invalid_limits`.\n\n---\n\n**Sample request (C++, one test case):**\n```json\n{\n\"language\": \"cpp\",\n\"source\": \"#include <iostream>\\nint main(){std::cout<<\\\"hi\\\";}\",\n\"source_filename\": \"solution.cpp\",\n\"artifact_filename\": \"solution\",\n\"build\": {\n\"limits\": { \"wall_time_s\": 5, \"memory_kb\": 1048576, \"max_processes\": 100 },\n\"flags\": [\"-O2\"]\n},\n\"run\": {\n\"limits\": { \"wall_time_s\": 3, \"memory_kb\": 524288, \"max_processes\": 64 },\n\"flags\": []\n},\n\"tests\": [\n{ \"stdin\": \"1\\n\", \"expected_stdout\": \"hi\" }\n]\n}\n```\n\n**Sample response** (code printed `\"HI\"` instead of `\"hi\"` — wrong_output):\n```json\n{\n\"status\": \"wrong_output\",\n\"build\": { \"status\": \"ok\", \"stdout\": \"\", \"stderr\": \"\", \"duration_ms\": 412 },\n\"tests\": [\n{ \"status\": \"wrong_output\", \"stdout\": \"HI\", \"stderr\": \"\", \"duration_ms\": 38, \"memory_peak_kb\": 8192 }\n]\n}\n```",
+                "description": "Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.\n\n**Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the `status` fields of the response body — not as HTTP error codes.\n\n**Test cases:** `tests` is required and must contain at least one entry (up to the server's `max_tests`). Each `stdin` feeds the program; `expected_stdout` is compared against its stdout.\n\n**Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The language definition's strategy controls this.\n\n**Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.\n\n**Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 `invalid_limits`.\n\n---\n\n**Sample request (C++, one test case):**\n```json\n{\n\"language\": \"cpp\",\n\"source\": \"#include <iostream>\\nint main(){std::cout<<\\\"hi\\\";}\",\n\"source_filename\": \"solution.cpp\",\n\"artifact_filename\": \"solution\",\n\"build\": {\n\"limits\": { \"wall_time_s\": 5, \"memory_kb\": 524288, \"max_processes\": 100 },\n\"flags\": [\"-O2\"]\n},\n\"run\": {\n\"limits\": { \"wall_time_s\": 3, \"memory_kb\": 262144, \"max_processes\": 64 },\n\"flags\": []\n},\n\"tests\": [\n{ \"stdin\": \"1\\n\", \"expected_stdout\": \"hi\" }\n]\n}\n```\n\n**Sample response** (code printed `\"HI\"` instead of `\"hi\"` — wrong_output):\n```json\n{\n\"status\": \"wrong_output\",\n\"build\": { \"status\": \"ok\", \"stdout\": \"\", \"stderr\": \"\", \"duration_ms\": 412 },\n\"tests\": [\n{ \"status\": \"wrong_output\", \"stdout\": \"HI\", \"stderr\": \"\", \"duration_ms\": 38, \"memory_peak_kb\": 8192 }\n]\n}\n```",
                 "consumes": [
                     "application/json"
                 ],
@@ -181,14 +181,15 @@
     "definitions": {
         "config.LimitsDef": {
             "type": "object",
+            "description": "Per-request limit override. Each value may only REDUCE the language's configured maximum for that phase; exceeding it returns 400 invalid_limits. These example values are kept low enough to be valid for every registered language (the smallest run caps are memory_kb 65536, max_processes 50, wall_time_s 5).",
             "properties": {
                 "max_processes": {
                     "type": "integer",
-                    "example": 64
+                    "example": 50
                 },
                 "memory_kb": {
                     "type": "integer",
-                    "example": 262144
+                    "example": 65536
                 },
                 "wall_time_s": {
                     "type": "integer",
