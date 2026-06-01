@@ -117,15 +117,15 @@ func TestLimits(t *testing.T) {
 		t.Errorf("equal limits should be valid: %v", err)
 	}
 
-	// Each field independently triggering an error.
-	if err := validate.Limits(config.LimitsDef{WallTimeS: 11}, base); err == nil {
-		t.Error("expected error: wall_time_s exceeds max")
+	// Each field independently triggering an error (must exceed 2x default).
+	if err := validate.Limits(config.LimitsDef{WallTimeS: 21}, base); err == nil {
+		t.Error("expected error: wall_time_s exceeds max (2x default of 10 = 20)")
 	}
-	if err := validate.Limits(config.LimitsDef{MemoryKB: 102401}, base); err == nil {
-		t.Error("expected error: memory_kb exceeds max")
+	if err := validate.Limits(config.LimitsDef{MemoryKB: 204801}, base); err == nil {
+		t.Error("expected error: memory_kb exceeds max (2x default of 102400 = 204800)")
 	}
-	if err := validate.Limits(config.LimitsDef{MaxProcesses: 101}, base); err == nil {
-		t.Error("expected error: max_processes exceeds max")
+	if err := validate.Limits(config.LimitsDef{MaxProcesses: 201}, base); err == nil {
+		t.Error("expected error: max_processes exceeds max (2x default of 100 = 200)")
 	}
 
 	// All fields under the limit is fine.
