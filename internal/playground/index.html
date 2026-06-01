@@ -317,6 +317,41 @@
       cursor: not-allowed;
     }
 
+    /* ── API version dropdown ── */
+    .ep-select { position: relative; flex-shrink: 0; display: flex; align-items: center; }
+    .ep-select select {
+      appearance: none;
+      -webkit-appearance: none;
+      height: 32px;
+      padding: 0 28px 0 10px;
+      background: var(--bg);
+      border: 1px solid var(--b1);
+      color: var(--t1);
+      font-family: var(--mono);
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .ep-select select:hover { border-color: var(--b2); }
+    .ep-select select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(9,105,218,0.1);
+    }
+    .ep-select::after {
+      content: '';
+      position: absolute;
+      right: 11px;
+      top: 50%;
+      width: 7px; height: 7px;
+      margin-top: -5px;
+      pointer-events: none;
+      border-right: 1.5px solid var(--t3);
+      border-bottom: 1.5px solid var(--t3);
+      transform: rotate(45deg);
+    }
+
     /* ── Workspace ── */
     .workspace { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 
@@ -387,28 +422,117 @@
     #source-fallback::selection { background: var(--sel-bg); color: var(--sel-fg); }
     #source-fallback::placeholder { color: var(--t4); }
 
-    /* ── Input row ── */
-    .inputs-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      height: 188px;
-      min-height: 188px;
+    /* ── Test cases panel ── */
+    .tests-panel {
+      display: flex;
+      flex-direction: column;
+      height: 210px;
+      min-height: 210px;
       flex-shrink: 0;
       border-bottom: 1px solid var(--b1);
       overflow: hidden;
     }
+    .tests-hdr {
+      height: 30px;
+      min-height: 30px;
+      flex-shrink: 0;
+      background: var(--s1);
+      border-bottom: 1px solid var(--b1);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 8px 0 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--t2);
+      user-select: none;
+    }
+    .tests-count {
+      font-size: 10px;
+      color: var(--t3);
+      background: var(--s2);
+      border: 1px solid var(--b1);
+      padding: 0 6px;
+      line-height: 15px;
+    }
+    .add-test-btn {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      height: 22px;
+      padding: 0 9px;
+      background: var(--bg);
+      border: 1px solid var(--b1);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .add-test-btn:hover { background: var(--blue-bg); border-color: var(--accent); }
 
-    .input-cell { display: flex; flex-direction: column; overflow: hidden; }
-    .input-cell + .input-cell { border-left: 1px solid var(--b1); }
+    .tests-body { flex: 1; overflow-y: auto; min-height: 0; }
 
-    .input-ta {
+    .test-case { border-bottom: 1px solid var(--b1); }
+    .test-case:last-child { border-bottom: none; }
+    .tc-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 24px;
+      padding: 0 6px 0 12px;
+      background: var(--bg);
+      border-bottom: 1px dashed var(--b1);
+    }
+    .tc-num {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--t3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .tc-del {
+      margin-left: auto;
+      width: 18px; height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      color: var(--t3);
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      transition: background 0.1s, color 0.1s;
+    }
+    .tc-del:hover:not(:disabled) { background: var(--red-bg); color: var(--red); }
+    .tc-del:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .tc-io { display: grid; grid-template-columns: 1fr 1fr; height: 92px; }
+    .tc-cell { display: flex; flex-direction: column; overflow: hidden; }
+    .tc-cell + .tc-cell { border-left: 1px solid var(--b1); }
+    .tc-cell-hdr {
+      height: 20px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--t3);
+      background: var(--s1);
+      border-bottom: 1px solid var(--b1);
+    }
+    .tc-opt { color: var(--t4); margin-left: auto; }
+    .tc-ta {
       flex: 1;
       background: var(--bg);
       color: var(--t1);
       font-family: var(--mono);
       font-size: 12px;
-      line-height: 1.65;
-      padding: 10px 12px;
+      line-height: 1.55;
+      padding: 8px 10px;
       border: none;
       resize: none;
       outline: none;
@@ -416,8 +540,8 @@
       caret-color: var(--caret);
       cursor: var(--code-cursor);
     }
-    .input-ta::selection { background: var(--sel-bg); color: var(--sel-fg); }
-    .input-ta::placeholder { color: var(--t4); }
+    .tc-ta::selection { background: var(--sel-bg); color: var(--sel-fg); }
+    .tc-ta::placeholder { color: var(--t4); }
 
     /* ── Output pane ── */
     .out-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
@@ -590,6 +714,31 @@
     .sb-sep   { color: var(--b1); }
     .sb-space { flex: 1; }
 
+    /* ── Status bar: last-run cluster ── */
+    .sb-run {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .sb-idle { color: var(--t4); }
+    .sb-pill {
+      font-weight: 600;
+      font-size: 10px;
+      letter-spacing: 0.03em;
+      padding: 1px 7px;
+      flex-shrink: 0;
+    }
+    .sb-pill--ok   { background: var(--green-bg);  color: var(--green); }
+    .sb-pill--fail { background: var(--red-bg);    color: var(--red); }
+    .sb-pill--warn { background: var(--yellow-bg); color: var(--yellow); }
+    .sb-metric { color: var(--t2); flex-shrink: 0; }
+    .sb-metric b { color: var(--t1); font-weight: 600; }
+    .sb-k { color: var(--t3); }
+    .sb-mid-dot { color: var(--b2); flex-shrink: 0; }
+
     /* ── Scrollbars ── */
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -667,6 +816,13 @@
 
     <div class="vbar"></div>
 
+    <div class="ep-select" title="run endpoint version">
+      <select id="epSelect" aria-label="run endpoint version">
+        <option value="/run">POST /run</option>
+        <option value="/v1/run">POST /v1/run</option>
+      </select>
+    </div>
+
     <button id="runBtn" class="run-btn" type="button">
       <!-- Lucide: play -->
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
@@ -705,39 +861,32 @@
 
     <div class="side-pane">
 
-      <div class="inputs-row">
-        <div class="input-cell">
-          <div class="pane-hdr">
-            <!-- Lucide: terminal -->
-            <span class="ph-icon">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" stroke-width="2"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="4 17 10 11 4 5"/>
-                <line x1="12" y1="19" x2="20" y2="19"/>
-              </svg>
-            </span>
-            <span class="ph-title">stdin</span>
-          </div>
-          <textarea id="stdin" class="input-ta" spellcheck="false"
-                    placeholder="standard input…"></textarea>
+      <div class="tests-panel">
+        <div class="tests-hdr">
+          <!-- Lucide: list-checks -->
+          <span class="ph-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="m3 17 2 2 4-4"/>
+              <path d="m3 7 2 2 4-4"/>
+              <path d="M13 6h8"/>
+              <path d="M13 12h8"/>
+              <path d="M13 18h8"/>
+            </svg>
+          </span>
+          <span class="ph-title">test cases</span>
+          <span class="tests-count" id="testsCount">1</span>
+          <button class="add-test-btn" id="addTestBtn" type="button" title="Add another test case (sent as the tests[] array)">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            add test
+          </button>
         </div>
-        <div class="input-cell">
-          <div class="pane-hdr">
-            <!-- Lucide: check -->
-            <span class="ph-icon">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" stroke-width="2"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            </span>
-            <span class="ph-title">expected stdout</span>
-            <span class="ph-right">optional</span>
-          </div>
-          <textarea id="expected" class="input-ta" spellcheck="false"
-                    placeholder="assert output…"></textarea>
-        </div>
+        <div class="tests-body" id="testsBody"></div>
       </div>
 
       <div class="out-pane">
@@ -772,6 +921,8 @@
     <span id="sysStatus">connecting…</span>
     <span class="sb-sep">│</span>
     <span id="sysVersion">v—</span>
+    <span class="sb-sep">│</span>
+    <span class="sb-run" id="sbRun"><span class="sb-idle">no runs yet</span></span>
     <span class="sb-space"></span>
     <span>jobs&thinsp;<span id="sysJobs">0</span>/<span id="sysMaxJobs">—</span></span>
     <span class="sb-sep">│</span>
@@ -983,6 +1134,7 @@ let monacoReady    = false;
 let selectedLangId = '';
 let allLanguages   = [];
 let pickerOpen     = false;
+let selectedEndpoint = '/run';   // toggled by the /run · /v1/run switch
 
 const monacoTimer = setTimeout(initFallback, 4500);
 
@@ -1189,11 +1341,104 @@ async function fetchInfo() {
 setInterval(fetchInfo, 5000);
 fetchInfo();
 
+/* ── API version dropdown ── */
+const epSelect = $('epSelect');
+selectedEndpoint = epSelect.value;
+epSelect.addEventListener('change', () => { selectedEndpoint = epSelect.value; });
+
+/* ── Test cases (dynamic add/remove) ── */
+const testsBody  = $('testsBody');
+const addTestBtn = $('addTestBtn');
+
+function renumberTests() {
+  const cases = testsBody.querySelectorAll('.test-case');
+  cases.forEach((c, i) => { c.querySelector('.tc-num').textContent = 'test ' + (i + 1); });
+  $('testsCount').textContent = cases.length;
+  const onlyOne = cases.length === 1;          // never let the user remove the last test
+  cases.forEach(c => { c.querySelector('.tc-del').disabled = onlyOne; });
+}
+
+function addTestCase(stdin = '', expected = '') {
+  const tc = document.createElement('div');
+  tc.className = 'test-case';
+  tc.innerHTML =
+    '<div class="tc-bar">' +
+      '<span class="tc-num">test</span>' +
+      '<button class="tc-del" type="button" title="remove test">&times;</button>' +
+    '</div>' +
+    '<div class="tc-io">' +
+      '<div class="tc-cell">' +
+        '<div class="tc-cell-hdr">stdin</div>' +
+        '<textarea class="tc-ta tc-stdin" spellcheck="false" placeholder="standard input…"></textarea>' +
+      '</div>' +
+      '<div class="tc-cell">' +
+        '<div class="tc-cell-hdr">expected stdout<span class="tc-opt">optional</span></div>' +
+        '<textarea class="tc-ta tc-expected" spellcheck="false" placeholder="assert output…"></textarea>' +
+      '</div>' +
+    '</div>';
+  tc.querySelector('.tc-stdin').value    = stdin;
+  tc.querySelector('.tc-expected').value = expected;
+  tc.querySelector('.tc-del').addEventListener('click', () => {
+    if (testsBody.querySelectorAll('.test-case').length <= 1) return;
+    tc.remove();
+    renumberTests();
+  });
+  testsBody.appendChild(tc);
+  renumberTests();
+  return tc;
+}
+
+function collectTests() {
+  return Array.from(testsBody.querySelectorAll('.test-case')).map(c => ({
+    stdin:           c.querySelector('.tc-stdin').value,
+    expected_stdout: c.querySelector('.tc-expected').value,
+  }));
+}
+
+addTestBtn.addEventListener('click', () => {
+  const tc = addTestCase();
+  tc.querySelector('.tc-stdin').focus();
+  tc.scrollIntoView({ block: 'nearest' });
+});
+
+addTestCase();   // seed the first test case (the default single-test view)
+
 /* ── Output rendering ── */
 function verdictCls(s) {
   if (s === 'accepted' || s === 'ok') return 'verdict--ok';
   if (['time_exceeded','output_whitespace_mismatch'].includes(s)) return 'verdict--warn';
   return 'verdict--fail';
+}
+
+/* pill class (status-bar variant) from a status string */
+function pillCls(s) { return verdictCls(s).replace('verdict--', 'sb-pill--'); }
+
+/* Render the last-run summary into the status bar's bottom row. */
+function setLastRun(data, endpoint) {
+  const el = $('sbRun');
+  const tests = data.tests || [];
+  const parts = [
+    `<span class="sb-pill ${pillCls(data.status)}">${esc(data.status.replace(/_/g,' '))}</span>`,
+  ];
+  if (data.build && data.build.duration_ms != null)
+    parts.push(`<span class="sb-metric"><span class="sb-k">build</span> <b>${data.build.duration_ms}</b>ms</span>`);
+  if (tests.length === 1) {
+    const t = tests[0];
+    if (t.duration_ms != null)
+      parts.push(`<span class="sb-metric"><span class="sb-k">run</span> <b>${t.duration_ms}</b>ms</span>`);
+    if (t.memory_peak_kb > 0)
+      parts.push(`<span class="sb-metric"><span class="sb-k">mem</span> <b>${t.memory_peak_kb}</b>kb</span>`);
+    if (endpoint === '/v1/run' && t.exit_code != null)
+      parts.push(`<span class="sb-metric"><span class="sb-k">exit</span> <b>${t.exit_code}</b></span>`);
+  } else if (tests.length > 1) {
+    const passed = tests.filter(t => t.status === 'accepted').length;
+    parts.push(`<span class="sb-metric"><span class="sb-k">tests</span> <b>${passed}/${tests.length}</b></span>`);
+  }
+  el.innerHTML = parts.join('<span class="sb-mid-dot">·</span>');
+}
+
+function setLastRunText(txt) {
+  $('sbRun').innerHTML = `<span class="sb-idle">${esc(txt)}</span>`;
 }
 
 function setBadge(cls, text) {
@@ -1204,19 +1449,24 @@ function setBadge(cls, text) {
 
 function setOut(html) { $('outBody').innerHTML = html; }
 
-function renderResult(data, ms) {
+function renderResult(data, ms, endpoint) {
   let h = '<div class="result-wrap"><div class="result-head">';
   h += `<span class="verdict ${verdictCls(data.status)}">${esc(data.status.replace(/_/g,' '))}</span>`;
   h += '<div class="result-stats">';
   h += `<span class="stat"><span class="stat-k">wall</span>${ms}&thinsp;ms</span>`;
   if (data.build?.duration_ms != null)
     h += `<span class="stat"><span class="stat-k">build</span>${data.build.duration_ms}&thinsp;ms</span>`;
-  if (data.tests?.length) {
+  if (data.tests?.length === 1) {
     const t = data.tests[0];
     if (t.duration_ms != null)
       h += `<span class="stat"><span class="stat-k">run</span>${t.duration_ms}&thinsp;ms</span>`;
     if (t.memory_peak_kb > 0)
       h += `<span class="stat"><span class="stat-k">mem</span>${t.memory_peak_kb}&thinsp;kb</span>`;
+    if (endpoint === '/v1/run' && t.exit_code != null)
+      h += `<span class="stat"><span class="stat-k">exit</span>${t.exit_code}</span>`;
+  } else if (data.tests?.length > 1) {
+    const passed = data.tests.filter(t => t.status === 'accepted').length;
+    h += `<span class="stat"><span class="stat-k">tests</span>${passed}/${data.tests.length} passed</span>`;
   }
   h += '</div></div>';
 
@@ -1230,7 +1480,15 @@ function renderResult(data, ms) {
     if (i > 0) h += '<div class="res-sep"></div>';
     const vc = verdictCls(test.status);
     h += '<div class="res-block">';
-    h += `<div class="res-block-label"><span class="verdict ${vc}" style="font-size:9px;padding:2px 7px;">${esc(test.status.replace(/_/g,' '))}</span>test ${i + 1}</div>`;
+    h += `<div class="res-block-label"><span class="verdict ${vc}" style="font-size:9px;padding:2px 7px;">${esc(test.status.replace(/_/g,' '))}</span>test ${i + 1}`;
+    const meta = [];
+    if (endpoint === '/v1/run' && test.exit_code != null) meta.push(`exit ${test.exit_code}`);
+    if (test.verdict)        meta.push(`verdict ${esc(test.verdict)}`);
+    if (test.score != null)  meta.push(`score ${test.score}`);
+    if (meta.length) h += `<span style="margin-left:auto;color:var(--t3);font-size:10px;text-transform:none;letter-spacing:0;">${meta.join(' · ')}</span>`;
+    h += '</div>';
+    if (test.message)
+      h += `<div class="res-pre res-pre--dim" style="margin-bottom:7px;">${esc(test.message)}</div>`;
     h += test.stdout
       ? `<div class="res-pre">${esc(test.stdout)}</div>`
       : `<div class="res-pre res-pre--dim">[no stdout]</div>`;
@@ -1250,14 +1508,16 @@ $('runBtn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.innerHTML = '<svg class="spin" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>&nbsp;Running';
 
+  const endpoint = selectedEndpoint;
   setBadge('badge--running', 'executing');
+  setLastRunText('executing…');
   setOut('<div class="idle-wrap pulse"><div class="idle-hint">running in sandbox…</div></div>');
 
   const src = getSource();
   const payload = {
     language: selectedLangId,
     source:   src,
-    tests: [{ stdin: $('stdin').value, expected_stdout: $('expected').value }],
+    tests: collectTests(),
   };
   if (selectedLangId === 'java') {
     const m = src.match(/public\s+class\s+(\w+)/);
@@ -1268,7 +1528,7 @@ $('runBtn').addEventListener('click', async () => {
 
   try {
     const t0  = performance.now();
-    const res = await fetch('/run', {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -1278,17 +1538,20 @@ $('runBtn').addEventListener('click', async () => {
 
     if (!res.ok) {
       setBadge('badge--fail', 'api error');
+      setLastRunText('error: ' + (data.error?.code || res.status));
       setOut(`<div class="result-wrap"><div class="res-block-label">api error</div><div class="res-pre res-pre--err">${esc(JSON.stringify(data,null,2))}</div></div>`);
       return;
     }
 
     setBadge(data.status === 'accepted' ? 'badge--ok' : 'badge--fail',
              data.status.replace(/_/g,' '));
-    setOut(renderResult(data, ms));
+    setOut(renderResult(data, ms, endpoint));
+    setLastRun(data, endpoint);
     fetchInfo();
 
   } catch (err) {
     setBadge('badge--fail', 'network error');
+    setLastRunText('network error');
     setOut(`<div class="result-wrap"><div class="res-pre res-pre--err">${esc(String(err))}</div></div>`);
   } finally {
     btn.disabled = false;

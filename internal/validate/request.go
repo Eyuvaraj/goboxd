@@ -40,6 +40,9 @@ func Filename(s string) error {
 	if filepath.Base(s) != s {
 		return ErrFilenameSeparator
 	}
+	if s == "." || s == ".." {
+		return ErrFilenameLeadingDot
+	}
 	if strings.HasPrefix(s, ".") {
 		return ErrFilenameLeadingDot
 	}

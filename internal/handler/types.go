@@ -10,7 +10,21 @@ type RunRequest struct {
 	ArtifactFilename string         `json:"artifact_filename"`
 	Build            *PhaseOverride `json:"build"`
 	Run              *PhaseOverride `json:"run"`
+	Stdin            string         `json:"stdin"`     // /v1/run raw mode: single stdin when tests is empty
+	Evaluator        *EvaluatorSpec `json:"evaluator"` // /v1/run evaluator mode: grade tests with a custom program
 	Tests            []TestCase     `json:"tests"`
+}
+
+// EvaluatorSpec (/v1/run only) supplies a scoring program that grades each test
+// instead of comparing stdout to expected_stdout. It reuses a registered
+// language and accepts the same per-phase flag/limit overrides as the candidate.
+type EvaluatorSpec struct {
+	Language         string         `json:"language"`
+	Source           string         `json:"source"`
+	SourceFilename   string         `json:"source_filename"`
+	ArtifactFilename string         `json:"artifact_filename"`
+	Build            *PhaseOverride `json:"build"`
+	Run              *PhaseOverride `json:"run"`
 }
 
 // PhaseOverride lets the client supply per-request flags and limit overrides.
@@ -25,7 +39,7 @@ type TestCase struct {
 	ExpectedStdout string `json:"expected_stdout"`
 }
 
-// RunResponse is the JSON body returned by POST /run.
+// RunResponse is the JSON body returned by POST /run (COMPETITION.md §4.2).
 type RunResponse struct {
 	Status string       `json:"status"`
 	Build  BuildResult  `json:"build"`
@@ -45,6 +59,27 @@ type TestResult struct {
 	Stderr       string `json:"stderr"`
 	DurationMs   int64  `json:"duration_ms"`
 	MemoryPeakKB int64  `json:"memory_peak_kb"`
+}
+
+// V1RunResponse is the JSON body returned by POST /v1/run. It mirrors
+// RunResponse but adds exit_code to each test result.
+type V1RunResponse struct {
+	Status string         `json:"status"`
+	Build  BuildResult    `json:"build"`
+	Tests  []V1TestResult `json:"tests"`
+}
+
+type V1TestResult struct {
+	Status       string `json:"status"`
+	Stdout       string `json:"stdout"`
+	Stderr       string `json:"stderr"`
+	ExitCode     int    `json:"exit_code"`
+	DurationMs   int64  `json:"duration_ms"`
+	MemoryPeakKB int64  `json:"memory_peak_kb"`
+	// Populated only in evaluator mode.
+	Verdict string   `json:"verdict,omitempty"`
+	Score   *float64 `json:"score,omitempty"`
+	Message string   `json:"message,omitempty"`
 }
 
 // ErrorResponse is returned for 4xx/5xx errors.

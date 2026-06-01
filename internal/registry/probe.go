@@ -21,7 +21,9 @@ type ProbeResult struct {
 
 // ProbeNsjail checks that nsjailPath exists and can be launched.
 // nsjail has no --version flag; --help exits 255 but doesn't fail to exec,
-// so an exec.ExitError from --help means the binary is functional.
+// so an exec.ExitError from --help means the binary is functional. The version
+// string is not discoverable from the binary, so it is reported from the
+// NSJAIL_VERSION env var the image sets at build time (falling back to "ok").
 func ProbeNsjail(nsjailPath string) ProbeResult {
 	info, err := os.Stat(nsjailPath)
 	if err != nil {
@@ -38,7 +40,11 @@ func ProbeNsjail(nsjailPath string) ProbeResult {
 	if execErr != nil && !errors.As(execErr, &exitErr) {
 		return ProbeResult{OK: false, Error: fmt.Sprintf("nsjail not found at %s: %v", nsjailPath, execErr)}
 	}
-	return ProbeResult{OK: true, Version: "ok"}
+	version := os.Getenv("NSJAIL_VERSION")
+	if version == "" {
+		version = "ok"
+	}
+	return ProbeResult{OK: true, Version: version}
 }
 
 // ProbeLanguage runs a version check to confirm the binary is present and executable.

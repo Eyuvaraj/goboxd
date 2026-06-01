@@ -1,11 +1,12 @@
 definitions:
   config.LimitsDef:
+    description: Per-request limit override. Each value may only REDUCE the language's configured maximum for that phase; exceeding it returns 400 invalid_limits. These example values are kept low enough to be valid for every registered language (the smallest run caps are memory_kb 65536, max_processes 50, wall_time_s 5).
     properties:
       max_processes:
-        example: 64
+        example: 50
         type: integer
       memory_kb:
-        example: 262144
+        example: 65536
         type: integer
       wall_time_s:
         example: 5
@@ -17,10 +18,10 @@ definitions:
         example: abc1234
         type: string
       go_version:
-        example: go1.23.0
+        example: go1.26.3
         type: string
       version:
-        example: 0.1.0
+        example: dev
         type: string
     type: object
   handler.BuildResult:
@@ -36,10 +37,10 @@ definitions:
         example: ok
         type: string
       stderr:
-        example: ""
+        example: ''
         type: string
       stdout:
-        example: ""
+        example: ''
         type: string
     type: object
   handler.ErrorDetail:
@@ -49,7 +50,6 @@ definitions:
         enum:
         - invalid_json
         - unknown_language
-        - missing_source
         - source_too_large
         - missing_source_filename
         - missing_artifact_filename
@@ -59,6 +59,7 @@ definitions:
         - invalid_test_count
         - stdin_too_large
         - expected_too_large
+        - overloaded
         - internal_error
         example: unknown_language
         type: string
@@ -70,6 +71,26 @@ definitions:
     properties:
       error:
         $ref: '#/definitions/handler.ErrorDetail'
+    type: object
+  handler.EvaluatorSpec:
+    description: /v1/run only. A scoring program that grades each test's output instead of comparing it to expected_stdout. Reuses a registered language and accepts the same per-phase flag/limit overrides as the candidate.
+    properties:
+      artifact_filename:
+        example: checker
+        type: string
+      build:
+        $ref: '#/definitions/handler.PhaseOverride'
+      language:
+        example: py3
+        type: string
+      run:
+        $ref: '#/definitions/handler.PhaseOverride'
+      source:
+        example: import json,sys; print(json.dumps({"verdict":"accepted","score":1.0}))
+        type: string
+      source_filename:
+        example: checker.py
+        type: string
     type: object
   handler.HealthzResponse:
     properties:
@@ -103,7 +124,7 @@ definitions:
         example: Python 3
         type: string
       version:
-        example: Python 3.11.9
+        example: Python 3.11.2
         type: string
     type: object
   handler.LanguageRunLimits:
@@ -124,7 +145,7 @@ definitions:
         example: /usr/local/bin/nsjail
         type: string
       version:
-        example: 'nsjail version: 3.4'
+        example: '3.4'
         type: string
     type: object
   handler.PhaseOverride:
@@ -140,13 +161,13 @@ definitions:
   handler.ProbeInfo:
     properties:
       error:
-        example: ""
+        example: ''
         type: string
       ok:
         example: true
         type: boolean
       version:
-        example: Python 3.11.9
+        example: Python 3.11.2
         type: string
     type: object
   handler.ReadyzResponse:
@@ -158,8 +179,7 @@ definitions:
       nsjail:
         $ref: '#/definitions/handler.ProbeInfo'
       status:
-        description: Status is "ok" when all probes pass; "degraded" when any probe
-          fails.
+        description: Status is "ok" when all probes pass; "degraded" when any probe fails.
         enum:
         - ok
         - degraded
@@ -173,18 +193,25 @@ definitions:
         type: string
       build:
         $ref: '#/definitions/handler.PhaseOverride'
+      evaluator:
+        $ref: '#/definitions/handler.EvaluatorSpec'
+        description: /v1/run only. Custom grading program; ignored by /run.
       language:
         example: cpp
         type: string
       run:
         $ref: '#/definitions/handler.PhaseOverride'
       source:
-        example: |-
-          #include <iostream>
-          int main(){std::cout<<"hi";}
+        example: '#include <iostream>
+
+          int main(){std::cout<<"hi";}'
         type: string
       source_filename:
         example: solution.cpp
+        type: string
+      stdin:
+        description: '/v1/run raw mode only: stdin fed to the single run when tests is empty. Ignored by /run.'
+        example: ''
         type: string
       tests:
         items:
@@ -196,8 +223,7 @@ definitions:
       build:
         $ref: '#/definitions/handler.BuildResult'
       status:
-        description: Status summarises the overall result. "accepted" means build
-          succeeded and all tests passed.
+        description: Status summarises the overall result. "accepted" means build succeeded and all tests passed.
         enum:
         - accepted
         - build_failed
@@ -217,7 +243,7 @@ definitions:
   handler.ServiceLimits:
     properties:
       max_concurrent_jobs:
-        example: 8
+        example: 10
         type: integer
       max_source_bytes:
         example: 262144
@@ -241,7 +267,7 @@ definitions:
         example: 1042
         type: integer
       last_internal_error_at:
-        example: "2024-01-15T10:30:00Z"
+        example: '2024-01-15T10:30:00Z'
         type: string
       queue_size:
         example: 0
@@ -253,8 +279,9 @@ definitions:
         example: hi
         type: string
       stdin:
-        example: |
-          1
+        example: '1
+
+          '
         type: string
     type: object
   handler.TestResult:
@@ -278,23 +305,101 @@ definitions:
         example: wrong_output
         type: string
       stderr:
-        example: ""
+        example: ''
         type: string
       stdout:
         example: HI
         type: string
     type: object
+  handler.V1RunResponse:
+    description: Response body for POST /v1/run. Mirrors RunResponse but each test carries exit_code (and verdict/score/message in evaluator mode).
+    properties:
+      build:
+        $ref: '#/definitions/handler.BuildResult'
+      status:
+        enum:
+        - accepted
+        - build_failed
+        - wrong_output
+        - output_whitespace_mismatch
+        - time_exceeded
+        - memory_exceeded
+        - runtime_error
+        - internal_error
+        example: accepted
+        type: string
+      tests:
+        items:
+          $ref: '#/definitions/handler.V1TestResult'
+        type: array
+    type: object
+  handler.V1TestResult:
+    properties:
+      duration_ms:
+        example: 41
+        type: integer
+      exit_code:
+        example: 0
+        type: integer
+      memory_peak_kb:
+        example: 7508
+        type: integer
+      message:
+        description: Evaluator mode only.
+        example: ''
+        type: string
+      score:
+        description: Evaluator mode only.
+        example: 1.0
+        type: number
+      status:
+        enum:
+        - accepted
+        - wrong_output
+        - output_whitespace_mismatch
+        - time_exceeded
+        - memory_exceeded
+        - runtime_error
+        - not_executed
+        - internal_error
+        example: accepted
+        type: string
+      stderr:
+        example: ''
+        type: string
+      stdout:
+        example: 'HELLO
+
+          '
+        type: string
+      verdict:
+        description: Evaluator mode only.
+        example: accepted
+        type: string
+    type: object
 info:
   contact: {}
+  description: 'HTTP service that compiles or interprets untrusted source code inside an nsjail sandbox and runs it against test cases, returning structured per-test results.
+
+
+    **Two execution endpoints:**
+
+    - `POST /run` — the strict contract: `tests` is required, and each test result carries no `exit_code`.
+
+    - `POST /v1/run` — a superset that adds a per-test `exit_code`, raw execution (empty `tests` runs once against `stdin`), and evaluator mode (grade with a custom program).
+
+
+    Validation, security, resource limits, and status semantics are identical across both.'
+  title: goboxd API
+  version: '1.0'
 paths:
   /healthz:
     get:
-      description: Returns 200 as long as the server process is running. Intended
-        for load-balancer liveness probes.
+      description: Returns 200 as long as the server process is running. Intended for load-balancer liveness probes.
       produces:
       - application/json
       responses:
-        "200":
+        '200':
           description: OK
           schema:
             $ref: '#/definitions/handler.HealthzResponse'
@@ -303,13 +408,11 @@ paths:
       - health
   /info:
     get:
-      description: Returns build metadata (version, commit, Go version), nsjail info,
-        registered language list with default limits, server-wide enforcement limits,
-        and live runtime statistics (in-flight jobs, totals, disk space).
+      description: Returns build metadata (version, commit, Go version), nsjail info, registered language list with default limits, server-wide enforcement limits, and live runtime statistics (in-flight jobs, totals, disk space).
       produces:
       - application/json
       responses:
-        "200":
+        '200':
           description: OK
           schema:
             $ref: '#/definitions/handler.InfoResponse'
@@ -318,17 +421,15 @@ paths:
       - health
   /readyz:
     get:
-      description: Probes nsjail and every registered language binary. Returns 200
-        when all probes pass; 503 when any probe fails. Use this for load-balancer
-        readiness probes.
+      description: Probes nsjail and every registered language binary. Returns 200 when all probes pass; 503 when any probe fails. Use this for load-balancer readiness probes.
       produces:
       - application/json
       responses:
-        "200":
+        '200':
           description: OK
           schema:
             $ref: '#/definitions/handler.ReadyzResponse'
-        "503":
+        '503':
           description: One or more probes failed — service is degraded
           schema:
             $ref: '#/definitions/handler.ReadyzResponse'
@@ -339,50 +440,87 @@ paths:
     post:
       consumes:
       - application/json
-      description: |-
-        Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.
+      description: 'Compiles (if needed) and runs the submitted source against one or more test cases inside an nsjail sandbox.
+
 
         **Result encoding:** HTTP 200 is returned for all structurally valid requests. Execution outcomes (build failure, wrong output, TLE, MLE, runtime error) are encoded in the `status` fields of the response body — not as HTTP error codes.
 
-        **Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The `strategy` field in the language definition controls this.
+
+        **Test cases:** `tests` is required and must contain at least one entry (up to the server''s `max_tests`). Each `stdin` feeds the program; `expected_stdout` is compared against its stdout.
+
+
+        **Filename requirements:** Some languages (e.g. Java) require `source_filename` and `artifact_filename` to match the public class name. The language definition''s strategy controls this.
+
 
         **Flag allowlists:** Build and run flags are filtered against a per-language allowlist. Disallowed flags return 400 `invalid_flag`.
 
-        **Limit overrides:** Per-request limits may only reduce a language's configured maximum — attempting to exceed the language ceiling returns 400 `invalid_limits`.
+
+        **Limit overrides:** Per-request limits may only reduce a language''s configured maximum — attempting to exceed the language ceiling returns 400 `invalid_limits`.
+
 
         ---
 
+
         **Sample request (C++, one test case):**
+
         ```json
+
         {
+
         "language": "cpp",
+
         "source": "#include <iostream>\nint main(){std::cout<<\"hi\";}",
+
         "source_filename": "solution.cpp",
+
         "artifact_filename": "solution",
+
         "build": {
-        "limits": { "wall_time_s": 5, "memory_kb": 1048576, "max_processes": 100 },
+
+        "limits": { "wall_time_s": 5, "memory_kb": 524288, "max_processes": 100 },
+
         "flags": ["-O2"]
+
         },
+
         "run": {
-        "limits": { "wall_time_s": 3, "memory_kb": 524288, "max_processes": 64 },
+
+        "limits": { "wall_time_s": 3, "memory_kb": 262144, "max_processes": 64 },
+
         "flags": []
+
         },
+
         "tests": [
+
         { "stdin": "1\n", "expected_stdout": "hi" }
+
         ]
+
         }
+
         ```
 
+
         **Sample response** (code printed `"HI"` instead of `"hi"` — wrong_output):
+
         ```json
+
         {
+
         "status": "wrong_output",
+
         "build": { "status": "ok", "stdout": "", "stderr": "", "duration_ms": 412 },
+
         "tests": [
+
         { "status": "wrong_output", "stdout": "HI", "stderr": "", "duration_ms": 38, "memory_peak_kb": 8192 }
+
         ]
+
         }
-        ```
+
+        ```'
       parameters:
       - description: Code execution request
         in: body
@@ -393,23 +531,105 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
+        '200':
           description: Execution completed (check body status fields for pass/fail)
           schema:
             $ref: '#/definitions/handler.RunResponse'
-        "400":
+        '400':
           description: Validation error — see error.code for the specific cause
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
-        "500":
+        '500':
           description: Internal server error (nsjail fault, disk full, etc.)
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
-        "503":
+        '503':
           description: Server at capacity or request cancelled by client
           schema:
             type: string
       summary: Execute code in a sandbox
       tags:
       - execution
-swagger: "2.0"
+  /v1/run:
+    post:
+      consumes:
+      - application/json
+      description: 'Superset of `POST /run` for richer clients. The contest endpoint is `/run`; `/v1/run` keeps the same request shape and all the same validation, security, limits, and status semantics, and adds three things:
+
+
+        1. **`exit_code`** — every test result includes the process exit code.
+
+        2. **Raw execution** — submit an empty (or omitted) `tests` array to run the program once against `stdin` with no output grading. The single result reports the raw outcome (and `exit_code`).
+
+        3. **Evaluator mode** — supply an `evaluator` program (in any registered language) to grade each test''s output instead of comparing it to `expected_stdout`. Each test result then also carries `verdict`, `score`, and `message`.
+
+
+        ---
+
+
+        **Sample request (raw execution — no tests, just stdin):**
+
+        ```json
+
+        {
+
+        "language": "py3",
+
+        "source": "import sys; print(sys.stdin.read().upper())",
+
+        "stdin": "hello\n"
+
+        }
+
+        ```
+
+
+        **Sample response:**
+
+        ```json
+
+        {
+
+        "status": "accepted",
+
+        "build": { "status": "ok", "stdout": "", "stderr": "", "duration_ms": 0 },
+
+        "tests": [
+
+        { "status": "accepted", "stdout": "HELLO\n", "stderr": "", "exit_code": 0, "duration_ms": 41, "memory_peak_kb": 7508 }
+
+        ]
+
+        }
+
+        ```'
+      parameters:
+      - description: Code execution request. `tests` may be empty for raw execution; `evaluator` enables custom grading.
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RunRequest'
+      produces:
+      - application/json
+      responses:
+        '200':
+          description: Execution completed (check body status fields for pass/fail)
+          schema:
+            $ref: '#/definitions/handler.V1RunResponse'
+        '400':
+          description: Validation error — see error.code for the specific cause
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        '500':
+          description: Internal server error (nsjail fault, disk full, etc.)
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        '503':
+          description: Server at capacity or request cancelled by client
+          schema:
+            type: string
+      summary: 'Execute code (extended: exit_code, raw, evaluator)'
+      tags:
+      - execution
+swagger: '2.0'
