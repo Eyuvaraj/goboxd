@@ -170,31 +170,31 @@ languages:
         memory_kb: 131072
         max_processes: 100
 
-  # - id: rust
-  #   name: Rust
-  #   source_filename: solution.rs
-  #   artifact_filename: solution
-  #   build:
-  #     cmd: /usr/bin/rustc
-  #     args: ["{{flags}}", "-o", "{{artifact}}", "{{source}}"]
-  #     limits:
-  #       wall_time_s: 30
-  #       memory_kb: 524288
-  #       max_processes: 100
-  #     flag_allowlist:
-  #       - "-O"
-  #       - "-g"
-  #       - "--edition"
-  #       - "2021"
-  #       - "2018"
-  #       - "2015"
-  #   run:
-  #     cmd: /solution
-  #     args: []
-  #     limits:
-  #       wall_time_s: 5
-  #       memory_kb: 262144
-  #       max_processes: 64
+  - id: rust
+    name: Rust
+    source_filename: solution.rs
+    artifact_filename: solution
+    build:
+      cmd: /usr/bin/rustc
+      args: ["{{flags}}", "-o", "{{artifact}}", "{{source}}"]
+      limits:
+        wall_time_s: 30
+        memory_kb: 524288
+        max_processes: 100
+      flag_allowlist:
+        - "-O"
+        - "-g"
+        - "--edition"
+        - "2021"
+        - "2018"
+        - "2015"
+    run:
+      cmd: /solution
+      args: []
+      limits:
+        wall_time_s: 5
+        memory_kb: 262144
+        max_processes: 64
 
   # - id: kotlin
   #   name: Kotlin

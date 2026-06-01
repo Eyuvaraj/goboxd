@@ -51,6 +51,10 @@ COPY --from=nsjail-builder /usr/local/bin/nsjail /usr/local/bin/nsjail
 COPY --from=builder        /out/goboxd           /usr/local/bin/goboxd
 COPY configs/languages.yaml /etc/goboxd/languages.yaml
 
+# Copy the Go toolchain from the builder stage (same version, avoids stale apt package).
+COPY --from=builder /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}"
+
 # nsjail has no --version flag, so the probe reads its version from here.
 ARG NSJAIL_VERSION=3.4
 ENV NSJAIL_VERSION=${NSJAIL_VERSION}
