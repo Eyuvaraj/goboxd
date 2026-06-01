@@ -13,9 +13,9 @@ build:
 run:
 	$(COMPOSE) up goboxd
 
-# Run unit tests (no nsjail required).
+# Run unit tests (no nsjail required — runs locally, no Docker needed).
 test:
-	$(TOOLS) go test ./internal/... ./cmd/...
+	go test ./internal/... ./cmd/...
 
 # Run integration tests (requires nsjail inside the container).
 integration:

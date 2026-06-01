@@ -39,7 +39,7 @@ Validation failures return `400`; infrastructure errors return `5xx`.
 
 ## Languages
 
-`py3` · `bash` · `js` · `c` · `cpp` · `java` · `verilog` · `ruby` · `lua` · `ocaml`
+`py3` · `bash` · `js` · `c` · `cpp` · `java` · `verilog` · `ruby` · `lua` · `ocaml` · `go`
 
 Adding a language takes one YAML block in [`configs/languages.yaml`](configs/languages.yaml)
 and one `apt-get install` in the [`Dockerfile`](Dockerfile), with no Go code changes.

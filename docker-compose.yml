@@ -25,6 +25,7 @@ services:
     # "run the container with --cgroupns=host" otherwise).
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ./configs/languages.yaml:/etc/goboxd/languages.yaml:ro
     cgroup: host
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"ok\"' <&3"]

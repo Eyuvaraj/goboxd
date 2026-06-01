@@ -46,14 +46,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         bash \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Language toolchains: install all packages in a single transaction, then run
-#    the scripts (which will just exit quickly and run their version checks).
+# 2. Language toolchains: each install script does its own apt-get install so
+#    adding a new language is one script file with no Dockerfile edits needed.
+#    Cache mounts persist apt lists across builds; no rm -rf needed here.
 COPY scripts/lang_install /install
-RUN apt-get update --allow-releaseinfo-change \
-    && pkgs=$(cat /install/*.sh | grep "apt-get install" | sed -E 's/.*apt-get install -y --no-install-recommends (.*)/\1/') \
-    && apt-get install -y --no-install-recommends $pkgs \
-    && for s in /install/*.sh; do bash "$s"; done \
-    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+    && for s in /install/*.sh; do bash "$s"; done
 
 COPY --from=nsjail-builder /usr/local/bin/nsjail /usr/local/bin/nsjail
 COPY --from=builder        /out/goboxd           /usr/local/bin/goboxd
