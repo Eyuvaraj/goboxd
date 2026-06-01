@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libprotobuf-dev libtool make pkg-config protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 COPY external/nsjail /src/nsjail
-RUN make -C /src/nsjail \
+RUN make -j$(nproc) -C /src/nsjail \
     && install -m 0755 /src/nsjail/nsjail /usr/local/bin/nsjail
 
 # ---- Builder / dev image (Go + linters + nsjail) ----
@@ -46,10 +46,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         bash \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Language toolchains: a single apt-get update before the loop so each
-#    install script does not re-fetch the package index (was 10× fetches).
+# 2. Language toolchains: install all packages in a single transaction, then run
+#    the scripts (which will just exit quickly and run their version checks).
 COPY scripts/lang_install /install
 RUN apt-get update --allow-releaseinfo-change \
+    && pkgs=$(cat /install/*.sh | grep "apt-get install" | sed -E 's/.*apt-get install -y --no-install-recommends (.*)/\1/') \
+    && apt-get install -y --no-install-recommends $pkgs \
     && for s in /install/*.sh; do bash "$s"; done \
     && rm -rf /var/lib/apt/lists/*
 
