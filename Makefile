@@ -29,7 +29,6 @@ lint:
 load:
 	@bash scripts/load_test.sh
 
-# Regenerate Swagger docs from annotations (installs swag CLI if missing).
+# Regenerate Swagger docs from annotations (runs inside the tools container).
 swagger:
-	@which swag > /dev/null 2>&1 || go install github.com/swaggo/swag/cmd/swag@latest
-	swag init -g cmd/goboxd/main.go --output docs --parseInternal
+	$(TOOLS) sh -c 'which swag > /dev/null 2>&1 || go install github.com/swaggo/swag/cmd/swag@latest && swag init -g cmd/goboxd/main.go --output docs --parseInternal'

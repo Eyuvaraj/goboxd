@@ -27,7 +27,7 @@ services:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
     cgroup: host
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"ok\"' <&3"]
       interval: 2s
       timeout: 5s
       retries: 15

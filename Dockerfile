@@ -39,13 +39,19 @@ RUN CGO_ENABLED=0 go build \
 
 # ---- Runtime image ----
 FROM debian:${DEBIAN_VERSION}-slim AS runtime
+# Install base runtime deps and all language toolchains in two layers:
+# 1. Base deps that don't change often (separate from language toolchains for cache efficiency).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates libnl-route-3-200 libprotobuf32 \
-        wget bash \
+        bash \
     && rm -rf /var/lib/apt/lists/*
 
+# 2. Language toolchains: a single apt-get update before the loop so each
+#    install script does not re-fetch the package index (was 10× fetches).
 COPY scripts/lang_install /install
-RUN for s in /install/*.sh; do bash "$s"; done && rm -rf /var/lib/apt/lists/*
+RUN apt-get update --allow-releaseinfo-change \
+    && for s in /install/*.sh; do bash "$s"; done \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=nsjail-builder /usr/local/bin/nsjail /usr/local/bin/nsjail
 COPY --from=builder        /out/goboxd           /usr/local/bin/goboxd
@@ -59,7 +65,7 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 ARG NSJAIL_VERSION=3.4
 ENV NSJAIL_VERSION=${NSJAIL_VERSION}
 
-	# Language smoke tests are performed by their respective install scripts.
+# Language smoke tests are performed by their respective install scripts.
 
 RUN mkdir -p /tmp/goboxd
 
