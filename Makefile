@@ -13,9 +13,10 @@ build:
 run:
 	$(COMPOSE) up goboxd
 
-# Run unit tests (no nsjail required — runs locally, no Docker needed).
+# Run unit tests inside the tools container (no nsjail required).
+# --no-deps skips starting goboxd so this works without make run.
 test:
-	go test ./internal/... ./cmd/...
+	$(COMPOSE) --profile tools run --rm --no-deps tools go test ./internal/... ./cmd/...
 
 # Run integration tests (requires nsjail inside the container).
 integration:

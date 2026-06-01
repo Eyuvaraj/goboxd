@@ -18,6 +18,11 @@ services:
       # ("Couldn't mount '/proc'"). Unconfining the system paths removes the
       # masks so nsjail can mount /proc. Without this, every /run fails.
       - systempaths=unconfined
+      # Ubuntu's docker-default AppArmor profile blocks pivot_root, mount, and
+      # some namespace operations that nsjail uses during chroot setup.
+      # Without this, all executions fail: compiled → build.internal_error,
+      # interpreted → runtime_error (nsjail exits before the child starts).
+      - apparmor:unconfined
     # Docker mounts /sys/fs/cgroup read-only by default (all host OSes). nsjail
     # needs to create child cgroups under it to enforce memory.max / pids.max and
     # read memory.peak, so mount it read-write. Combined with cgroup: host below

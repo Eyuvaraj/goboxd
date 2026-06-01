@@ -119,17 +119,17 @@ func ExpectedSize(s string, max int) error {
 	return nil
 }
 
-// Limits rejects overrides that exceed the language's configured maximums.
+// Limits rejects overrides that exceed 2x the language's configured maximums.
 // Zero values in override are ignored (they mean "use the language default").
 func Limits(override, langDefault config.LimitsDef) error {
-	if override.WallTimeS > 0 && override.WallTimeS > langDefault.WallTimeS {
-		return fmt.Errorf("wall_time_s %d exceeds language maximum of %d", override.WallTimeS, langDefault.WallTimeS)
+	if override.WallTimeS > 0 && override.WallTimeS > 2*langDefault.WallTimeS {
+		return fmt.Errorf("wall_time_s %d exceeds maximum allowed (2x default of %d)", override.WallTimeS, langDefault.WallTimeS)
 	}
-	if override.MemoryKB > 0 && override.MemoryKB > langDefault.MemoryKB {
-		return fmt.Errorf("memory_kb %d exceeds language maximum of %d", override.MemoryKB, langDefault.MemoryKB)
+	if override.MemoryKB > 0 && override.MemoryKB > 2*langDefault.MemoryKB {
+		return fmt.Errorf("memory_kb %d exceeds maximum allowed (2x default of %d)", override.MemoryKB, langDefault.MemoryKB)
 	}
-	if override.MaxProcesses > 0 && override.MaxProcesses > langDefault.MaxProcesses {
-		return fmt.Errorf("max_processes %d exceeds language maximum of %d", override.MaxProcesses, langDefault.MaxProcesses)
+	if override.MaxProcesses > 0 && override.MaxProcesses > 2*langDefault.MaxProcesses {
+		return fmt.Errorf("max_processes %d exceeds maximum allowed (2x default of %d)", override.MaxProcesses, langDefault.MaxProcesses)
 	}
 	return nil
 }

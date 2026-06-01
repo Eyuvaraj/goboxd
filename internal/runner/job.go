@@ -382,6 +382,9 @@ func buildBindMounts(lang *config.LanguageDef) []string {
 			return
 		}
 		d := filepath.Dir(cmd)
+		if d == "/" {
+			return
+		}
 		for existing := range dirs {
 			if d == existing || strings.HasPrefix(d, existing+"/") {
 				return
