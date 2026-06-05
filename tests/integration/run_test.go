@@ -741,6 +741,156 @@ func TestReadyz(t *testing.T) {
 	}
 }
 
+// smokeCase is a minimal hello-world for one language used by TestAllLanguagesHelloWorld.
+// SourceFilename/ArtifactFilename are only needed for from_request languages (e.g. Java).
+type smokeCase struct {
+	Source           string
+	ExpectedStdout   string
+	SourceFilename   string
+	ArtifactFilename string
+}
+
+// langSmoke maps language ids to hello-world payloads. Add an entry whenever a
+// new language is added to configs/languages.yaml — TestAllLanguagesHelloWorld
+// picks it up automatically. Languages not in this map are silently skipped.
+var langSmoke = map[string]smokeCase{
+	"py3":      {Source: "print('hello')\n", ExpectedStdout: "hello\n"},
+	"bash":     {Source: "echo hello\n", ExpectedStdout: "hello\n"},
+	"js":       {Source: "console.log('hello')\n", ExpectedStdout: "hello\n"},
+	"ruby":     {Source: "puts 'hello'\n", ExpectedStdout: "hello\n"},
+	"lua":      {Source: "print('hello')\n", ExpectedStdout: "hello\n"},
+	"ocaml":    {Source: "print_string \"hello\\n\";;\n", ExpectedStdout: "hello\n"},
+	"perl":     {Source: "print(\"hello\\n\");\n", ExpectedStdout: "hello\n"},
+	"php":      {Source: "<?php echo \"hello\\n\";\n", ExpectedStdout: "hello\n"},
+	"r":        {Source: "cat(\"hello\\n\")\n", ExpectedStdout: "hello\n"},
+	"julia":    {Source: "println(\"hello\")\n", ExpectedStdout: "hello\n"},
+	"elixir":   {Source: "IO.puts \"hello\"\n", ExpectedStdout: "hello\n"},
+	"groovy":   {Source: "println \"hello\"\n", ExpectedStdout: "hello\n"},
+	"tcl":      {Source: "puts hello\n", ExpectedStdout: "hello\n"},
+	"fish":     {Source: "echo hello\n", ExpectedStdout: "hello\n"},
+	"haskell":  {Source: "main = putStrLn \"hello\"\n", ExpectedStdout: "hello\n"},
+	"swift":    {Source: "print(\"hello\")\n", ExpectedStdout: "hello\n"},
+	"clojure":  {Source: "(println \"hello\")\n", ExpectedStdout: "hello\n"},
+	"racket":   {Source: "#lang racket\n(display \"hello\")\n(newline)\n", ExpectedStdout: "hello\n"},
+	"ts":       {Source: "console.log('hello');\n", ExpectedStdout: "hello\n"},
+	"typescript": {Source: "console.log('hello');\n", ExpectedStdout: "hello\n"},
+	// Erlang escript: ~n is Erlang's newline in format strings
+	"erlang": {Source: "#!/usr/bin/env escript\nmain(_) ->\n    io:format(\"hello~n\").\n", ExpectedStdout: "hello\n"},
+
+	"c": {
+		Source:         "#include <stdio.h>\nint main(){printf(\"hello\\n\");return 0;}\n",
+		ExpectedStdout: "hello\n",
+	},
+	"cpp": {
+		Source:         "#include <iostream>\nint main(){std::cout<<\"hello\\n\";}\n",
+		ExpectedStdout: "hello\n",
+	},
+	// Java: source_filename_strategy: from_request — class name must match filename
+	"java": {
+		Source:           "public class Main {\npublic static void main(String[] a) {\nSystem.out.println(\"hello\"); } }\n",
+		ExpectedStdout:   "hello\n",
+		SourceFilename:   "Main.java",
+		ArtifactFilename: "Main",
+	},
+	"verilog": {
+		Source:         "module main;\ninitial begin\n$display(\"hello\");\n$finish;\nend\nendmodule\n",
+		ExpectedStdout: "hello\n",
+	},
+	"rust":   {Source: "fn main() { println!(\"hello\"); }\n", ExpectedStdout: "hello\n"},
+	"kotlin": {Source: "fun main() { println(\"hello\") }\n", ExpectedStdout: "hello\n"},
+	"go": {
+		Source:         "package main\nimport \"fmt\"\nfunc main() { fmt.Println(\"hello\") }\n",
+		ExpectedStdout: "hello\n",
+	},
+	"csharp": {
+		Source:         "using System;\nclass Program {\n  static void Main() {\n    Console.WriteLine(\"hello\");\n  }\n}\n",
+		ExpectedStdout: "hello\n",
+	},
+	"dotnet": {
+		Source:         "using System;\nclass Program {\n  static void Main() {\n    Console.WriteLine(\"hello\");\n  }\n}\n",
+		ExpectedStdout: "hello\n",
+	},
+	"fsharp": {Source: "printfn \"hello\"\n", ExpectedStdout: "hello\n"},
+	// Scala: YAML should use source_filename: Main.scala, artifact_filename: Main
+	"scala": {
+		Source:         "object Main extends App {\n  println(\"hello\")\n}\n",
+		ExpectedStdout: "hello\n",
+	},
+	"nim":     {Source: "echo \"hello\"\n", ExpectedStdout: "hello\n"},
+	"crystal": {Source: "puts \"hello\"\n", ExpectedStdout: "hello\n"},
+	"d":       {Source: "import std.stdio;\nvoid main() { writeln(\"hello\"); }\n", ExpectedStdout: "hello\n"},
+	"pascal":  {Source: "program hello;\nbegin\n  writeln('hello');\nend.\n", ExpectedStdout: "hello\n"},
+	// Fortran: explicit format avoids leading space from list-directed print
+	"fortran": {Source: "program hello\n  write(*,'(a)') 'hello'\nend program hello\n", ExpectedStdout: "hello\n"},
+	"ada":     {Source: "with Ada.Text_IO; use Ada.Text_IO;\nprocedure Hello is\nbegin\n  Put_Line(\"hello\");\nend Hello;\n", ExpectedStdout: "hello\n"},
+	"zig": {
+		Source:         "const std = @import(\"std\");\npub fn main() !void {\n    const out = std.io.getStdOut().writer();\n    try out.writeAll(\"hello\\n\");\n}\n",
+		ExpectedStdout: "hello\n",
+	},
+}
+
+// TestAllLanguagesHelloWorld runs a hello-world for every language in the live
+// registry. Subtests are parallel; languages with no langSmoke entry are silently skipped.
+func TestAllLanguagesHelloWorld(t *testing.T) {
+	resp, err := http.Get(baseURL + "/info")
+	if err != nil {
+		t.Fatalf("GET /info: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var info struct {
+		Languages []struct {
+			ID string `json:"id"`
+		} `json:"languages"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		t.Fatalf("decode /info: %v", err)
+	}
+	if len(info.Languages) == 0 {
+		t.Fatal("no languages registered — is the service running?")
+	}
+
+	for _, lang := range info.Languages {
+		lang := lang
+		t.Run(lang.ID, func(t *testing.T) {
+			t.Parallel()
+
+			sc, ok := langSmoke[lang.ID]
+			if !ok {
+				return
+			}
+
+			r, code := postRun(t, runRequest{
+				Language:         lang.ID,
+				Source:           sc.Source,
+				SourceFilename:   sc.SourceFilename,
+				ArtifactFilename: sc.ArtifactFilename,
+				Tests:            []testCase{{Stdin: "", ExpectedStdout: sc.ExpectedStdout}},
+			})
+			if code != 200 {
+				t.Fatalf("HTTP %d (expected 200)", code)
+			}
+			if r.Build.Status == validate.BuildStatusInternalError {
+				t.Fatalf("build.status=internal_error — binary likely inaccessible inside the jail; check bind_mounts in YAML for %q", lang.ID)
+			}
+			if r.Build.Status == validate.BuildStatusFailed {
+				t.Fatalf("build.status=failed — compiler invocation wrong; check build.cmd/args in YAML for %q", lang.ID)
+			}
+			if r.Status == validate.StatusInternalError {
+				t.Fatalf("status=internal_error — runtime likely inaccessible inside the jail; check bind_mounts in YAML for %q", lang.ID)
+			}
+			if r.Status != validate.StatusAccepted {
+				stdout := ""
+				if len(r.Tests) > 0 {
+					stdout = r.Tests[0].Stdout
+				}
+				t.Fatalf("status=%s (want %s)\n  stdout: %q\n  check langSmoke entry for %q",
+					r.Status, validate.StatusAccepted, stdout, lang.ID)
+			}
+		})
+	}
+}
+
 func TestInfo(t *testing.T) {
 	resp, err := http.Get(baseURL + "/info")
 	if err != nil {
