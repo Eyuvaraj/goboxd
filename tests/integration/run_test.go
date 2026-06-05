@@ -10,6 +10,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/thesouldev/goboxd/internal/validate"
 )
 
 var baseURL = func() string {
@@ -137,8 +139,8 @@ func TestPy3HelloWorld(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s (build: %s)", resp.Status, resp.Build.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s (build: %s)", validate.StatusAccepted, resp.Status, resp.Build.Status)
 	}
 }
 
@@ -151,8 +153,8 @@ func TestBashHelloWorld(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s", resp.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s", validate.StatusAccepted, resp.Status)
 	}
 }
 
@@ -165,8 +167,8 @@ func TestJsHelloWorld(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s", resp.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s", validate.StatusAccepted, resp.Status)
 	}
 }
 
@@ -182,8 +184,8 @@ int main() { printf("hello\n"); return 0; }
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s (build: %s)", resp.Status, resp.Build.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s (build: %s)", validate.StatusAccepted, resp.Status, resp.Build.Status)
 	}
 }
 
@@ -199,8 +201,8 @@ int main() { std::cout << "hello\n"; return 0; }
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s (build: %s)", resp.Status, resp.Build.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s (build: %s)", validate.StatusAccepted, resp.Status, resp.Build.Status)
 	}
 }
 
@@ -221,8 +223,8 @@ func TestJavaHelloWorld(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s (build: %s)", resp.Status, resp.Build.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s (build: %s)", validate.StatusAccepted, resp.Status, resp.Build.Status)
 	}
 }
 
@@ -242,8 +244,8 @@ endmodule
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s (build: %s)", resp.Status, resp.Build.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s (build: %s)", validate.StatusAccepted, resp.Status, resp.Build.Status)
 	}
 }
 
@@ -256,15 +258,15 @@ func TestBuildFailure(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200 even on build failure, got %d", code)
 	}
-	if resp.Status != "build_failed" {
-		t.Fatalf("expected build_failed, got %s", resp.Status)
+	if resp.Status != validate.StatusBuildFailed {
+		t.Fatalf("expected %s, got %s", validate.StatusBuildFailed, resp.Status)
 	}
-	if resp.Build.Status != "failed" {
-		t.Fatalf("expected build.status=failed, got %s", resp.Build.Status)
+	if resp.Build.Status != validate.BuildStatusFailed {
+		t.Fatalf("expected build.status=%s, got %s", validate.BuildStatusFailed, resp.Build.Status)
 	}
 	for i, tr := range resp.Tests {
-		if tr.Status != "not_executed" {
-			t.Fatalf("test[%d]: expected not_executed, got %s", i, tr.Status)
+		if tr.Status != validate.StatusNotExecuted {
+			t.Fatalf("test[%d]: expected %s, got %s", i, validate.StatusNotExecuted, tr.Status)
 		}
 	}
 }
@@ -278,8 +280,8 @@ func TestWrongOutput(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "wrong_output" {
-		t.Fatalf("expected wrong_output, got %s", resp.Status)
+	if resp.Status != validate.StatusWrongOutput {
+		t.Fatalf("expected %s, got %s", validate.StatusWrongOutput, resp.Status)
 	}
 }
 
@@ -437,16 +439,16 @@ func TestMultipleTestCases(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
+	if resp.Status != validate.StatusAccepted {
 		for i, tr := range resp.Tests {
 			fmt.Printf("  test[%d]: status=%s stdout=%q\n", i, tr.Status, tr.Stdout)
 		}
-		t.Fatalf("expected accepted, got %s", resp.Status)
+		t.Fatalf("expected %s, got %s", validate.StatusAccepted, resp.Status)
 	}
 }
 
 func TestWhitespaceMismatch(t *testing.T) {
-	// Program prints "hello\n" but expected has trailing space — whitespace diff, not wrong_output.
+	// Program prints "hello\n" but expected has no newline — whitespace diff, not wrong_output.
 	resp, code := postRun(t, runRequest{
 		Language: "py3",
 		Source:   "print('hello')\n",
@@ -455,8 +457,8 @@ func TestWhitespaceMismatch(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "output_whitespace_mismatch" {
-		t.Fatalf("expected output_whitespace_mismatch, got %s", resp.Status)
+	if resp.Status != validate.StatusWhitespaceMismatch {
+		t.Fatalf("expected %s, got %s", validate.StatusWhitespaceMismatch, resp.Status)
 	}
 }
 
@@ -497,8 +499,8 @@ func TestRubyHelloWorld(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s", resp.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s", validate.StatusAccepted, resp.Status)
 	}
 }
 
@@ -512,8 +514,8 @@ func TestLuaHelloWorld(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s", resp.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s", validate.StatusAccepted, resp.Status)
 	}
 }
 
@@ -528,8 +530,8 @@ func TestRustHelloWorld(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s (build: %s)", resp.Status, resp.Build.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s (build: %s)", validate.StatusAccepted, resp.Status, resp.Build.Status)
 	}
 }
 
@@ -547,8 +549,8 @@ func main() { fmt.Println("hello") }
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s (build: %s)", resp.Status, resp.Build.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s (build: %s)", validate.StatusAccepted, resp.Status, resp.Build.Status)
 	}
 }
 
@@ -563,8 +565,8 @@ func TestOCamlHelloWorld(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s", resp.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s", validate.StatusAccepted, resp.Status)
 	}
 }
 
@@ -579,8 +581,8 @@ func TestKotlinHelloWorld(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("expected accepted, got %s (build: %s)", resp.Status, resp.Build.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("expected %s, got %s (build: %s)", validate.StatusAccepted, resp.Status, resp.Build.Status)
 	}
 }
 
@@ -596,11 +598,11 @@ func TestTimeExceeded(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "time_exceeded" {
-		t.Fatalf("expected time_exceeded, got %s", resp.Status)
+	if resp.Status != validate.StatusTimeExceeded {
+		t.Fatalf("expected %s, got %s", validate.StatusTimeExceeded, resp.Status)
 	}
-	if resp.Tests[0].Status != "time_exceeded" {
-		t.Fatalf("expected tests[0].status=time_exceeded, got %s", resp.Tests[0].Status)
+	if resp.Tests[0].Status != validate.StatusTimeExceeded {
+		t.Fatalf("expected tests[0].status=%s, got %s", validate.StatusTimeExceeded, resp.Tests[0].Status)
 	}
 }
 
@@ -613,8 +615,8 @@ func TestRuntimeError(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "runtime_error" {
-		t.Fatalf("expected runtime_error, got %s", resp.Status)
+	if resp.Status != validate.StatusRuntimeError {
+		t.Fatalf("expected %s, got %s", validate.StatusRuntimeError, resp.Status)
 	}
 }
 
@@ -630,7 +632,7 @@ func TestMemoryExceeded(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "memory_exceeded" && resp.Status != "runtime_error" {
+	if resp.Status != validate.StatusMemoryExceeded && resp.Status != validate.StatusRuntimeError {
 		// runtime_error is acceptable if the OOM kill arrives as SIGKILL before
 		// nsjail logs the cgroup memory event.
 		t.Skipf("memory limit enforcement not triggered (got %s); skip in this environment", resp.Status)

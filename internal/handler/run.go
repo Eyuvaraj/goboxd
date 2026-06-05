@@ -45,6 +45,11 @@ func (h *RunHandler) ServeHTTPV1(w http.ResponseWriter, r *http.Request) {
 func (h *RunHandler) serve(w http.ResponseWriter, r *http.Request, v1 bool) {
 	var req RunRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusBadRequest, "source_too_large", "request body too large")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid_json", err.Error())
 		return
 	}

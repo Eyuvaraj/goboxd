@@ -402,6 +402,12 @@ func buildBindMounts(lang *config.LanguageDef) []string {
 		addIfNotCovered(lang.Run.Cmd)
 	}
 
+	// Per-language extra mounts declared in YAML (e.g. /opt/swift for languages
+	// installed outside the standard Debian tree). Covered-parent check still applies.
+	for _, m := range lang.BindMounts {
+		addIfNotCovered(m)
+	}
+
 	mounts := make([]string, 0, len(dirs))
 	for d := range dirs {
 		mounts = append(mounts, d)

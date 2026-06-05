@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+
+	"github.com/thesouldev/goboxd/internal/validate"
 )
 
 type evaluatorSpec struct {
@@ -66,8 +68,8 @@ func TestV1RawExecution(t *testing.T) {
 	if len(resp.Tests) != 1 {
 		t.Fatalf("raw mode should yield one result, got %d", len(resp.Tests))
 	}
-	if resp.Tests[0].Status != "accepted" {
-		t.Fatalf("raw status: want accepted, got %q", resp.Tests[0].Status)
+	if resp.Tests[0].Status != validate.StatusAccepted {
+		t.Fatalf("raw status: want %s, got %q", validate.StatusAccepted, resp.Tests[0].Status)
 	}
 	if resp.Tests[0].Stdout != "HELLO\n" {
 		t.Fatalf("raw stdout: want %q, got %q", "HELLO\n", resp.Tests[0].Stdout)
@@ -92,8 +94,8 @@ print(json.dumps({"verdict": "accepted" if ok else "rejected", "score": 1.0 if o
 	if code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", code)
 	}
-	if resp.Status != "accepted" {
-		t.Fatalf("top-level: want accepted, got %q", resp.Status)
+	if resp.Status != validate.StatusAccepted {
+		t.Fatalf("top-level: want %s, got %q", validate.StatusAccepted, resp.Status)
 	}
 	if resp.Tests[0].Verdict != "accepted" {
 		t.Fatalf("verdict: want accepted, got %q (status=%q msg=%q)", resp.Tests[0].Verdict, resp.Tests[0].Status, resp.Tests[0].Message)
@@ -106,8 +108,8 @@ print(json.dumps({"verdict": "accepted" if ok else "rejected", "score": 1.0 if o
 		Evaluator: &evaluatorSpec{Language: "py3", Source: checker},
 		Tests:     []testCase{{Stdin: "5\n"}},
 	})
-	if resp.Status != "wrong_output" {
-		t.Fatalf("top-level: want wrong_output, got %q", resp.Status)
+	if resp.Status != validate.StatusWrongOutput {
+		t.Fatalf("top-level: want %s, got %q", validate.StatusWrongOutput, resp.Status)
 	}
 	if resp.Tests[0].Verdict != "rejected" {
 		t.Fatalf("verdict: want rejected, got %q", resp.Tests[0].Verdict)

@@ -29,9 +29,10 @@ type LanguageDef struct {
 	// Set this for runtimes that use a different flag, e.g. lua5.4 uses ["-v"].
 	ProbeArgs []string `yaml:"probe_args"`
 
-	Env   []string  `yaml:"env"`   // extra KEY=VALUE vars injected into every nsjail invocation
-	Build *PhaseDef `yaml:"build"` // nil for interpreted languages
-	Run   PhaseDef  `yaml:"run"`
+	Env        []string  `yaml:"env"`         // extra KEY=VALUE vars injected into every nsjail invocation
+	BindMounts []string  `yaml:"bind_mounts"` // additional read-only host paths to expose inside the jail
+	Build      *PhaseDef `yaml:"build"`       // nil for interpreted languages
+	Run        PhaseDef  `yaml:"run"`
 }
 
 // IsCompiled returns true when the language has a build phase.
