@@ -99,6 +99,10 @@ func validateLang(l *config.LanguageDef) error {
 		return fmt.Errorf("artifact_filename_strategy must be \"from_request\" or empty, got %q", l.ArtifactFilenameStrategy)
 	}
 
+	if err := checkBindMounts(l.BindMounts); err != nil {
+		return err
+	}
+
 	if l.Run.Cmd == "" {
 		return fmt.Errorf("run.cmd is required")
 	}
@@ -121,6 +125,20 @@ func validateLang(l *config.LanguageDef) error {
 		}
 	}
 
+	return nil
+}
+
+// checkBindMounts rejects bind_mounts entries that are not absolute paths or
+// that point at the filesystem root (mounting "/" would expose the whole host).
+func checkBindMounts(mounts []string) error {
+	for _, m := range mounts {
+		if !strings.HasPrefix(m, "/") {
+			return fmt.Errorf("bind_mounts entry %q must be an absolute path", m)
+		}
+		if m == "/" {
+			return fmt.Errorf("bind_mounts entry %q: cannot bind-mount filesystem root", m)
+		}
+	}
 	return nil
 }
 

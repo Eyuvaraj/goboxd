@@ -190,6 +190,73 @@ languages:
 	}
 }
 
+func TestLoadInvalidBindMount(t *testing.T) {
+	yaml := `
+languages:
+  - id: bad
+    name: Bad
+    source_filename: solution.py
+    bind_mounts:
+      - relative/path
+    run:
+      cmd: /usr/bin/python3
+      args: ["{{source}}"]
+      limits: {wall_time_s: 5, memory_kb: 1024, max_processes: 10}
+`
+	path := writeYAML(t, yaml)
+	_, err := registry.Load(path)
+	if err == nil {
+		t.Error("expected error for relative bind_mounts path")
+	}
+}
+
+func TestLoadRootBindMount(t *testing.T) {
+	yaml := `
+languages:
+  - id: bad
+    name: Bad
+    source_filename: solution.py
+    bind_mounts:
+      - /
+    run:
+      cmd: /usr/bin/python3
+      args: ["{{source}}"]
+      limits: {wall_time_s: 5, memory_kb: 1024, max_processes: 10}
+`
+	path := writeYAML(t, yaml)
+	_, err := registry.Load(path)
+	if err == nil {
+		t.Error("expected error for bind_mounts entry /")
+	}
+}
+
+func TestLoadValidBindMount(t *testing.T) {
+	yaml := `
+languages:
+  - id: swift
+    name: Swift
+    source_filename: solution.swift
+    bind_mounts:
+      - /opt/swift
+    run:
+      cmd: /opt/swift/bin/swift
+      args: ["{{source}}"]
+      limits: {wall_time_s: 10, memory_kb: 262144, max_processes: 64}
+`
+	path := writeYAML(t, yaml)
+	reg, err := registry.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	lang := reg.Get("swift")
+	if lang == nil {
+		t.Fatal("swift not found")
+	}
+	if len(lang.BindMounts) != 1 || lang.BindMounts[0] != "/opt/swift" {
+		t.Errorf("bind_mounts not preserved: %v", lang.BindMounts)
+	}
+}
+
 func TestLoadMissingSourceFilename(t *testing.T) {
 	yaml := `
 languages:

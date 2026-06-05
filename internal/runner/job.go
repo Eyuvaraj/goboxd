@@ -403,9 +403,22 @@ func buildBindMounts(lang *config.LanguageDef) []string {
 	}
 
 	// Per-language extra mounts declared in YAML (e.g. /opt/swift for languages
-	// installed outside the standard Debian tree). Covered-parent check still applies.
+	// installed outside the standard Debian tree). Add the path itself — not its
+	// parent — and skip if a parent is already in the set to avoid nsjail EINVAL.
 	for _, m := range lang.BindMounts {
-		addIfNotCovered(m)
+		if m == "" || m == "/" {
+			continue
+		}
+		covered := false
+		for existing := range dirs {
+			if m == existing || strings.HasPrefix(m, existing+"/") {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			dirs[m] = struct{}{}
+		}
 	}
 
 	mounts := make([]string, 0, len(dirs))
