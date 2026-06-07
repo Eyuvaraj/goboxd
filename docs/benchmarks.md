@@ -2,6 +2,8 @@
 
 Results from a clean Docker container (`make build && make run`) on the measurement host.
 
+> **Measurement caveat.** These figures were captured on an **otherwise-idle host**. A trivial job spends most of its wall-time in nsjail namespace/cgroup setup (latency, not CPU), so throughput on Docker Desktop for Mac is sensitive to host load and VM CPU contention — a busy machine can roughly halve req/s and double latencies even while the container has idle cores. On a dedicated Linux host the numbers are higher and steadier. Re-run `make load` on an idle machine to reproduce.
+
 ---
 
 ## Python 3 (interpreted, no compile step)

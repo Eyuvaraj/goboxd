@@ -99,11 +99,20 @@ It writes a single JSON object to stdout: `{"verdict": "accepted"|"rejected", "s
 
 Requests are bounded by a buffered channel used as a counting semaphore.
 
-- **Capacity** is `MAX_CONCURRENT_JOBS`, defaulting to `runtime.NumCPU()`.
-- **Blocking:** `runner.Submit()` sends to the channel, blocking until a slot is free. The slot is released on return. By default requests queue and never fail due to backpressure.
-- **Optional load shedding:** when `MAX_QUEUE_DEPTH` is set, a request that arrives while at least that many are already waiting is rejected with `503` and a `Retry-After` header instead of queueing. The default (`0`) leaves the queue unbounded.
-- **Semaphore over worker pool:** a pool requires persistent goroutines and a job channel. With the semaphore, each request goroutine drives its own job and blocks until a slot is available. Throughput is identical; complexity is lower.
-- **Sequential tests:** parallel test execution within a job was rejected. nsjail process startup is the bottleneck, not goroutines. Sequential execution gives deterministic file layout and avoids workspace races.
+- **Capacity** is `MAX_CONCURRENT_JOBS`, defaulting to `config.AvailableCPUs()` — the cgroup v2 CPU quota when the container is CPU-limited, otherwise `runtime.NumCPU()`. The same value is set as `GOMAXPROCS`, so a quota-limited container is never oversubscribed.
+- **Blocking:** `runner.Submit()` receives from the channel, blocking until a slot is free, and returns the slot on completion. By default requests queue and never fail due to backpressure.
+- **Optional load shedding:** when `MAX_QUEUE_DEPTH` is set, a request whose arrival pushes the wait queue past that depth is rejected with `503` and `Retry-After` instead of queueing. The depth is reserved with a single atomic increment so a burst cannot slip past the cap. The default (`0`) leaves the queue unbounded.
+
+### Why a fixed semaphore, not a cleverer scheduler
+
+A submission's wall-time splits in two: nsjail setup/teardown (namespace + cgroup creation, bind mounts — latency, not compute) and the program's own execution. Compiled and compute-heavy submissions are **CPU-bound**, and for those the throughput-optimal concurrency is the core count — the semaphore's default capacity — which no scheduler can beat, since the CPUs cannot do more work per second. Trivial or I/O-bound submissions are instead **setup-bound**: raising the in-flight limit above the core count overlaps their setup latency and does increase throughput (measured — doubling the limit on a hello-world workload roughly doubled req/s while CPU stayed half-idle). `MAX_CONCURRENT_JOBS` is therefore an operator-tunable knob, defaulting to the core count because that is the safe optimum for CPU-bound work and because oversubscription multiplies peak memory (each in-flight job can reach its per-language memory cap). Given that, the deliberate choices are:
+
+- **Fixed limit, not adaptive concurrency** (AIMD / gradient): adaptive limits exist to *discover* an unknown safe concurrency under shifting load. Here the safe point is known (core count for CPU-bound work) and the operator can override it per deployment, so adaptation adds tuning machinery and failure modes for little gain.
+- **FIFO, not priority / shortest-job-first:** a blocked channel receive parks on Go's runtime waiter queue, which is already FIFO — fair ordering with no starvation, for free. Priority ordering would need a job-cost estimate we cannot obtain before running the code, and invites starvation.
+- **Semaphore, not a worker pool:** a pool needs persistent goroutines and a job channel. With the semaphore each request goroutine drives its own job. Throughput is identical; complexity is lower.
+- **Sequential tests within a job:** nsjail process startup dominates, not goroutine scheduling. Sequential execution gives a deterministic file layout and avoids workspace races.
+
+Bounding the queue (`MAX_QUEUE_DEPTH`) is the one backpressure lever worth having; a persistent or distributed queue is explicitly out of scope.
 
 ---
 

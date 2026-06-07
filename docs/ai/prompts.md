@@ -210,3 +210,16 @@ Tracks AI interactions during the development of goboxd, as required by the hack
 - Two real gaps: child stderr was captured unbounded (host-OOM risk); `MAX_CONCURRENT_JOBS`/`GOMAXPROCS` used `NumCPU()`, which over-counts in a CPU-limited container.
 
 **What we used / didn't use:** Capped stderr via `StderrPipe` + a shared `readCapped()` helper. Added `config.AvailableCPUs()` (reads cgroup v2 `cpu.max`, falls back to `NumCPU()`) for the semaphore default and `GOMAXPROCS` — preferred over a new `automaxprocs` dependency. Skipped gRPC.
+
+---
+
+## 2026-06-07: Load-test regression and correcting an old claim
+
+**Prompt:** `make load` numbers dropped ~2x vs the committed benchmarks — find out why, and be honest about whether our concurrency design and writeup are correct.
+
+**Response summary:**
+- The container provisioning was unchanged (10 cores, no quota, `MAX_CONCURRENT_JOBS=10`), so it was not a code/config regression. During load the container peaked at ~233% CPU of 1000% available — 4x idle headroom — so the workload is **setup-latency-bound, not CPU-bound** for trivial programs.
+- A throwaway instance at `MAX_CONCURRENT_JOBS=20` raised py3 throughput 257 → 562 req/s (2.2x) with CPU still half-idle. This **disproved** the `architecture.md` claim that "no queueing discipline can raise that ceiling" — true for compiled/CPU-bound work, false for setup-bound work.
+- The ~2x benchmark drop was environmental: host contention (load avg ~2.2, active dev session, fanless M4 Air time-sharing the Docker VM), not a regression.
+
+**What we used / didn't use:** Reworded the `architecture.md` concurrency justification to the honest two-regime explanation (CPU-bound vs setup-bound) instead of the absolute claim, and added a host-sensitivity caveat to `benchmarks.md`. Deliberately did **not** change the default (`= cores`) or any code — oversubscription multiplies peak memory and chasing a non-representative hello-world number would be gaming the benchmark.

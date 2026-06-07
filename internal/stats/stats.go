@@ -20,7 +20,7 @@ func (c *Counters) IncFailed() {
 }
 func (c *Counters) IncInFlight()      { c.inFlight.Add(1) }
 func (c *Counters) DecInFlight()      { c.inFlight.Add(-1) }
-func (c *Counters) IncQueued()        { c.queueSize.Add(1) }
+func (c *Counters) IncQueued() int64  { return c.queueSize.Add(1) } // returns new depth
 func (c *Counters) DecQueued()        { c.queueSize.Add(-1) }
 func (c *Counters) JobsTotal() int64  { return c.jobsTotal.Load() }
 func (c *Counters) JobsFailed() int64 { return c.jobsFailedInternal.Load() }

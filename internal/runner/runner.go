@@ -64,13 +64,13 @@ func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 		}
 	}
 
-	// Shed load only once the queue is genuinely backed up. With MaxQueueDepth
-	// at 0 the queue is unbounded and requests always wait their turn.
-	if r.maxQueueDepth > 0 && r.counters.QueueSize() >= int64(r.maxQueueDepth) {
+	// One atomic reserve-then-shed so a burst can't slip past the cap. 0 = unbounded.
+	depth := r.counters.IncQueued()
+	if r.maxQueueDepth > 0 && depth > int64(r.maxQueueDepth) {
+		r.counters.DecQueued()
 		return Response{}, ErrOverloaded
 	}
 
-	r.counters.IncQueued()
 	select {
 	case <-r.sem:
 	case <-ctx.Done():
