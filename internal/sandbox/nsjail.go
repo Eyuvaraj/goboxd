@@ -134,8 +134,10 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	if err != nil {
 		return RunResult{}, fmt.Errorf("stdout pipe: %w", err)
 	}
-	var stderrBuf bytes.Buffer
-	cmd.Stderr = &stderrBuf
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return RunResult{}, fmt.Errorf("stderr pipe: %w", err)
+	}
 
 	// ExtraFiles[0] becomes fd 3 inside nsjail (--log_fd 3).
 	logR, logW, err := os.Pipe()
@@ -161,17 +163,18 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 		_ = logR.Close()
 	}()
 
-	limited := io.LimitReader(stdoutPipe, cfg.MaxOutputBytes+1)
-	raw, _ := io.ReadAll(limited)
+	// Read stderr concurrently; StderrPipe requires reads done before cmd.Wait.
+	var stderrBytes []byte
+	stderrDone := make(chan struct{})
+	go func() {
+		defer close(stderrDone)
+		stderrBytes, _ = readCapped(stderrPipe, cfg.MaxOutputBytes)
+	}()
 
-	truncated := false
-	if int64(len(raw)) > cfg.MaxOutputBytes {
-		raw = raw[:cfg.MaxOutputBytes]
-		truncated = true
-		_, _ = io.Copy(io.Discard, stdoutPipe) // drain so the process isn't blocked
-	}
+	stdout, truncated := readCapped(stdoutPipe, cfg.MaxOutputBytes)
 
 	<-logDone
+	<-stderrDone
 	err = cmd.Wait()
 	durationMs := time.Since(start).Milliseconds()
 
@@ -181,11 +184,6 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 		if errors.As(err, &ee) {
 			exitCode = ee.ExitCode()
 		}
-	}
-
-	stdout := raw
-	if truncated {
-		stdout = append(stdout, []byte(truncationMarker)...)
 	}
 
 	// Read accounting from our per-job cgroup before the deferred cleanup removes
@@ -200,7 +198,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 
 	return RunResult{
 		Stdout:       stdout,
-		Stderr:       stderrBuf.Bytes(),
+		Stderr:       stderrBytes,
 		Log:          logBuf.Bytes(),
 		ExitCode:     exitCode,
 		DurationMs:   durationMs,
@@ -208,6 +206,19 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 		MemoryPeakKB: peakKB,
 		OOMKilled:    oomKilled,
 	}, nil
+}
+
+// readCapped reads up to max bytes, marking truncation and draining the rest so
+// the child never blocks or OOMs the host (output guard, see docs/security.md).
+func readCapped(r io.Reader, max int64) (out []byte, truncated bool) {
+	raw, _ := io.ReadAll(io.LimitReader(r, max+1))
+	if int64(len(raw)) > max {
+		raw = raw[:max]
+		truncated = true
+		_, _ = io.Copy(io.Discard, r) // drain remaining so the process isn't blocked
+		raw = append(raw, []byte(truncationMarker)...)
+	}
+	return raw, truncated
 }
 
 // cgroupOOMKilled reports whether the cgroup's memory.events recorded an

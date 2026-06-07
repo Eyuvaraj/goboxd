@@ -197,3 +197,16 @@ Tracks AI interactions during the development of goboxd, as required by the hack
 - Caught a bug: code was trimming leading spaces from output, but the spec says only trailing spaces should be trimmed.
 
 **What we used / didn't use:** Used all the generated tests; they covered edge cases that hadn't been considered. Applied the `TrimRight` fix so output comparison follows the spec exactly.
+
+---
+
+## 2026-06-07: Concurrency / Go-usage audit
+
+**Prompt:** Are we using Go concurrency feature well, can anything help here? Audit the code.
+
+**Response summary:**
+- Concurrency model is sound; no changes needed.
+- gRPC: skip it. The spec fixes an HTTP+JSON contract and lists binary wire formats as out of scope.
+- Two real gaps: child stderr was captured unbounded (host-OOM risk); `MAX_CONCURRENT_JOBS`/`GOMAXPROCS` used `NumCPU()`, which over-counts in a CPU-limited container.
+
+**What we used / didn't use:** Capped stderr via `StderrPipe` + a shared `readCapped()` helper. Added `config.AvailableCPUs()` (reads cgroup v2 `cpu.max`, falls back to `NumCPU()`) for the semaphore default and `GOMAXPROCS` — preferred over a new `automaxprocs` dependency. Skipped gRPC.

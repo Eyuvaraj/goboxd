@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -24,6 +25,9 @@ import (
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
+	// Match GOMAXPROCS to the cgroup CPU quota so a limited container isn't oversubscribed.
+	runtime.GOMAXPROCS(config.AvailableCPUs())
 
 	cfg := config.Load()
 
