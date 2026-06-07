@@ -113,3 +113,17 @@ The exact policy is defined in `internal/sandbox/nsjail.go:seccompPolicy`.
 - `perf_event_open`: the JVM requires it for profiling (Kotlin, Java).
 - `socket`, `connect`, `bind`: network access is blocked at the nsjail network namespace level; seccomp denial is redundant.
 - `mknod`, `io_uring_*`, `kexec_file_load`: absent from the ARM64 Kafel syscall table; a deny rule for a non-existent syscall fails policy compilation.
+
+---
+
+## Containment Test Suite
+
+A standalone probe runner at `tests/sandbox/` submits 15 adversarial programs to a live goboxd service and verifies the sandbox contained each one. It is separate from the integration suite and produces a Markdown report.
+
+```bash
+make run                                          # terminal 1
+go run ./tests/sandbox/                           # terminal 2
+go run ./tests/sandbox/ --out docs/sandbox-report.md  # save report
+```
+
+Full documentation, per-probe explanations, and troubleshooting steps: **[docs/sandbox-tests.md](sandbox-tests.md)**.
