@@ -29,7 +29,7 @@ var programFS embed.FS
 func prog(name string) string {
 	b, err := programFS.ReadFile("programs/" + name)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "missing program %q: %v\n", name, err)
+		_, _ = fmt.Fprintf(os.Stderr, "missing program %q: %v\n", name, err)
 		os.Exit(1)
 	}
 	return string(b)
@@ -175,7 +175,7 @@ func postRun(baseURL string, req runReq) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var r runResp
 	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
 		return "", fmt.Errorf("decode: %w", err)
@@ -202,7 +202,7 @@ func main() {
 	// Health check.
 	resp, err := http.Get(*baseURL + "/healthz")
 	if err != nil || resp.StatusCode != 200 {
-		fmt.Fprintf(os.Stderr, "service unreachable at %s — run 'make run' first\n", *baseURL)
+		_, _ = fmt.Fprintf(os.Stderr, "service unreachable at %s — run 'make run' first\n", *baseURL)
 		os.Exit(1)
 	}
 
@@ -210,18 +210,18 @@ func main() {
 	if *outFile != "" {
 		f, err := os.Create(*outFile)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "create %s: %v\n", *outFile, err)
+			_, _ = fmt.Fprintf(os.Stderr, "create %s: %v\n", *outFile, err)
 			os.Exit(1)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		w = f
 	}
 
-	fmt.Fprintf(w, "# Sandbox Containment Report\n\n")
-	fmt.Fprintf(w, "**Date:** %s  \n", time.Now().Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(w, "**Service:** %s  \n\n", *baseURL)
-	fmt.Fprintf(w, "| # | Test | Category | Lang | Expected | Actual | Result |\n")
-	fmt.Fprintf(w, "|---|------|----------|------|----------|--------|--------|\n")
+	_, _ = fmt.Fprintf(w, "# Sandbox Containment Report\n\n")
+	_, _ = fmt.Fprintf(w, "**Date:** %s  \n", time.Now().Format("2006-01-02 15:04:05"))
+	_, _ = fmt.Fprintf(w, "**Service:** %s  \n\n", *baseURL)
+	_, _ = fmt.Fprintf(w, "| # | Test | Category | Lang | Expected | Actual | Result |\n")
+	_, _ = fmt.Fprintf(w, "|---|------|----------|------|----------|--------|--------|\n")
 
 	pass, fail, breach := 0, 0, 0
 
@@ -255,24 +255,24 @@ func main() {
 		}
 
 		want := strings.Join(p.Want, " \\| ")
-		fmt.Fprintf(w, "| %d | %s | %s | %s | %s | %s | %s |\n",
+		_, _ = fmt.Fprintf(w, "| %d | %s | %s | %s | %s | %s | %s |\n",
 			i+1, p.Name, p.Category, p.Lang, want, status, result)
 	}
 
 	total := len(probes)
-	fmt.Fprintf(w, "\n## Summary\n\n")
-	fmt.Fprintf(w, "**%d / %d contained** — PASS: %d, FAIL: %d, BREACH: %d\n\n",
+	_, _ = fmt.Fprintf(w, "\n## Summary\n\n")
+	_, _ = fmt.Fprintf(w, "**%d / %d contained** — PASS: %d, FAIL: %d, BREACH: %d\n\n",
 		pass, total, pass, fail, breach)
 
 	if breach > 0 {
-		fmt.Fprintf(w, "> **BREACH** means the program ran to completion when it should have been blocked.\n")
-		fmt.Fprintf(w, "> This indicates a sandbox misconfiguration, not a test error.\n")
+		_, _ = fmt.Fprintf(w, "> **BREACH** means the program ran to completion when it should have been blocked.\n")
+		_, _ = fmt.Fprintf(w, "> This indicates a sandbox misconfiguration, not a test error.\n")
 	}
 
 	// Also print summary to stderr when writing to a file.
 	if *outFile != "" {
-		fmt.Fprintf(os.Stderr, "Results written to %s\n", *outFile)
-		fmt.Fprintf(os.Stderr, "PASS %d/%d | FAIL %d | BREACH %d\n", pass, total, fail, breach)
+		_, _ = fmt.Fprintf(os.Stderr, "Results written to %s\n", *outFile)
+		_, _ = fmt.Fprintf(os.Stderr, "PASS %d/%d | FAIL %d | BREACH %d\n", pass, total, fail, breach)
 	}
 
 	if breach > 0 {

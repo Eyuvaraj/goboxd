@@ -100,7 +100,7 @@ func (j *Job) compile(ctx context.Context) BuildResult {
 	}
 
 	srcPath := j.ws.SourcePath(j.req.SourceFilename)
-	if err := os.WriteFile(srcPath, []byte(j.req.Source), 0o644); err != nil {
+	if err := os.WriteFile(srcPath, []byte(j.req.Source), 0o600); err != nil {
 		return BuildResult{Status: validate.BuildStatusInternalError, Stderr: err.Error()}
 	}
 
@@ -156,7 +156,7 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 	// Write source for interpreted languages (compiled ones did it in compile()).
 	if !j.lang.IsCompiled() {
 		srcPath := j.ws.SourcePath(j.req.SourceFilename)
-		if err := os.WriteFile(srcPath, []byte(j.req.Source), 0o644); err != nil {
+		if err := os.WriteFile(srcPath, []byte(j.req.Source), 0o600); err != nil {
 			for i := range results {
 				results[i] = TestResult{Status: validate.StatusInternalError}
 			}
@@ -194,7 +194,7 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 		}
 
 		stdinPath := filepath.Join(testDir, "stdin")
-		if err := os.WriteFile(stdinPath, []byte(tc.Stdin), 0o644); err != nil {
+		if err := os.WriteFile(stdinPath, []byte(tc.Stdin), 0o600); err != nil {
 			results[i] = TestResult{Status: validate.StatusInternalError}
 			continue
 		}
@@ -271,7 +271,7 @@ func (j *Job) setupEvaluator(ctx context.Context) (*evalContext, string) {
 		return nil, "evaluator workspace: " + err.Error()
 	}
 
-	if err := os.WriteFile(ws.SourcePath(ev.SourceFilename), []byte(ev.Source), 0o644); err != nil {
+	if err := os.WriteFile(ws.SourcePath(ev.SourceFilename), []byte(ev.Source), 0o600); err != nil {
 		ws.Cleanup()
 		return nil, "writing evaluator source: " + err.Error()
 	}
@@ -310,7 +310,7 @@ func (j *Job) gradeWithEvaluator(ctx context.Context, ec *evalContext, tc TestCa
 		"expected": []byte(tc.ExpectedStdout),
 		"output":   candidateOut,
 	} {
-		if err := os.WriteFile(filepath.Join(ec.ws.Dir, name), data, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(ec.ws.Dir, name), data, 0o600); err != nil {
 			return validate.StatusInternalError, "", nil, "evaluator io: " + err.Error()
 		}
 	}
