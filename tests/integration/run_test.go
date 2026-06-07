@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -20,6 +21,22 @@ var baseURL = func() string {
 	}
 	return "http://localhost:8080"
 }()
+
+// Hello-world programs live as real source files (with native extensions) under
+// testdata/hello rather than inlined here, so each one reads naturally and can be
+// linted/run on its own. helloSource fetches one by filename.
+//
+//go:embed testdata/hello
+var helloFS embed.FS
+
+func helloSource(t *testing.T, name string) string {
+	t.Helper()
+	b, err := helloFS.ReadFile("testdata/hello/" + name)
+	if err != nil {
+		t.Fatalf("read embedded hello program %q: %v", name, err)
+	}
+	return string(b)
+}
 
 type limitsDef struct {
 	WallTimeS    int `json:"wall_time_s,omitempty"`
@@ -133,7 +150,7 @@ func TestHealthz(t *testing.T) {
 func TestPy3HelloWorld(t *testing.T) {
 	resp, code := postRun(t, runRequest{
 		Language: "py3",
-		Source:   "print('hello')\n",
+		Source:   helloSource(t, "hello.py"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -147,7 +164,7 @@ func TestPy3HelloWorld(t *testing.T) {
 func TestBashHelloWorld(t *testing.T) {
 	resp, code := postRun(t, runRequest{
 		Language: "bash",
-		Source:   "echo hello\n",
+		Source:   helloSource(t, "hello.sh"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -161,7 +178,7 @@ func TestBashHelloWorld(t *testing.T) {
 func TestJsHelloWorld(t *testing.T) {
 	resp, code := postRun(t, runRequest{
 		Language: "js",
-		Source:   `console.log("hello")` + "\n",
+		Source:   helloSource(t, "hello.js"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -173,12 +190,9 @@ func TestJsHelloWorld(t *testing.T) {
 }
 
 func TestCHelloWorld(t *testing.T) {
-	src := `#include <stdio.h>
-int main() { printf("hello\n"); return 0; }
-`
 	resp, code := postRun(t, runRequest{
 		Language: "c",
-		Source:   src,
+		Source:   helloSource(t, "hello.c"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -190,12 +204,9 @@ int main() { printf("hello\n"); return 0; }
 }
 
 func TestCppHelloWorld(t *testing.T) {
-	src := `#include <iostream>
-int main() { std::cout << "hello\n"; return 0; }
-`
 	resp, code := postRun(t, runRequest{
 		Language: "cpp",
-		Source:   src,
+		Source:   helloSource(t, "hello.cpp"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -207,15 +218,9 @@ int main() { std::cout << "hello\n"; return 0; }
 }
 
 func TestJavaHelloWorld(t *testing.T) {
-	src := `public class Main {
-    public static void main(String[] args) {
-        System.out.println("hello");
-    }
-}
-`
 	resp, code := postRun(t, runRequest{
 		Language:         "java",
-		Source:           src,
+		Source:           helloSource(t, "Main.java"),
 		SourceFilename:   "Main.java",
 		ArtifactFilename: "Main",
 		Tests:            []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
@@ -229,16 +234,9 @@ func TestJavaHelloWorld(t *testing.T) {
 }
 
 func TestVerilogHelloWorld(t *testing.T) {
-	src := `module main;
-  initial begin
-    $display("hello");
-    $finish;
-  end
-endmodule
-`
 	resp, code := postRun(t, runRequest{
 		Language: "verilog",
-		Source:   src,
+		Source:   helloSource(t, "hello.v"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -493,7 +491,7 @@ func TestRubyHelloWorld(t *testing.T) {
 	skipIfNotRegistered(t, "ruby")
 	resp, code := postRun(t, runRequest{
 		Language: "ruby",
-		Source:   "puts 'hello'\n",
+		Source:   helloSource(t, "hello.rb"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -508,7 +506,7 @@ func TestLuaHelloWorld(t *testing.T) {
 	skipIfNotRegistered(t, "lua")
 	resp, code := postRun(t, runRequest{
 		Language: "lua",
-		Source:   `print("hello")` + "\n",
+		Source:   helloSource(t, "hello.lua"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -521,10 +519,9 @@ func TestLuaHelloWorld(t *testing.T) {
 
 func TestRustHelloWorld(t *testing.T) {
 	skipIfNotRegistered(t, "rust")
-	src := `fn main() { println!("hello"); }` + "\n"
 	resp, code := postRun(t, runRequest{
 		Language: "rust",
-		Source:   src,
+		Source:   helloSource(t, "hello.rs"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -537,13 +534,9 @@ func TestRustHelloWorld(t *testing.T) {
 
 func TestGoHelloWorld(t *testing.T) {
 	skipIfNotRegistered(t, "go")
-	src := `package main
-import "fmt"
-func main() { fmt.Println("hello") }
-`
 	resp, code := postRun(t, runRequest{
 		Language: "go",
-		Source:   src,
+		Source:   helloSource(t, "hello.go"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -556,10 +549,9 @@ func main() { fmt.Println("hello") }
 
 func TestOCamlHelloWorld(t *testing.T) {
 	skipIfNotRegistered(t, "ocaml")
-	src := `print_string "hello\n";;` + "\n"
 	resp, code := postRun(t, runRequest{
 		Language: "ocaml",
-		Source:   src,
+		Source:   helloSource(t, "hello.ml"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -572,10 +564,9 @@ func TestOCamlHelloWorld(t *testing.T) {
 
 func TestKotlinHelloWorld(t *testing.T) {
 	skipIfNotRegistered(t, "kotlin")
-	src := `fun main() { println("hello") }` + "\n"
 	resp, code := postRun(t, runRequest{
 		Language: "kotlin",
-		Source:   src,
+		Source:   helloSource(t, "hello.kt"),
 		Tests:    []testCase{{Stdin: "", ExpectedStdout: "hello\n"}},
 	})
 	if code != 200 {
@@ -742,91 +733,68 @@ func TestReadyz(t *testing.T) {
 }
 
 // smokeCase is a minimal hello-world for one language used by TestAllLanguagesHelloWorld.
+// File names a program under testdata/hello (loaded via helloSource).
 // SourceFilename/ArtifactFilename are only needed for from_request languages (e.g. Java).
 type smokeCase struct {
-	Source           string
+	File             string
 	ExpectedStdout   string
 	SourceFilename   string
 	ArtifactFilename string
 }
 
-// langSmoke maps language ids to hello-world payloads. Add an entry whenever a
-// new language is added to configs/languages.yaml — TestAllLanguagesHelloWorld
-// picks it up automatically. Languages not in this map are silently skipped.
+// langSmoke maps language ids to hello-world payloads. The program text lives in a
+// real file under testdata/hello (native extension); only the filename is referenced
+// here. Add an entry whenever a new language is added to configs/languages.yaml —
+// TestAllLanguagesHelloWorld picks it up automatically. Languages not in this map
+// are silently skipped.
 var langSmoke = map[string]smokeCase{
-	"py3":      {Source: "print('hello')\n", ExpectedStdout: "hello\n"},
-	"bash":     {Source: "echo hello\n", ExpectedStdout: "hello\n"},
-	"js":       {Source: "console.log('hello')\n", ExpectedStdout: "hello\n"},
-	"ruby":     {Source: "puts 'hello'\n", ExpectedStdout: "hello\n"},
-	"lua":      {Source: "print('hello')\n", ExpectedStdout: "hello\n"},
-	"ocaml":    {Source: "print_string \"hello\\n\";;\n", ExpectedStdout: "hello\n"},
-	"perl":     {Source: "print(\"hello\\n\");\n", ExpectedStdout: "hello\n"},
-	"php":      {Source: "<?php echo \"hello\\n\";\n", ExpectedStdout: "hello\n"},
-	"r":        {Source: "cat(\"hello\\n\")\n", ExpectedStdout: "hello\n"},
-	"julia":    {Source: "println(\"hello\")\n", ExpectedStdout: "hello\n"},
-	"elixir":   {Source: "IO.puts \"hello\"\n", ExpectedStdout: "hello\n"},
-	"groovy":   {Source: "println \"hello\"\n", ExpectedStdout: "hello\n"},
-	"tcl":      {Source: "puts hello\n", ExpectedStdout: "hello\n"},
-	"fish":     {Source: "echo hello\n", ExpectedStdout: "hello\n"},
-	"haskell":  {Source: "main = putStrLn \"hello\"\n", ExpectedStdout: "hello\n"},
-	"swift":    {Source: "print(\"hello\")\n", ExpectedStdout: "hello\n"},
-	"clojure":  {Source: "(println \"hello\")\n", ExpectedStdout: "hello\n"},
-	"racket":   {Source: "#lang racket\n(display \"hello\")\n(newline)\n", ExpectedStdout: "hello\n"},
-	"ts":       {Source: "console.log('hello');\n", ExpectedStdout: "hello\n"},
-	"typescript": {Source: "console.log('hello');\n", ExpectedStdout: "hello\n"},
-	// Erlang escript: ~n is Erlang's newline in format strings
-	"erlang": {Source: "#!/usr/bin/env escript\nmain(_) ->\n    io:format(\"hello~n\").\n", ExpectedStdout: "hello\n"},
+	"py3":        {File: "hello.py", ExpectedStdout: "hello\n"},
+	"bash":       {File: "hello.sh", ExpectedStdout: "hello\n"},
+	"js":         {File: "hello.js", ExpectedStdout: "hello\n"},
+	"ruby":       {File: "hello.rb", ExpectedStdout: "hello\n"},
+	"lua":        {File: "hello.lua", ExpectedStdout: "hello\n"},
+	"ocaml":      {File: "hello.ml", ExpectedStdout: "hello\n"},
+	"perl":       {File: "hello.pl", ExpectedStdout: "hello\n"},
+	"php":        {File: "hello.php", ExpectedStdout: "hello\n"},
+	"r":          {File: "hello.r", ExpectedStdout: "hello\n"},
+	"julia":      {File: "hello.jl", ExpectedStdout: "hello\n"},
+	"elixir":     {File: "hello.exs", ExpectedStdout: "hello\n"},
+	"groovy":     {File: "hello.groovy", ExpectedStdout: "hello\n"},
+	"tcl":        {File: "hello.tcl", ExpectedStdout: "hello\n"},
+	"fish":       {File: "hello.fish", ExpectedStdout: "hello\n"},
+	"haskell":    {File: "hello.hs", ExpectedStdout: "hello\n"},
+	"swift":      {File: "hello.swift", ExpectedStdout: "hello\n"},
+	"clojure":    {File: "hello.clj", ExpectedStdout: "hello\n"},
+	"racket":     {File: "hello.rkt", ExpectedStdout: "hello\n"},
+	"ts":         {File: "hello.ts", ExpectedStdout: "hello\n"},
+	"typescript": {File: "hello.ts", ExpectedStdout: "hello\n"},
+	"erlang":     {File: "hello.erl", ExpectedStdout: "hello\n"},
 
-	"c": {
-		Source:         "#include <stdio.h>\nint main(){printf(\"hello\\n\");return 0;}\n",
-		ExpectedStdout: "hello\n",
-	},
-	"cpp": {
-		Source:         "#include <iostream>\nint main(){std::cout<<\"hello\\n\";}\n",
-		ExpectedStdout: "hello\n",
-	},
+	"c":   {File: "hello.c", ExpectedStdout: "hello\n"},
+	"cpp": {File: "hello.cpp", ExpectedStdout: "hello\n"},
 	// Java: source_filename_strategy: from_request — class name must match filename
 	"java": {
-		Source:           "public class Main {\npublic static void main(String[] a) {\nSystem.out.println(\"hello\"); } }\n",
+		File:             "Main.java",
 		ExpectedStdout:   "hello\n",
 		SourceFilename:   "Main.java",
 		ArtifactFilename: "Main",
 	},
-	"verilog": {
-		Source:         "module main;\ninitial begin\n$display(\"hello\");\n$finish;\nend\nendmodule\n",
-		ExpectedStdout: "hello\n",
-	},
-	"rust":   {Source: "fn main() { println!(\"hello\"); }\n", ExpectedStdout: "hello\n"},
-	"kotlin": {Source: "fun main() { println(\"hello\") }\n", ExpectedStdout: "hello\n"},
-	"go": {
-		Source:         "package main\nimport \"fmt\"\nfunc main() { fmt.Println(\"hello\") }\n",
-		ExpectedStdout: "hello\n",
-	},
-	"csharp": {
-		Source:         "using System;\nclass Program {\n  static void Main() {\n    Console.WriteLine(\"hello\");\n  }\n}\n",
-		ExpectedStdout: "hello\n",
-	},
-	"dotnet": {
-		Source:         "using System;\nclass Program {\n  static void Main() {\n    Console.WriteLine(\"hello\");\n  }\n}\n",
-		ExpectedStdout: "hello\n",
-	},
-	"fsharp": {Source: "printfn \"hello\"\n", ExpectedStdout: "hello\n"},
+	"verilog": {File: "hello.v", ExpectedStdout: "hello\n"},
+	"rust":    {File: "hello.rs", ExpectedStdout: "hello\n"},
+	"kotlin":  {File: "hello.kt", ExpectedStdout: "hello\n"},
+	"go":      {File: "hello.go", ExpectedStdout: "hello\n"},
+	"csharp":  {File: "hello.cs", ExpectedStdout: "hello\n"},
+	"dotnet":  {File: "hello.cs", ExpectedStdout: "hello\n"},
+	"fsharp":  {File: "hello.fs", ExpectedStdout: "hello\n"},
 	// Scala: YAML should use source_filename: Main.scala, artifact_filename: Main
-	"scala": {
-		Source:         "object Main extends App {\n  println(\"hello\")\n}\n",
-		ExpectedStdout: "hello\n",
-	},
-	"nim":     {Source: "echo \"hello\"\n", ExpectedStdout: "hello\n"},
-	"crystal": {Source: "puts \"hello\"\n", ExpectedStdout: "hello\n"},
-	"d":       {Source: "import std.stdio;\nvoid main() { writeln(\"hello\"); }\n", ExpectedStdout: "hello\n"},
-	"pascal":  {Source: "program hello;\nbegin\n  writeln('hello');\nend.\n", ExpectedStdout: "hello\n"},
-	// Fortran: explicit format avoids leading space from list-directed print
-	"fortran": {Source: "program hello\n  write(*,'(a)') 'hello'\nend program hello\n", ExpectedStdout: "hello\n"},
-	"ada":     {Source: "with Ada.Text_IO; use Ada.Text_IO;\nprocedure Hello is\nbegin\n  Put_Line(\"hello\");\nend Hello;\n", ExpectedStdout: "hello\n"},
-	"zig": {
-		Source:         "const std = @import(\"std\");\npub fn main() !void {\n    const out = std.io.getStdOut().writer();\n    try out.writeAll(\"hello\\n\");\n}\n",
-		ExpectedStdout: "hello\n",
-	},
+	"scala":   {File: "Main.scala", ExpectedStdout: "hello\n"},
+	"nim":     {File: "hello.nim", ExpectedStdout: "hello\n"},
+	"crystal": {File: "hello.cr", ExpectedStdout: "hello\n"},
+	"d":       {File: "hello.d", ExpectedStdout: "hello\n"},
+	"pascal":  {File: "hello.pas", ExpectedStdout: "hello\n"},
+	"fortran": {File: "hello.f90", ExpectedStdout: "hello\n"},
+	"ada":     {File: "hello.adb", ExpectedStdout: "hello\n"},
+	"zig":     {File: "hello.zig", ExpectedStdout: "hello\n"},
 }
 
 // TestAllLanguagesHelloWorld runs a hello-world for every language in the live
@@ -862,7 +830,7 @@ func TestAllLanguagesHelloWorld(t *testing.T) {
 
 			r, code := postRun(t, runRequest{
 				Language:         lang.ID,
-				Source:           sc.Source,
+				Source:           helloSource(t, sc.File),
 				SourceFilename:   sc.SourceFilename,
 				ArtifactFilename: sc.ArtifactFilename,
 				Tests:            []testCase{{Stdin: "", ExpectedStdout: sc.ExpectedStdout}},
