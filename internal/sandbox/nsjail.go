@@ -110,7 +110,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	// hierarchical memory.peak / memory.events then outlive the child teardown.
 	cgroupPath := filepath.Join(cgroupRoot, cfg.CgroupParent)
 	cfg.CgroupV2Mount = cgroupPath
-	_ = os.Mkdir(cgroupPath, 0o755)
+	_ = os.Mkdir(cgroupPath, 0o755) //nolint:gosec // cgroup dir must be world-accessible for kernel accounting
 	defer func() {
 		// nsjail may leave a child cgroup behind; clean sub-dirs first.
 		if entries, err := os.ReadDir(cgroupPath); err == nil {
@@ -189,7 +189,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	// Read accounting from our per-job cgroup before the deferred cleanup removes
 	// it. Values are hierarchical, so they include nsjail's NSJAIL.<pid> child.
 	var peakKB int64
-	if peakBytes, err := os.ReadFile(filepath.Join(cgroupPath, "memory.peak")); err == nil {
+	if peakBytes, err := os.ReadFile(filepath.Join(cgroupPath, "memory.peak")); err == nil { //nolint:gosec // cgroupPath is constructed internally, never from user input
 		if peak, err := strconv.ParseInt(string(bytes.TrimSpace(peakBytes)), 10, 64); err == nil {
 			peakKB = peak / 1024
 		}
@@ -225,7 +225,7 @@ func readCapped(r io.Reader, max int64) (out []byte, truncated bool) {
 // oom_kill. nsjail surfaces a cgroup OOM only as a SIGKILL, so this file is the
 // one reliable way to tell memory_exceeded apart from an ordinary runtime crash.
 func cgroupOOMKilled(cgroupPath string) bool {
-	data, err := os.ReadFile(filepath.Join(cgroupPath, "memory.events"))
+	data, err := os.ReadFile(filepath.Join(cgroupPath, "memory.events")) //nolint:gosec // cgroupPath is constructed internally, never from user input
 	if err != nil {
 		return false
 	}

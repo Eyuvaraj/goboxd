@@ -18,7 +18,7 @@ type Registry struct {
 
 // Load reads and validates the language YAML file. Returns an error if any entry is malformed.
 func Load(path string) (*Registry, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path is the LANGUAGE_FILE env var, operator-controlled
 	if err != nil {
 		return nil, fmt.Errorf("reading language file %s: %w", path, err)
 	}

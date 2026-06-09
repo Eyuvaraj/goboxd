@@ -20,6 +20,7 @@ linters:
       - path: "_test.go"
         linters:
           - errcheck
+          - gosec
 
 formatters:
   enable:

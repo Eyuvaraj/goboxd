@@ -132,8 +132,8 @@ func (j *Job) compile(ctx context.Context) BuildResult {
 	if status == validate.BuildStatusOK && j.req.ArtifactFilename != "" {
 		// Lock down the compiled artifact and source to prevent test[i] from
 		// overwriting the binary before test[i+1] runs (shared workspace).
-		_ = os.Chmod(j.ws.SourcePath(j.req.ArtifactFilename), 0o555)
-		_ = os.Chmod(j.ws.SourcePath(j.req.SourceFilename), 0o444)
+		_ = os.Chmod(j.ws.SourcePath(j.req.ArtifactFilename), 0o555) //nolint:gosec // 0555: artifact must be executable inside jail but not writable by the sandboxed process
+		_ = os.Chmod(j.ws.SourcePath(j.req.SourceFilename), 0o444)   //nolint:gosec // 0444: source is read-only; prevents test[i] from modifying it before test[i+1] runs
 	}
 	return BuildResult{
 		Status:     status,
@@ -199,7 +199,7 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 			continue
 		}
 
-		f, err := os.Open(stdinPath)
+		f, err := os.Open(stdinPath) //nolint:gosec // stdinPath is constructed from MkdirTemp workspace, never from user input
 		if err != nil {
 			results[i] = TestResult{Status: validate.StatusInternalError}
 			continue
@@ -291,7 +291,7 @@ func (j *Job) setupEvaluator(ctx context.Context) (*evalContext, string) {
 			ws.Cleanup()
 			return nil, "evaluator build failed: " + strings.TrimSpace(string(res.Stderr))
 		}
-		_ = os.Chmod(ws.SourcePath(ev.ArtifactFilename), 0o555)
+		_ = os.Chmod(ws.SourcePath(ev.ArtifactFilename), 0o555) //nolint:gosec // 0555: artifact must be executable inside jail
 	}
 
 	return &evalContext{

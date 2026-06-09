@@ -22,7 +22,7 @@ func NewWorkspace(jailDir string) (*Workspace, error) {
 		return nil, fmt.Errorf("creating workspace: %w", err)
 	}
 	// nsjail mounts procfs at /proc inside the chroot; the mount point must exist first.
-	if err := os.Mkdir(filepath.Join(dir, "proc"), 0o555); err != nil {
+	if err := os.Mkdir(filepath.Join(dir, "proc"), 0o555); err != nil { //nolint:gosec // proc mount point must be world-readable inside the chroot
 		_ = os.RemoveAll(dir)
 		return nil, fmt.Errorf("creating proc mount point: %w", err)
 	}
