@@ -125,6 +125,10 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 
 	argv := buildArgv(cfg)
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	// Backstop: if ctx is cancelled or nsjail exits while a descendant still holds
+	// a pipe open, force the pipes closed after WaitDelay so Wait — and the
+	// concurrency slot it holds — can never block indefinitely.
+	cmd.WaitDelay = 5 * time.Second
 
 	if cfg.Stdin != nil {
 		cmd.Stdin = cfg.Stdin

@@ -187,6 +187,15 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 	}
 
 	for i, tc := range j.req.Tests {
+		// Client gone or deadline hit: stop spawning sandboxes; mark the rest as
+		// not run rather than wasting work and inflating the internal-error count.
+		if ctx.Err() != nil {
+			for k := i; k < len(results); k++ {
+				results[k] = TestResult{Status: validate.StatusNotExecuted}
+			}
+			break
+		}
+
 		testDir, err := j.ws.TestDir(i)
 		if err != nil {
 			results[i] = TestResult{Status: validate.StatusInternalError}
