@@ -8,9 +8,13 @@ linters:
     - unused
     - ineffassign
     - misspell
+    - gosec
   settings:
     errcheck:
       check-type-assertions: false
+    gosec:
+      excludes:
+        - G204 # exec with variable argv — all call sites use pre-validated args
   exclusions:
     rules:
       - path: "_test.go"
