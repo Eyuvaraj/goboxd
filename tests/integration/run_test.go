@@ -755,6 +755,7 @@ var langSmoke = map[string]smokeCase{
 	"lua":        {File: "hello.lua", ExpectedStdout: "hello\n"},
 	"ocaml":      {File: "hello.ml", ExpectedStdout: "hello\n"},
 	"perl":       {File: "hello.pl", ExpectedStdout: "hello\n"},
+	"awk":        {File: "hello.awk", ExpectedStdout: "hello\n"},
 	"php":        {File: "hello.php", ExpectedStdout: "hello\n"},
 	"r":          {File: "hello.r", ExpectedStdout: "hello\n"},
 	"julia":      {File: "hello.jl", ExpectedStdout: "hello\n"},

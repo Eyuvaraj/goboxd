@@ -219,6 +219,62 @@ languages:
   #       memory_kb: 524288
   #       max_processes: 100
 
+  # Perl ships in the base image (perl-base, Priority: required) — zero added weight.
+  # perl has no GNU-style --version, so probe by printing the version variable.
+  - id: perl
+    name: Perl
+    source_filename: solution.pl
+    probe_args: ["-e", "print $^V"]
+    run:
+      cmd: /usr/bin/perl
+      args: ["{{source}}"]
+      limits:
+        wall_time_s: 10
+        memory_kb: 131072
+        max_processes: 50
+
+  # AWK via mawk (tiny, the default /usr/bin/awk in Debian). -W version is
+  # understood by both mawk and gawk, so the probe works whichever provides awk.
+  - id: awk
+    name: AWK
+    source_filename: solution.awk
+    probe_args: ["-W", "version"]
+    run:
+      cmd: /usr/bin/awk
+      args: ["-f", "{{source}}"]
+      limits:
+        wall_time_s: 10
+        memory_kb: 65536
+        max_processes: 50
+
+  # TypeScript: tsc transpiles solution.ts to solution.js, then Node runs it.
+  # Reuses the already-installed Node runtime; only the small tsc package is added.
+  - id: ts
+    name: TypeScript
+    source_filename: solution.ts
+    artifact_filename: solution.js
+    build:
+      cmd: /usr/bin/tsc
+      args: ["{{flags}}", "{{source}}"]
+      limits:
+        wall_time_s: 20
+        memory_kb: 524288
+        max_processes: 100
+      flag_allowlist:
+        - "--strict"
+        - "--target"
+        - "ES2017"
+        - "ES2020"
+        - "ES2021"
+        - "ESNext"
+    run:
+      cmd: /usr/bin/node
+      args: ["{{artifact}}"]
+      limits:
+        wall_time_s: 10
+        memory_kb: 262144
+        max_processes: 100
+
   - id: go
     name: Go
     source_filename: solution.go
