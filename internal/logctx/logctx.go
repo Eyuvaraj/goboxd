@@ -10,6 +10,7 @@ type Fields struct {
 	Language        string
 	ExecStatus      string
 	BuildDurationMs int64
+	TotalCpuMs      int64
 	TestsTotal      int
 	TestsAccepted   int
 }

@@ -163,15 +163,18 @@ func (h *RunHandler) serve(w http.ResponseWriter, r *http.Request, v1 bool) {
 	}
 
 	accepted := 0
+	totalCpuMs := resp.Build.CpuMs
 	for _, t := range resp.Tests {
 		if t.Status == validate.StatusAccepted {
 			accepted++
 		}
+		totalCpuMs += t.CpuMs
 	}
 	*r = *r.WithContext(logctx.Set(r.Context(), logctx.Fields{
 		Language:        req.Language,
 		ExecStatus:      resp.Status,
 		BuildDurationMs: resp.Build.DurationMs,
+		TotalCpuMs:      totalCpuMs,
 		TestsTotal:      len(resp.Tests),
 		TestsAccepted:   accepted,
 	}))

@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/thesouldev/goboxd/internal/config"
@@ -94,7 +95,8 @@ type RunResult struct {
 	DurationMs   int64
 	Truncated    bool
 	MemoryPeakKB int64
-	OOMKilled    bool // cgroup memory.events recorded an oom_kill for this run
+	CpuMs        int64 // user+sys CPU time of the nsjail process (includes sandboxed child)
+	OOMKilled    bool  // cgroup memory.events recorded an oom_kill for this run
 }
 
 // Run executes cmd inside an nsjail sandbox.
@@ -200,6 +202,12 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 	}
 	oomKilled := cgroupOOMKilled(cgroupPath)
 
+	var cpuMs int64
+	if rusage, ok := cmd.ProcessState.SysUsage().(*syscall.Rusage); ok {
+		cpuMs = int64(rusage.Utime.Sec)*1000 + int64(rusage.Utime.Usec)/1000 +
+			int64(rusage.Stime.Sec)*1000 + int64(rusage.Stime.Usec)/1000
+	}
+
 	return RunResult{
 		Stdout:       stdout,
 		Stderr:       stderrBytes,
@@ -208,6 +216,7 @@ func Run(ctx context.Context, cfg RunConfig) (RunResult, error) {
 		DurationMs:   durationMs,
 		Truncated:    truncated,
 		MemoryPeakKB: peakKB,
+		CpuMs:        cpuMs,
 		OOMKilled:    oomKilled,
 	}, nil
 }

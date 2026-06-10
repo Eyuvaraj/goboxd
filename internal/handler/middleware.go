@@ -42,6 +42,7 @@ func StructuredLogger(next http.Handler) http.Handler {
 				"language", f.Language,
 				"exec_status", f.ExecStatus,
 				"build_duration_ms", f.BuildDurationMs,
+				"cpu_ms", f.TotalCpuMs,
 				"tests_total", f.TestsTotal,
 				"tests_accepted", f.TestsAccepted,
 			)

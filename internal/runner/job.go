@@ -19,6 +19,7 @@ type BuildResult struct {
 	Stdout     string `json:"stdout"`
 	Stderr     string `json:"stderr"`
 	DurationMs int64  `json:"duration_ms"`
+	CpuMs      int64  `json:"cpu_ms"`
 }
 
 type TestResult struct {
@@ -28,6 +29,7 @@ type TestResult struct {
 	ExitCode     int    `json:"exit_code"`
 	DurationMs   int64  `json:"duration_ms"`
 	MemoryPeakKB int64  `json:"memory_peak_kb"`
+	CpuMs        int64  `json:"cpu_ms"`
 	// Set only in evaluator mode (see EvaluatorJob).
 	Verdict string
 	Score   *float64
@@ -140,6 +142,7 @@ func (j *Job) compile(ctx context.Context) BuildResult {
 		Stdout:     string(result.Stdout),
 		Stderr:     string(result.Stderr),
 		DurationMs: result.DurationMs,
+		CpuMs:      result.CpuMs,
 	}
 }
 
@@ -240,6 +243,7 @@ func (j *Job) runTests(ctx context.Context, buildStatus string) []TestResult {
 			ExitCode:     result.ExitCode,
 			DurationMs:   result.DurationMs,
 			MemoryPeakKB: result.MemoryPeakKB,
+			CpuMs:        result.CpuMs,
 		}
 		sandboxStatus := sandbox.ParseRunStatus(result.Log, result.ExitCode, result.OOMKilled)
 		switch {
