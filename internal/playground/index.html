@@ -1442,16 +1442,16 @@ function renderResult(data, ms, endpoint) {
   h += `<span class="verdict ${verdictCls(data.status)}">${esc(data.status.replace(/_/g,' '))}</span>`;
   h += '<div class="result-stats">';
   h += `<span class="stat"><span class="stat-k">wall</span>${ms}&thinsp;ms</span>`;
-  if (data.build?.duration_ms != null)
+  if (data.build?.duration_ms > 0)
     h += `<span class="stat"><span class="stat-k">build</span>${data.build.duration_ms}&thinsp;ms</span>`;
-  if (data.build?.cpu_ms > 0)
+  if (data.build?.cpu_ms != null && data.build.duration_ms > 0)
     h += `<span class="stat"><span class="stat-k">build cpu</span>${data.build.cpu_ms}&thinsp;ms</span>`;
   if (data.tests?.length === 1) {
     const t = data.tests[0];
     if (t.duration_ms != null)
       h += `<span class="stat"><span class="stat-k">run</span>${t.duration_ms}&thinsp;ms</span>`;
-    if (t.cpu_ms > 0)
-      h += `<span class="stat"><span class="stat-k">cpu</span>${t.cpu_ms}&thinsp;ms</span>`;
+    if (t.cpu_ms != null)
+      h += `<span class="stat"><span class="stat-k">run cpu</span>${t.cpu_ms}&thinsp;ms</span>`;
     if (t.memory_peak_kb > 0)
       h += `<span class="stat"><span class="stat-k">mem</span>${t.memory_peak_kb}&thinsp;kb</span>`;
     if (endpoint === '/v1/run' && t.exit_code != null)
