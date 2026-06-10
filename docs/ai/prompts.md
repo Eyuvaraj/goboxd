@@ -223,3 +223,15 @@ Tracks AI interactions during the development of goboxd, as required by the hack
 - The ~2x benchmark drop was environmental: host contention (load avg ~2.2, active dev session, fanless M4 Air time-sharing the Docker VM), not a regression.
 
 **What we used / didn't use:** Reworded the `architecture.md` concurrency justification to the honest two-regime explanation (CPU-bound vs setup-bound) instead of the absolute claim, and added a host-sensitivity caveat to `benchmarks.md`. Deliberately did **not** change the default (`= cores`) or any code — oversubscription multiplies peak memory and chasing a non-representative hello-world number would be gaming the benchmark.
+
+---
+
+## 2026-06-10: Full API-contract conformance sweep against a live container
+
+**Prompt:** Hit the endpoints and check whether we comply with the API contract 100%.
+
+**Response summary:**
+- Ran the service (`make run`) and exercised every endpoint and every status/error path in the spec — ~22 cases. `/healthz`, `/readyz`, `/info` shapes all correct; `memory_peak_kb` returns real kernel values; every test status (accepted, wrong_output, output_whitespace_mismatch, time_exceeded, memory_exceeded, runtime_error, build_failed→not_executed) and the first-non-accepted ordering rule all correct; all 12 input error codes return 400 with the `{error:{code,message}}` shape; `GET /run` → 405 (not 5xx).
+- One gray-area finding: a malformed `source_filename` sent to a fixed-filename language (e.g. cpp) returned `200` instead of `400`, because `resolveFilename` ignored the client value entirely when the strategy wasn't `from_request`. Not a security hole (the value is never path-joined for fixed-filename langs; the real `from_request`/Java vector was correctly rejected), but a strict reading of the contract ("must be a single path component") wants it rejected.
+
+**What we used / didn't use:** Hardened `resolveFilename` (`handler/run.go`) to validate a non-empty client filename even for fixed-filename languages while still using the fixed name — a change that can only reject inputs that were previously silently ignored, so no valid request changes behaviour. Added a regression unit test (`TestRunHandler_FixedFilenameLang_RejectsMalformedFilename`). Verified end to end: rebuilt the image, re-ran the live sweep (the case now returns `400 invalid_filename`; valid/omitted filenames still run), `make test` green, `make integration` 50/0/1, `make lint` 0 issues. Sweep is now 22/22.

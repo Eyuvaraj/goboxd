@@ -24,14 +24,19 @@ The entire language catalog lives in `configs/languages.yaml`. No Go code change
 |----|----------|------|-----------|
 | `ruby` | Ruby | Interpreted | `/usr/bin/ruby` |
 | `lua` | Lua 5.4 | Interpreted | `/usr/bin/lua5.4` |
-| `rust` | Rust | Compiled | `/usr/bin/rustc` |
-| `kotlin` | Kotlin | Compiled | `/usr/bin/kotlinc` + `java` |
 | `ocaml` | OCaml | Interpreted | `/usr/bin/ocaml` |
-| `go` | Go | Compiled | `/usr/bin/go build` |
+| `rust` | Rust | Compiled | `/usr/bin/rustc` |
+| `perl` | Perl | Interpreted | `/usr/bin/perl` |
+| `awk` | AWK | Interpreted | `/usr/bin/awk` |
+| `ts` | TypeScript | Compiled | `/usr/bin/tsc` then `/usr/bin/node` |
+| `go` | Go | Compiled | `/usr/local/go/bin/go build` |
 
 ---
 
 ## YAML Schema
+
+<details>
+<summary>Full annotated example (C++)</summary>
 
 ```yaml
 - id: cpp
@@ -51,7 +56,7 @@ The entire language catalog lives in `configs/languages.yaml`. No Go code change
       max_processes: 100
     flag_allowlist:                # unlisted flags return 400 invalid_flag
       - "-O2"
-      - "-std=*"                   # trailing * = prefix match
+      - "-std=*"                   # trailing * means prefix match
 
   run:
     cmd: /solution                 # compiled artifact lives at the workspace root
@@ -65,46 +70,37 @@ The entire language catalog lives in `configs/languages.yaml`. No Go code change
     - GO111MODULE=off
 ```
 
+</details>
+
 ### Template Variables
 
 | Placeholder | Expands to |
 |-------------|------------|
 | `{{source}}` | Absolute path to the source file in the workspace |
 | `{{artifact}}` | Absolute path to the compiled output |
-| `{{flags}}` | Zero or more validated client-supplied flags (expanded in-place) |
+| `{{flags}}` | Zero or more validated client-supplied flags, expanded in-place |
 
 Expansion happens element-by-element in `sandbox.ExpandArgs`, never through a shell.
 
 ---
 
+## Readiness Probe
+
+By default `/readyz` runs `<cmd> --version` against each language's run command (or `build.cmd` for compiled languages, since the run command is the per-job artifact). If a toolchain uses a different version flag, set **`probe_args`** in the YAML:
+
+| Language | `probe_args` |
+|----------|-------------|
+| `lua` | `["-v"]` |
+| `verilog` | `["-V"]` |
+| `go` | `["version"]` |
+| `perl` | `["-e", "print $^V"]` |
+
+Any output at all counts as success, so toolchains that print to stderr and exit non-zero (like `javac`) still pass.
+
+---
+
 ## Adding a Language
 
-With a warm Docker cache, adding a language takes under 10 minutes. Cold build adds ~5 minutes for the base image layer.
+One YAML block plus one install script, with no Go code change. Typically under 10 minutes on a warm Docker cache.
 
-**1. Add a YAML block** to `configs/languages.yaml`, copying the shape closest to the new language (interpreted or compiled).
-
-**2. Install the toolchain** in the Dockerfile runtime stage:
-```dockerfile
-RUN apt-get install -y php-cli
-```
-
-**3. Rebuild and verify:**
-```bash
-make build && make run
-curl http://localhost:8080/readyz | jq .languages.php
-# → {"ok": true, "version": "PHP 8.2.x"}
-```
-
-**4. Test with a hello-world request:**
-```bash
-curl -s http://localhost:8080/run -d '{
-  "language": "php",
-  "source": "<?php echo \"hello\\n\";",
-  "tests": [{"stdin": "", "expected_stdout": "hello\n"}]
-}' | jq .status
-# → "accepted"
-```
-
-No Go code change at any step.
-
-> By default, `/readyz` runs `<cmd> --version` against each language's run command. If a toolchain uses a different version flag, set `probe_cmd` in the YAML.
+Step-by-step runbook: [adding-a-language.md](adding-a-language.md)

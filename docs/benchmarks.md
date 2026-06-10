@@ -2,13 +2,13 @@
 
 Results from a clean Docker container (`make build && make run`) on the measurement host.
 
-> **Measurement caveat.** These figures were captured on an **otherwise-idle host**. A trivial job spends most of its wall-time in nsjail namespace/cgroup setup (latency, not CPU), so throughput on Docker Desktop for Mac is sensitive to host load and VM CPU contention — a busy machine can roughly halve req/s and double latencies even while the container has idle cores. On a dedicated Linux host the numbers are higher and steadier. Re-run `make load` on an idle machine to reproduce.
+> **Measurement caveat.** These figures were captured on an otherwise-idle host. A trivial job spends most of its wall-time in nsjail namespace/cgroup setup (latency, not compute), so throughput on Docker Desktop for Mac is sensitive to host load and VM CPU contention. A busy machine can roughly halve req/s and double latencies even while the container has idle cores. On a dedicated Linux host the numbers are higher and steadier. Re-run `make load` on an idle machine to reproduce.
 
 ---
 
 ## Python 3 (interpreted, no compile step)
 
-**Test payload:**
+**Payload:**
 ```json
 {
   "language": "py3",
@@ -28,9 +28,9 @@ All responses returned HTTP 200 at every concurrency level. Requests queue when 
 
 ---
 
-## C++ (compiled with g++), single test case
+## C++ (compiled with g++, single test case)
 
-**Test payload:**
+**Payload:**
 ```json
 {
   "language": "cpp",
@@ -48,7 +48,7 @@ All responses returned HTTP 200 at every concurrency level. Requests queue when 
 | 50                 | 100      | 30.9  | 1428.6   | 1946.8   | 2001.5    | 0      |
 | 100                | 100      | 31.8  | 1749.0   | 3081.8   | 3148.3    | 0      |
 
-Each request includes a full compile + run cycle. At 1 client, latency is dominated by the ~130 ms `g++` compile time. At 10+ clients, requests queue on the semaphore as slots fill with in-progress compile jobs. Throughput plateaus while p95/p99 grows proportionally, which is the expected bounded-queue behaviour.
+Each request includes a full compile and run cycle. At 1 client, latency is dominated by the ~130 ms `g++` compile time. At 10+ clients, requests queue on the semaphore as slots fill with in-progress compile jobs. Throughput plateaus while p95/p99 grows proportionally; this is the expected bounded-queue behaviour.
 
 ---
 
@@ -71,4 +71,7 @@ make run                      # in one terminal
 bash scripts/load_test.sh     # in another terminal (requires hey or k6)
 ```
 
-Install `hey`: `go install github.com/rakyll/hey@latest`
+Install `hey`:
+```bash
+go install github.com/rakyll/hey@latest
+```
