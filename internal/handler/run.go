@@ -329,6 +329,14 @@ type apiErr struct {
 // filename is used.
 func resolveFilename(field, strategy, requested, fixed string) (string, *apiErr) {
 	if strategy != "from_request" {
+		// The language uses a fixed server-side filename, so the client value is
+		// not used. Still reject a malformed one if supplied, per the contract's
+		// "must be a single path component" rule, rather than silently ignoring it.
+		if requested != "" {
+			if err := validate.Filename(requested); err != nil {
+				return "", &apiErr{code: "invalid_filename", message: err.Error()}
+			}
+		}
 		return fixed, nil
 	}
 	if requested == "" {

@@ -266,6 +266,20 @@ func TestRunHandler_InvalidArtifactFilename(t *testing.T) {
 	assertErrorCode(t, w, http.StatusBadRequest, "invalid_filename")
 }
 
+// A fixed-filename language ignores the client's source_filename, but a malformed
+// one must still be rejected rather than silently accepted (contract: filenames
+// "must be a single path component").
+func TestRunHandler_FixedFilenameLang_RejectsMalformedFilename(t *testing.T) {
+	h := newTestRunHandler(t, nil)
+	w := postJSON(t, h, map[string]any{
+		"language":        "py3",
+		"source":          "print(1)",
+		"source_filename": "../../etc/passwd",
+		"tests":           []map[string]any{{"stdin": "", "expected_stdout": "1\n"}},
+	})
+	assertErrorCode(t, w, http.StatusBadRequest, "invalid_filename")
+}
+
 func TestRunHandler_DisallowedBuildFlag(t *testing.T) {
 	h := newTestRunHandler(t, nil)
 	w := postJSON(t, h, map[string]any{
