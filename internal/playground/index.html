@@ -1414,26 +1414,14 @@ function verdictCls(s) {
 function pillCls(s) { return verdictCls(s).replace('verdict--', 'sb-pill--'); }
 
 /* Render the last-run summary into the status bar's bottom row. */
-function setLastRun(data, endpoint) {
+function setLastRun(data) {
   const el = $('sbRun');
   const tests = data.tests || [];
+  const passed = tests.filter(t => t.status === 'accepted').length;
   const parts = [
     `<span class="sb-pill ${pillCls(data.status)}">${esc(data.status.replace(/_/g,' '))}</span>`,
+    `<span class="sb-metric"><b>${passed}/${tests.length}</b> passed</span>`,
   ];
-  if (data.build && data.build.duration_ms != null)
-    parts.push(`<span class="sb-metric"><span class="sb-k">build</span> <b>${data.build.duration_ms}</b>ms</span>`);
-  if (tests.length === 1) {
-    const t = tests[0];
-    if (t.duration_ms != null)
-      parts.push(`<span class="sb-metric"><span class="sb-k">run</span> <b>${t.duration_ms}</b>ms</span>`);
-    if (t.memory_peak_kb > 0)
-      parts.push(`<span class="sb-metric"><span class="sb-k">mem</span> <b>${t.memory_peak_kb}</b>kb</span>`);
-    if (endpoint === '/v1/run' && t.exit_code != null)
-      parts.push(`<span class="sb-metric"><span class="sb-k">exit</span> <b>${t.exit_code}</b></span>`);
-  } else if (tests.length > 1) {
-    const passed = tests.filter(t => t.status === 'accepted').length;
-    parts.push(`<span class="sb-metric"><span class="sb-k">tests</span> <b>${passed}/${tests.length}</b></span>`);
-  }
   el.innerHTML = parts.join('<span class="sb-mid-dot">·</span>');
 }
 
@@ -1456,10 +1444,14 @@ function renderResult(data, ms, endpoint) {
   h += `<span class="stat"><span class="stat-k">wall</span>${ms}&thinsp;ms</span>`;
   if (data.build?.duration_ms != null)
     h += `<span class="stat"><span class="stat-k">build</span>${data.build.duration_ms}&thinsp;ms</span>`;
+  if (data.build?.cpu_ms > 0)
+    h += `<span class="stat"><span class="stat-k">build cpu</span>${data.build.cpu_ms}&thinsp;ms</span>`;
   if (data.tests?.length === 1) {
     const t = data.tests[0];
     if (t.duration_ms != null)
       h += `<span class="stat"><span class="stat-k">run</span>${t.duration_ms}&thinsp;ms</span>`;
+    if (t.cpu_ms > 0)
+      h += `<span class="stat"><span class="stat-k">cpu</span>${t.cpu_ms}&thinsp;ms</span>`;
     if (t.memory_peak_kb > 0)
       h += `<span class="stat"><span class="stat-k">mem</span>${t.memory_peak_kb}&thinsp;kb</span>`;
     if (endpoint === '/v1/run' && t.exit_code != null)
@@ -1546,7 +1538,7 @@ $('runBtn').addEventListener('click', async () => {
     setBadge(data.status === 'accepted' ? 'badge--ok' : 'badge--fail',
              data.status.replace(/_/g,' '));
     setOut(renderResult(data, ms, endpoint));
-    setLastRun(data, endpoint);
+    setLastRun(data);
     fetchInfo();
 
   } catch (err) {
