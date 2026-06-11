@@ -202,7 +202,7 @@ languages:
     artifact_filename: solution.jar
     build:
       cmd: /usr/bin/kotlinc
-      args: ["{{source}}", "-include-runtime", "-d", "{{artifact}}"]
+      args: ["{{flags}}", "{{source}}", "-include-runtime", "-d", "{{artifact}}"]
       limits:
         wall_time_s: 60
         memory_kb: 1048576

@@ -1,8 +1,7 @@
 # Architecture Decision Records
 
 Non-obvious design decisions made while building goboxd, with the context that
-forced them and the consequences we accepted. These are the choices a reviewer
-is most likely to question — written down so the reasoning survives the code.
+forced them and the consequences we accepted.
 
 Format: **Context → Decision → Consequences**. Newest decisions are appended at
 the bottom.
