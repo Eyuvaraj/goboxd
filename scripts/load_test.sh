@@ -18,6 +18,15 @@ if ! command -v hey &>/dev/null && ! command -v k6 &>/dev/null; then
   fi
 fi
 
+# Auto-install hey if still not found and Go is available
+if ! command -v hey &>/dev/null && ! command -v k6 &>/dev/null; then
+  if command -v go &>/dev/null; then
+    echo "hey not found — installing via go install github.com/rakyll/hey@latest ..."
+    go install github.com/rakyll/hey@latest
+    export PATH="$(go env GOPATH)/bin:$PATH"
+  fi
+fi
+
 HOST="${1:-http://localhost:8080}"
 ENDPOINT="${HOST}/run"
 
