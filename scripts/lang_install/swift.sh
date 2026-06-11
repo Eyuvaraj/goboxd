@@ -20,4 +20,24 @@ apt-get install -y --no-install-recommends \
 mkdir -p /usr/local/swift
 curl -fsSL "${SWIFT_URL}" | tar -xz --strip-components=1 -C /usr/local/swift
 
+# Remove tools not needed for compilation: debugger, LSP, SPM, docs.
+# Only swiftc + swift-frontend + clang + stdlib are required to compile and
+# statically link Swift source files.
+rm -rf \
+  /usr/local/swift/usr/share \
+  /usr/local/swift/usr/bin/lldb \
+  /usr/local/swift/usr/bin/lldb-server \
+  /usr/local/swift/usr/bin/sourcekit-lsp \
+  /usr/local/swift/usr/bin/swift-package \
+  /usr/local/swift/usr/bin/swift-build \
+  /usr/local/swift/usr/bin/swift-test \
+  /usr/local/swift/usr/bin/swift-run \
+  /usr/local/swift/usr/bin/swift-docc \
+  /usr/local/swift/usr/bin/swift-inspect \
+  /usr/local/swift/usr/bin/swift-symbolgraph-extract \
+  /usr/local/swift/usr/bin/swift-api-digester \
+  /usr/local/swift/usr/bin/swift-api-checker \
+  /usr/local/swift/usr/bin/swift-refactor \
+  /usr/local/swift/usr/bin/swift-stdlib-tool
+
 /usr/local/swift/usr/bin/swiftc --version
