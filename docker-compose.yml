@@ -28,6 +28,8 @@ services:
     # read memory.peak, so mount it read-write. Combined with cgroup: host below
     # this gives nsjail the root cgroup-v2 hierarchy it requires (it errors with
     # "run the container with --cgroupns=host" otherwise).
+    environment:
+      - NSJAIL_VERSION=3.4
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
       - ./configs/languages.yaml:/etc/goboxd/languages.yaml:ro

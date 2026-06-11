@@ -39,7 +39,7 @@ make load         # load benchmarks (requires hey or k6)
 
 **In-Scope:** `py3` · `bash` · `js` · `c` · `cpp` · `java` · `verilog`
 
-**Additional:** `ruby` · `lua` · `ocaml` · `rust` · `perl` · `awk` · `ts` · `go`
+**Additional:** `ruby` · `lua` · `ocaml` · `rust` · `kotlin` · `go`
 
 Adding a language requires:
 
