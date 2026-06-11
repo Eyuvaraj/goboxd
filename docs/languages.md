@@ -2,6 +2,10 @@
 
 The entire language catalog lives in `configs/languages.yaml`. No Go code changes are required to add a language.
 
+<div align="center">
+  <img src="diagrams/language-registry.svg" alt="Language Registry" width="680" />
+</div>
+
 ---
 
 ## Supported Languages

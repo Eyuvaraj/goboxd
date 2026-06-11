@@ -1,0 +1,49 @@
+<svg viewBox="0 0 760 760" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <rect x="0" y="0" width="760" height="760" fill="#FFFFFF"/>
+  <text x="380" y="36" text-anchor="middle" font-size="22" font-weight="bold" fill="#1E2761">Defense in Depth — 7 Layers</text>
+  <text x="380" y="58" text-anchor="middle" font-size="12" fill="#666666">Untrusted code must pass through every layer before it can do anything; each layer is independently sufficient to stop common escape attempts.</text>
+
+  <!-- Layer 1 -->
+  <rect x="60" y="80" width="640" height="80" rx="8" fill="#1E2761"/>
+  <text x="380" y="108" text-anchor="middle" font-size="15" font-weight="bold" fill="#FFFFFF">1. Application-Level Validation</text>
+  <text x="380" y="130" text-anchor="middle" font-size="12" fill="#FFFFFF">Path traversal, shell-injection, compiler-flag, and size checks (internal/validate)</text>
+  <text x="380" y="148" text-anchor="middle" font-size="11" fill="#CADCFC">Closes 7 application-level holes before any process is spawned</text>
+
+  <!-- Layer 2 -->
+  <rect x="80" y="172" width="600" height="80" rx="8" fill="#2C3E91"/>
+  <text x="380" y="200" text-anchor="middle" font-size="15" font-weight="bold" fill="#FFFFFF">2. Per-Job Workspace Isolation</text>
+  <text x="380" y="222" text-anchor="middle" font-size="12" fill="#FFFFFF">os.MkdirTemp(0700), unique dirs, deferred cleanup, orphan reaper</text>
+  <text x="380" y="240" text-anchor="middle" font-size="11" fill="#CADCFC">Prevents workspace collisions and stale-directory buildup</text>
+
+  <!-- Layer 3 -->
+  <rect x="100" y="264" width="560" height="80" rx="8" fill="#3A4FB0"/>
+  <text x="380" y="292" text-anchor="middle" font-size="15" font-weight="bold" fill="#FFFFFF">3. Linux Namespaces  (nsjail)</text>
+  <text x="380" y="314" text-anchor="middle" font-size="12" fill="#FFFFFF">PID, mount, network, UTS, IPC, cgroup namespaces</text>
+  <text x="380" y="332" text-anchor="middle" font-size="11" fill="#CADCFC">Process sees its own PID tree, root filesystem, and no network</text>
+
+  <!-- Layer 4 -->
+  <rect x="120" y="356" width="520" height="80" rx="8" fill="#4863D0"/>
+  <text x="380" y="384" text-anchor="middle" font-size="15" font-weight="bold" fill="#FFFFFF">4. Filesystem Confinement  (chroot)</text>
+  <text x="380" y="406" text-anchor="middle" font-size="12" fill="#FFFFFF">chroot to per-job workspace; no /etc, no host paths visible</text>
+  <text x="380" y="424" text-anchor="middle" font-size="11" fill="#CADCFC">Read /etc/passwd, write /etc/hostname → FileNotFoundError</text>
+
+  <!-- Layer 5 -->
+  <rect x="140" y="448" width="480" height="80" rx="8" fill="#5A78F0"/>
+  <text x="380" y="476" text-anchor="middle" font-size="15" font-weight="bold" fill="#FFFFFF">5. Resource Limits  (rlimits + cgroup v2)</text>
+  <text x="380" y="498" text-anchor="middle" font-size="12" fill="#FFFFFF">CPU time, AS, FSIZE, NPROC, STACK + memory.max, pids.max</text>
+  <text x="380" y="516" text-anchor="middle" font-size="11" fill="#CADCFC">Stops fork bombs, memory hogs, huge file writes, deep recursion</text>
+
+  <!-- Layer 6 -->
+  <rect x="160" y="540" width="440" height="80" rx="8" fill="#7C97FF"/>
+  <text x="380" y="568" text-anchor="middle" font-size="15" font-weight="bold" fill="#1E2761">6. Capability Dropping</text>
+  <text x="380" y="590" text-anchor="middle" font-size="12" fill="#1E2761">All Linux capabilities dropped before exec (no CAP_SYS_CHROOT, etc.)</text>
+  <text x="380" y="608" text-anchor="middle" font-size="11" fill="#1E2761">os.chroot('/') → PermissionError (EPERM)</text>
+
+  <!-- Layer 7 -->
+  <rect x="180" y="632" width="400" height="90" rx="8" fill="#CADCFC" stroke="#1E2761" stroke-width="2"/>
+  <text x="380" y="660" text-anchor="middle" font-size="15" font-weight="bold" fill="#1E2761">7. Seccomp-BPF Deny-List  (Kafel)</text>
+  <text x="380" y="682" text-anchor="middle" font-size="12" fill="#1E2761">DEFAULT ALLOW + KILL_PROCESS on ~17 dangerous syscall groups</text>
+  <text x="380" y="700" text-anchor="middle" font-size="11" fill="#1E2761">ptrace, mount, bpf, kexec_load, init_module, chroot/pivot_root...</text>
+
+  <text x="380" y="745" text-anchor="middle" font-size="11" fill="#666666">Verified by 15 adversarial probes (sandbox-tests.md) + unit, integration, gosec, and govulncheck in CI</text>
+</svg>

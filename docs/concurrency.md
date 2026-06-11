@@ -2,6 +2,10 @@
 
 How goboxd bounds concurrent work, queues fairly, sheds load when asked, and why the design is a fixed semaphore rather than something cleverer. This is the authoritative treatment; [architecture.md](architecture.md) carries a short summary that links here.
 
+<div align="center">
+  <img src="diagrams/concurrency-model.svg" alt="Concurrency Model" width="680" />
+</div>
+
 ---
 
 ## The Mechanism: a Counting Semaphore

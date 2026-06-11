@@ -2,6 +2,10 @@
 
 How a request flows from HTTP to sandbox and back.
 
+<div align="center">
+  <img src="diagrams/architecture-overview.svg" alt="Architecture Overview" width="680" />
+</div>
+
 ---
 
 ## Request Lifecycle

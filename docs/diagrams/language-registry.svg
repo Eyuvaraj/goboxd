@@ -1,0 +1,55 @@
+<svg viewBox="0 0 760 620" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="arrow3" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E2761"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="760" height="620" fill="#FFFFFF"/>
+  <text x="380" y="36" text-anchor="middle" font-size="22" font-weight="bold" fill="#1E2761">Language Registry — Plug-and-Play Design</text>
+
+  <!-- YAML file -->
+  <rect x="270" y="60" width="220" height="70" rx="8" fill="#1E2761"/>
+  <text x="380" y="90" text-anchor="middle" font-size="14" font-weight="bold" fill="#FFFFFF">configs/languages.yaml</text>
+  <text x="380" y="112" text-anchor="middle" font-size="11" fill="#CADCFC">declarative: id, build, run, probe, limits</text>
+  <line x1="380" y1="130" x2="380" y2="158" stroke="#1E2761" stroke-width="2" marker-end="url(#arrow3)"/>
+
+  <!-- Registry loader -->
+  <rect x="230" y="160" width="300" height="70" rx="8" fill="#CADCFC" stroke="#1E2761" stroke-width="1.5"/>
+  <text x="380" y="190" text-anchor="middle" font-size="14" font-weight="bold" fill="#1E2761">internal/registry — Loader</text>
+  <text x="380" y="212" text-anchor="middle" font-size="11" fill="#1E2761">parses YAML at startup, validates schema</text>
+  <line x1="380" y1="230" x2="380" y2="258" stroke="#1E2761" stroke-width="2" marker-end="url(#arrow3)"/>
+
+  <!-- Template expansion -->
+  <rect x="180" y="260" width="400" height="80" rx="8" fill="#CADCFC" stroke="#1E2761" stroke-width="1.5"/>
+  <text x="380" y="288" text-anchor="middle" font-size="14" font-weight="bold" fill="#1E2761">Template Expansion</text>
+  <text x="380" y="308" text-anchor="middle" font-size="11" fill="#1E2761">{{source}}  {{artifact}}  {{flags}}</text>
+  <text x="380" y="326" text-anchor="middle" font-size="11" fill="#1E2761">→ concrete build / run argv per job</text>
+
+  <line x1="380" y1="340" x2="380" y2="368" stroke="#1E2761" stroke-width="2" marker-end="url(#arrow3)"/>
+
+  <!-- Required vs Bonus -->
+  <text x="380" y="392" text-anchor="middle" font-size="14" font-weight="bold" fill="#1E2761">15 Registered Languages</text>
+
+  <rect x="40" y="405" width="330" height="195" rx="8" fill="#1E2761"/>
+  <text x="205" y="430" text-anchor="middle" font-size="13" font-weight="bold" fill="#FFFFFF">Required (7)</text>
+  <text x="205" y="452" text-anchor="middle" font-size="12" fill="#CADCFC">Python 3</text>
+  <text x="205" y="472" text-anchor="middle" font-size="12" fill="#CADCFC">Bash</text>
+  <text x="205" y="492" text-anchor="middle" font-size="12" fill="#CADCFC">JavaScript (Node)</text>
+  <text x="205" y="512" text-anchor="middle" font-size="12" fill="#CADCFC">C</text>
+  <text x="205" y="532" text-anchor="middle" font-size="12" fill="#CADCFC">C++</text>
+  <text x="205" y="552" text-anchor="middle" font-size="12" fill="#CADCFC">Java</text>
+  <text x="205" y="572" text-anchor="middle" font-size="12" fill="#CADCFC">Verilog (iverilog)</text>
+
+  <rect x="390" y="405" width="330" height="195" rx="8" fill="#5A78F0"/>
+  <text x="555" y="430" text-anchor="middle" font-size="13" font-weight="bold" fill="#FFFFFF">Bonus (8)</text>
+  <text x="555" y="452" text-anchor="middle" font-size="12" fill="#FFFFFF">Ruby</text>
+  <text x="555" y="472" text-anchor="middle" font-size="12" fill="#FFFFFF">Lua</text>
+  <text x="555" y="492" text-anchor="middle" font-size="12" fill="#FFFFFF">OCaml</text>
+  <text x="555" y="512" text-anchor="middle" font-size="12" fill="#FFFFFF">Rust</text>
+  <text x="555" y="532" text-anchor="middle" font-size="12" fill="#FFFFFF">Perl</text>
+  <text x="555" y="552" text-anchor="middle" font-size="12" fill="#FFFFFF">AWK</text>
+  <text x="555" y="572" text-anchor="middle" font-size="12" fill="#FFFFFF">TypeScript</text>
+  <text x="555" y="592" text-anchor="middle" font-size="12" fill="#FFFFFF">Go</text>
+
+  <text x="380" y="615" text-anchor="middle" font-size="11" fill="#666666">Adding a new language = adding a YAML block + (optional) toolchain in the Docker image. No Go code changes.</text>
+</svg>
