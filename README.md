@@ -61,12 +61,12 @@ See: [`docs/adding-a-language.md`](docs/adding-a-language.md)
 ## Docs
 
 * [Full documentation](https://drive.google.com/file/d/1MKdEqvTQ-d0YkdGD02Hrn8tt5qer3SYR/view?usp=sharing)
-* [`docs/api.md`](docs/api.md) — API contract
-* [`docs/architecture.md`](docs/architecture.md) — system architecture
-* [`docs/security.md`](docs/security.md) — sandboxing and security model
-* [`docs/concurrency.md`](docs/concurrency.md) — concurrency and load handling
-* [`docs/languages.md`](docs/languages.md) — language configuration
-* [`docs/benchmarks.md`](docs/benchmarks.md) — benchmark results
+* [`docs/api.md`](docs/api.md): API contract
+* [`docs/architecture.md`](docs/architecture.md): system architecture
+* [`docs/security.md`](docs/security.md): sandboxing and security model
+* [`docs/concurrency.md`](docs/concurrency.md): concurrency and load handling
+* [`docs/languages.md`](docs/languages.md): language configuration
+* [`docs/benchmarks.md`](docs/benchmarks.md): benchmark results
 
-* [`docs/`](docs/) — documentation index
-* [`docs/ai/`](docs/ai/) — AI usage log and decision records
+* [`docs/`](docs/): documentation index
+* [`docs/ai/`](docs/ai/): AI usage log and decision records

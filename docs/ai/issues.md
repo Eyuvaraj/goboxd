@@ -1,15 +1,15 @@
-# Issues — Problems We Were Blocked On
+# Issues: Problems We Were Blocked On
 
 Problems that cost real time (roughly an hour or more), what the symptom was,
 what the root cause turned out to be, and how it was resolved. These are the
-non-obvious failures — the ones worth recording so they are not rediscovered.
+non-obvious failures; the ones worth recording so they are not rediscovered.
 
 ---
 
 ## nsjail worked for interpreters but failed for compiled languages
 
 **Symptom.** Python, Bash, and JS ran fine in the sandbox. C, C++, Java, and
-other compiled languages failed — the compiler or the produced binary could not
+other compiled languages failed: the compiler or the produced binary could not
 find what it needed inside the jail.
 
 **Root cause.** Our first sandbox model was interpreter-shaped: one source file,
@@ -31,7 +31,7 @@ sandbox (see plan-evolution, 2026-05-28).
 memory reporting was useless and `memory_exceeded` could not be detected
 reliably.
 
-**Root cause.** Nothing was actually accounting memory per job — there was no
+**Root cause.** Nothing was actually accounting memory per job; there was no
 mechanism reading real usage from the kernel.
 
 **Resolution.** Put each sandbox in a per-job cgroup v2 slice and read
@@ -67,7 +67,7 @@ the correct single status instead of a misleading memory verdict.
 only fail.
 
 **Resolution.** Report the version from the pinned submodule source (we build
-nsjail from a known tag — ADR-12), instead of asking the binary at runtime.
+nsjail from a known tag (see ADR-12), instead of asking the binary at runtime.
 
 ---
 

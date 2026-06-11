@@ -3,7 +3,7 @@
 goboxd closes all seven vulnerabilities present in the Python reference implementation. Each section documents the risk, the fix, and the enforcing code location.
 
 <div align="center">
-  <img src="diagrams/security-layers.svg" alt="Security Layers — Defense in Depth" width="680" />
+  <img src="diagrams/security-layers.svg" alt="Security Layers, Defense in Depth" width="680" />
 </div>
 
 ---

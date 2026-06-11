@@ -6,12 +6,12 @@ the real commit history.
 
 ---
 
-## 2026-05-23 — Build everything thin, end to end, in one pass
+## 2026-05-23: Build everything thin, end to end, in one pass
 
 **Expected.** Stand up the full skeleton (config, registry, handler, runner,
 sandbox, validate, stats, health) in one session and iterate.
 
-**Actual.** Did exactly that — the first working version of all main packages
+**Actual.** Did exactly that, the first working version of all main packages
 plus `configs/languages.yaml` for the seven required languages and a first set of
 integration tests landed together.
 
@@ -23,7 +23,7 @@ to perfection in isolation. We deliberately took a Prometheus-metrics suggestion
 
 ---
 
-## 2026-05-24 — Security and isolation are the hard part, not the API
+## 2026-05-24: Security and isolation are the hard part, not the API
 
 **Expected.** Close the listed pyjail holes with input validation and move on.
 
@@ -38,12 +38,12 @@ pulled cgroup v2 / seccomp forward from "nice to have" to core.
 
 ---
 
-## 2026-05-28 — Compiled languages broke our sandbox assumptions
+## 2026-05-28: Compiled languages broke our sandbox assumptions
 
 **Expected.** The same nsjail invocation that runs an interpreter would run a
 compiled artifact.
 
-**Actual.** Spent real effort fixing the sandbox for compiled languages —
+**Actual.** Spent real effort fixing the sandbox for compiled languages:
 chroot, bind mounts, and `/dev` mounts that interpreters never needed but
 compilers and their produced binaries do. Same window: added the interactive
 playground SPA and wired cgroup v2 memory tracking.
@@ -55,7 +55,7 @@ incomplete. This is the single biggest "the plan was wrong" moment of the build.
 
 ---
 
-## 2026-05-29 → 05-30 — Registry has to defend itself
+## 2026-05-29 → 05-30: Registry has to defend itself
 
 **Expected.** Load the YAML, trust it, run.
 
@@ -71,7 +71,7 @@ contract.
 
 ---
 
-## 2026-05-31 — Two modes: protect the spec, allow experimentation
+## 2026-05-31: Two modes: protect the spec, allow experimentation
 
 **Expected.** One `/run` endpoint serves every purpose.
 
@@ -88,7 +88,7 @@ saturation story (ADR-10).
 
 ---
 
-## 2026-06-01 — Docker build is a deliverable, not a detail
+## 2026-06-01: Docker build is a deliverable, not a detail
 
 **Expected.** Add languages by editing the Dockerfile inline.
 
@@ -97,7 +97,7 @@ scripts, parallelized the nsjail build, consolidated apt layers, and added cache
 mounts. Churned on Rust and Kotlin (commented out, re-enabled, script removed)
 before settling.
 
-**Why.** The Dockerfile *is* part of the plug-and-play story — adding a language
+**Why.** The Dockerfile *is* part of the plug-and-play story, adding a language
 should touch one install script, not a growing monolithic RUN line. The
 Rust/Kotlin churn taught us to treat a language as fully done only when its
 install script, YAML block, `/readyz` probe, and an integration test all agree;
@@ -106,7 +106,7 @@ not left half-wired).
 
 ---
 
-## 2026-06-02 → 06-09 — Make the claims verifiable
+## 2026-06-02 → 06-09: Make the claims verifiable
 
 **Expected.** The code being correct is enough.
 

@@ -1,6 +1,6 @@
 # goboxd documentation
 
-A map of what goboxd does and where each area is documented in depth. New here? Skim this page, then jump to the file you need — the full index is at the bottom.
+A map of what goboxd does and where each area is documented in depth. New here? Skim this page, then jump to the file you need, the full index is at the bottom.
 
 ---
 

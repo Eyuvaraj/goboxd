@@ -8,27 +8,27 @@ the bottom.
 
 ---
 
-## ADR-1 — chi for routing, not gin/echo or bare net/http
+## ADR-1: chi for routing, not gin/echo or bare net/http
 
 **Context.** We needed routing, a couple of middlewares (body limit, structured
 logging), and nothing else. The reference pyjail was a single handler. The real
 question was how much framework to take on for a service with four endpoints.
 
 **Decision.** Use `chi`. It is a thin layer over the standard library
-`http.Handler` — no custom context, no reflection-based binding, no ORM-style
+`http.Handler`, no custom context, no reflection-based binding, no ORM-style
 magic. Middleware is just `func(http.Handler) http.Handler`, which is exactly
 what our `BodyLimit` and `StructuredLogger` already are.
 
 **Consequences.** We keep stdlib-compatible handlers (easy to test with
 `httptest`), get clean middleware composition, and avoid gin/echo's heavier
 surface area that we would never use. The cost is one third-party dependency
-where `net/http`'s 1.22 `ServeMux` could *almost* have done the job — we judged
+where `net/http`'s 1.22 `ServeMux` could *almost* have done the job; we judged
 the middleware ergonomics worth it. A team could swap chi out in an afternoon
 because nothing depends on chi-specific types.
 
 ---
 
-## ADR-2 — Counting semaphore with a bounded queue, NOT a worker pool or a priority scheduler
+## ADR-2: Counting semaphore with a bounded queue, NOT a worker pool or a priority scheduler
 
 **Context.** The concurrency criterion is heavily weighted, so the temptation is
 to build something that *looks* sophisticated: a worker-pool, a persistent job
@@ -41,10 +41,10 @@ more requests arrive than we can serve.
 (`sem chan struct{}`, capacity = `MAX_CONCURRENT_JOBS`), plus a bounded wait
 queue with optional load-shedding (`503 + Retry-After`) once the queue is full.
 We explicitly rejected:
-- a **worker pool** — it adds goroutine lifecycle management and a dispatch
+- a **worker pool**: it adds goroutine lifecycle management and a dispatch
   channel to achieve the identical invariant (≤ N concurrent jobs) that one
   semaphore already guarantees;
-- a **persistent / priority queue** — FIFO admission is the *fair* default. A
+- a **persistent / priority queue**: FIFO admission is the *fair* default. A
   shortest-job-first scheduler optimizes mean latency for short jobs by
   penalizing long ones, which is a worse property for a code-judge where a slow
   compile is not lower-priority than a fast one. It also needs a cost model we
@@ -56,15 +56,56 @@ We explicitly rejected:
 **Consequences.** The whole concurrency control is a few lines, trivially
 correct, and easy to reason about under the race detector. Admission is FIFO and
 fair. Latency at saturation grows predictably (our benchmarks show p95/p99
-rising linearly while throughput plateaus — textbook bounded-queue behaviour).
+rising linearly while throughput plateaus, textbook bounded-queue behaviour).
 We give up the ability to favour cheap jobs under load, which we consider a
 feature, not a gap. If profiling ever showed head-of-line blocking hurting
-throughput, the semaphore is the right place to evolve from — but we will not
+throughput, the semaphore is the right place to evolve from; but we will not
 pay that complexity speculatively.
 
 ---
 
-## ADR-3 — Sequential test execution within a single job
+## ADR-2a: Three concurrency alternatives considered and rejected
+
+**Context.** Beyond the worker pool and priority-scheduler options covered in
+ADR-2, three more specific designs came up during implementation and were
+explicitly evaluated.
+
+**Alternative 1: Channel semaphore without context cancellation.**
+The naive version of a `chan struct{}` semaphore simply blocks on `<-sem` with
+no context check. A client that disconnects while waiting holds a queue slot
+until a job finishes and the receive finally unblocks, wasting the slot. Our
+implementation wraps the receive in a `select` with `ctx.Done()`, so a
+cancelled request exits the queue immediately and the slot stays available for
+the next arrival. Same data structure, zero added complexity, correct behaviour.
+
+**Alternative 2: `golang.org/x/sync/semaphore` (weighted package).**
+This package's main advantage over a channel is weighted acquisition: a job can
+claim more than one token if it needs more resources. We have no such
+requirement; every job is treated equally regardless of language or test count.
+For equal-weight jobs, `golang.org/x/sync/semaphore` is functionally identical
+to a `chan struct{}` with a context-aware select. It would add an external
+dependency to gain nothing. Rejected.
+
+**Alternative 3: Two-tiered build/run queues.**
+The idea: a small `BuildQueue` (sized to `NumCPU`) for compiler invocations,
+and a larger `RunQueue` for nsjail executions. Interpreted languages (Python,
+Bash, Ruby, Lua, JS, eight of our fifteen) skip the build queue entirely, so
+they would not be blocked by a burst of C++/Rust compilations. In theory this
+raises mixed-workload throughput. In practice, compiled-language jobs must
+acquire two resources sequentially (build slot then run slot), which increases
+their latency under contention and makes the capacity model harder to reason
+about. Our benchmarks show that at 50-100 concurrent clients the bottleneck is
+queueing time (p99 grows linearly with load), not per-job compile time, so the
+split queue solves the wrong bottleneck. It also roughly doubles the
+concurrency-control code. Rejected.
+
+**Consequences.** The three evaluations confirm the single semaphore is the
+right boundary. Context cancellation is the one real gap in the naive channel
+approach, and it is closed with two lines of code.
+
+---
+
+## ADR-3: Sequential test execution within a single job
 
 **Context.** Each `POST /run` carries up to `MAX_TESTS` test cases. Running them
 in parallel would cut wall-time for multi-test submissions.
@@ -75,13 +116,13 @@ in parallel would cut wall-time for multi-test submissions.
 sandboxes from a single request (which would let one request consume *N*
 semaphore-equivalent resources and break the global concurrency bound), and a
 deterministic, ordered result array. The cost is latency for submissions with
-many tests — acceptable, because cross-*request* concurrency (the semaphore) is
+many tests; acceptable, because cross-*request* concurrency (the semaphore) is
 where real throughput comes from, and parallel tests would undermine the very
 resource accounting the semaphore exists to protect.
 
 ---
 
-## ADR-4 — Languages are pure data: a YAML registry with no Go code per language
+## ADR-4: Languages are pure data: a YAML registry with no Go code per language
 
 **Context.** The highest-weighted criterion is plug-and-play language support,
 including adding a language live in under 30 minutes. Anything that requires a
@@ -102,10 +143,10 @@ is now a config error instead of a compile error.
 
 ---
 
-## ADR-5 — Always HTTP 200 for a structurally valid request; outcomes live in the body
+## ADR-5: Always HTTP 200 for a structurally valid request; outcomes live in the body
 
 **Context.** A submission whose code crashes, times out, or produces wrong
-output is *not* an HTTP error — the service did its job correctly. Mapping user
+output is *not* an HTTP error, the service did its job correctly. Mapping user
 code outcomes onto HTTP status codes is a common and costly conformance mistake.
 
 **Decision.** `200` for any structurally valid request regardless of user-code
@@ -122,7 +163,7 @@ vocabulary becomes load-bearing, so it lives in exactly one place
 
 ---
 
-## ADR-6 — Pure `[]string` argv everywhere; the shell is never invoked
+## ADR-6: Pure `[]string` argv everywhere; the shell is never invoked
 
 **Context.** The pyjail reference was vulnerable to shell-metacharacter
 injection. Filenames and flags come straight from the request body.
@@ -132,7 +173,7 @@ injection. Filenames and flags come straight from the request body.
 concatenation to form command lines, ever. All filesystem operations go through
 `os.*`, not shell utilities.
 
-**Consequences.** Shell injection is structurally impossible — there is no shell
+**Consequences.** Shell injection is structurally impossible; there is no shell
 in the path to inject into. This constraint is absolute and is enforced as a
 project rule, not a preference. It occasionally costs convenience (e.g. we build
 argv slices by hand instead of writing a one-line shell pipeline), which is the
@@ -140,7 +181,7 @@ correct trade.
 
 ---
 
-## ADR-7 — `os.MkdirTemp` per job for workspace uniqueness
+## ADR-7: `os.MkdirTemp` per job for workspace uniqueness
 
 **Context.** Under concurrent load, two jobs must never share a workspace
 directory or they can read each other's source. The pyjail UID-range approach
@@ -152,13 +193,13 @@ or RNG. A `defer ws.Cleanup()` follows immediately, and a startup
 `SweepOrphans()` removes directories left by crashes.
 
 **Consequences.** No collision is possible even at high concurrency, and the
-kernel — not our code — guarantees uniqueness. Cleanup is defended on two layers
+kernel, not our code, guarantees uniqueness. Cleanup is defended on two layers
 (the defer for the normal path, the sweep for crashes), so the disk does not
 fill with stale jails.
 
 ---
 
-## ADR-8 — Real `memory_peak_kb` from cgroup v2, not an estimate
+## ADR-8: Real `memory_peak_kb` from cgroup v2, not an estimate
 
 **Context.** A useful judge reports actual peak memory. Estimating it from
 rlimits or sampling is inaccurate and easy to game.
@@ -175,7 +216,7 @@ we surface in `/info` (cgroup accounting probe) rather than failing silently.
 
 ---
 
-## ADR-9 — Two endpoints: strict spec-conformant `/run` and a raw/evaluator `/v1/run`
+## ADR-9: Two endpoints: strict spec-conformant `/run` and a raw/evaluator `/v1/run`
 
 **Context.** The spec for `/run` is precise (fixed filenames, strict
 compare/whitespace semantics, fixed status vocabulary). But during development
@@ -193,7 +234,7 @@ endpoint from scope creep.
 
 ---
 
-## ADR-10 — Optional load-shedding (503 + Retry-After) instead of an unbounded queue
+## ADR-10: Optional load-shedding (503 + Retry-After) instead of an unbounded queue
 
 **Context.** A semaphore with an unbounded wait queue degrades gracefully until
 memory runs out; under a flood it can accumulate arbitrarily many parked
@@ -209,7 +250,7 @@ overload. Queue-depth tracking is atomic so `/info` reports it accurately.
 
 ---
 
-## ADR-11 — Kafel seccomp deny-list in the sandbox
+## ADR-11: Kafel seccomp deny-list in the sandbox
 
 **Context.** Namespace isolation alone leaves dangerous syscalls reachable
 (`ptrace`, `bpf`, `io_uring`, kernel-module ops, clock manipulation).
@@ -225,7 +266,7 @@ syscalls.
 
 ---
 
-## ADR-12 — nsjail built from source as a pinned git submodule
+## ADR-12: nsjail built from source as a pinned git submodule
 
 **Context.** Distro packages of nsjail lag and vary; reproducibility matters for
 a submission a judge will rebuild.
@@ -240,7 +281,7 @@ pinned source for `/readyz` and `/info`). The cost is a longer cold build
 
 ---
 
-## ADR-13 — Container-aware `GOMAXPROCS` and concurrency default
+## ADR-13: Container-aware `GOMAXPROCS` and concurrency default
 
 **Context.** Inside a CPU-limited container, Go's default `GOMAXPROCS` and a
 naive `runtime.NumCPU()` see the host's core count, not the container's quota,
