@@ -144,3 +144,8 @@ All `400` responses use this envelope:
 | `stdin_too_large` | A `stdin` value exceeds `MAX_STDIN_BYTES` |
 | `expected_too_large` | An `expected_stdout` value exceeds `MAX_STDIN_BYTES` |
 | `internal_error` | Sandbox setup failure |
+
+---
+
+<!-- nav-footer -->
+<sub>[← Documentation index](README.md) · [API](api.md) · [Architecture](architecture.md) · [Concurrency](concurrency.md) · [Security](security.md) · [Languages](languages.md) · [Configuration](configuration.md)</sub>

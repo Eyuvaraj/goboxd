@@ -28,7 +28,7 @@ to perfection in isolation. We deliberately took a Prometheus-metrics suggestion
 **Expected.** Close the listed pyjail holes with input validation and move on.
 
 **Actual.** Closed the validation holes, then went further: upgraded nsjail,
-moved to cgroup v2, and added a Kafel seccomp deny-list. Bonus languages went in
+moved to cgroup v2, and added a Kafel seccomp deny-list. Additional languages went in
 the same day.
 
 **Why.** Once the request flowed end to end, it was clear the scoring risk was

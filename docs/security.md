@@ -153,3 +153,8 @@ Full documentation and per-probe explanations: [sandbox-tests.md](sandbox-tests.
 | `govulncheck` (CI) | No known, reachable CVE in any dependency or the Go stdlib | `.github/workflows/ci.yml` |
 
 The whole pipeline runs on every push and PR (see [ci-cd.md](ci-cd.md)). A path that came from the request body and reaches the filesystem or an `exec` argv without passing the matching validator is, by construction, a build-or-test failure.
+
+---
+
+<!-- nav-footer -->
+<sub>[← Documentation index](README.md) · [API](api.md) · [Architecture](architecture.md) · [Concurrency](concurrency.md) · [Security](security.md) · [Languages](languages.md) · [Configuration](configuration.md)</sub>

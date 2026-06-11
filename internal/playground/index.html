@@ -926,6 +926,8 @@
     <span class="sb-space"></span>
     <span>jobs&thinsp;<span id="sysJobs">0</span>/<span id="sysMaxJobs">—</span></span>
     <span class="sb-sep">│</span>
+    <span>queued&thinsp;<span id="sysQueue">0</span></span>
+    <span class="sb-sep">│</span>
     <span>total&thinsp;<span id="sysTotal">0</span></span>
   </footer>
 
@@ -1332,13 +1334,14 @@ async function fetchInfo() {
     $('sysJobs').textContent    = data.stats?.in_flight_jobs       ?? 0;
     $('sysMaxJobs').textContent = data.limits?.max_concurrent_jobs ?? '—';
     $('sysTotal').textContent   = data.stats?.jobs_total           ?? 0;
+    $('sysQueue').textContent   = data.stats?.queue_size           ?? 0;
   } catch {
     $('sbDot').className       = 'sb-dot offline';
     $('sysStatus').textContent = 'offline';
   }
 }
 
-setInterval(fetchInfo, 5000);
+setInterval(fetchInfo, 500);
 fetchInfo();
 
 /* ── API version dropdown ── */

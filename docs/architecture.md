@@ -147,3 +147,8 @@ Field-by-field schema and current catalog: [languages.md](languages.md)
 - nsjail log is captured on fd 3. `ParseBuildStatus` / `ParseRunStatus` distinguish `internal_error` (lines with `[E][` prefix) from normal exit codes.
 
 </details>
+
+---
+
+<!-- nav-footer -->
+<sub>[← Documentation index](README.md) · [API](api.md) · [Architecture](architecture.md) · [Concurrency](concurrency.md) · [Security](security.md) · [Languages](languages.md) · [Configuration](configuration.md)</sub>

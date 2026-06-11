@@ -1,6 +1,6 @@
-# Features
+# goboxd documentation
 
-A map of everything goboxd does, with links to the document that covers each area in depth.
+A map of what goboxd does and where each area is documented in depth. New here? Skim this page, then jump to the file you need — the full index is at the bottom.
 
 ---
 

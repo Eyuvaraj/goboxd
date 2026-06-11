@@ -75,3 +75,8 @@ Install `hey`:
 ```bash
 go install github.com/rakyll/hey@latest
 ```
+
+---
+
+<!-- nav-footer -->
+<sub>[← Documentation index](README.md) · [API](api.md) · [Architecture](architecture.md) · [Concurrency](concurrency.md) · [Security](security.md) · [Languages](languages.md) · [Configuration](configuration.md)</sub>

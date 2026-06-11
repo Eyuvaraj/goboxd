@@ -69,3 +69,8 @@ Not part of the push/PR pipeline: throughput and latency are sensitive to the ho
 - **Pinned dependencies.** `go.mod` and `go.sum` lock chi `v5.2.2` and yaml.v3 `v3.0.1`; `go mod download` runs as its own Docker layer for cache efficiency.
 - **Reproducible binary.** Built with `CGO_ENABLED=0 -trimpath -ldflags="-s -w"`; `Version` and `Commit` are injected via `-X` ldflags and surfaced at `/info`.
 - **Lean runtime image.** The final stage carries only the binary, nsjail, the Go toolchain (for the `go` language), and the language runtimes; none of the build tools or linters.
+
+---
+
+<!-- nav-footer -->
+<sub>[← Documentation index](README.md) · [API](api.md) · [Architecture](architecture.md) · [Concurrency](concurrency.md) · [Security](security.md) · [Languages](languages.md) · [Configuration](configuration.md)</sub>

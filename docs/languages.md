@@ -104,3 +104,8 @@ Any output at all counts as success, so toolchains that print to stderr and exit
 One YAML block plus one install script, with no Go code change. Typically under 10 minutes on a warm Docker cache.
 
 Step-by-step runbook: [adding-a-language.md](adding-a-language.md)
+
+---
+
+<!-- nav-footer -->
+<sub>[← Documentation index](README.md) · [API](api.md) · [Architecture](architecture.md) · [Concurrency](concurrency.md) · [Security](security.md) · [Languages](languages.md) · [Configuration](configuration.md)</sub>

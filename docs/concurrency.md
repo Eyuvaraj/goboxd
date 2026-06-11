@@ -92,3 +92,8 @@ A persistent or distributed queue is explicitly out of scope; bounding the in-me
 | CPU-limited container oversubscribed | Nothing; the default already reads the cgroup quota |
 
 All knobs above are environment variables. Defaults and full descriptions: [configuration.md](configuration.md)
+
+---
+
+<!-- nav-footer -->
+<sub>[← Documentation index](README.md) · [API](api.md) · [Architecture](architecture.md) · [Concurrency](concurrency.md) · [Security](security.md) · [Languages](languages.md) · [Configuration](configuration.md)</sub>

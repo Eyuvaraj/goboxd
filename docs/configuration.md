@@ -52,3 +52,8 @@ make run          # docker compose up goboxd  => service on :8080
 The compose file also defines a `tools` profile (the `builder` stage with Go and linters) used by `make test`, `make integration`, `make lint`, and `make swagger`, so no local Go toolchain is required.
 
 To override a setting, add it under `environment:` for the `goboxd` service or pass `-e` to `docker run`.
+
+---
+
+<!-- nav-footer -->
+<sub>[← Documentation index](README.md) · [API](api.md) · [Architecture](architecture.md) · [Concurrency](concurrency.md) · [Security](security.md) · [Languages](languages.md) · [Configuration](configuration.md)</sub>

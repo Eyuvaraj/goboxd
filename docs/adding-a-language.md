@@ -153,3 +153,8 @@ Set `probe_args`. The probe treats any output as success (some tools, e.g. `java
 Bind-mount that directory via the language's `bind_mounts` field.
 
 </details>
+
+---
+
+<!-- nav-footer -->
+<sub>[← Documentation index](README.md) · [API](api.md) · [Architecture](architecture.md) · [Concurrency](concurrency.md) · [Security](security.md) · [Languages](languages.md) · [Configuration](configuration.md)</sub>

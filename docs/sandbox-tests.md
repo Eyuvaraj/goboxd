@@ -321,3 +321,8 @@ cgroup v2 memory accounting is not active. Check that `/sys/fs/cgroup/memory.max
 If the timeout fires before `ENETUNREACH` (unusual), you would see `time_exceeded` rather than `runtime_error`. Either result confirms the connection was not made; the probe only fails on `accepted`.
 
 </details>
+
+---
+
+<!-- nav-footer -->
+<sub>[← Documentation index](README.md) · [API](api.md) · [Architecture](architecture.md) · [Concurrency](concurrency.md) · [Security](security.md) · [Languages](languages.md) · [Configuration](configuration.md)</sub>

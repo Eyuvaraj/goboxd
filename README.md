@@ -1,5 +1,3 @@
-![CI](https://github.com/Eyuvaraj/goboxd/actions/workflows/ci.yml/badge.svg)
-
 # goboxd
 
 An HTTP service that compiles or interprets untrusted source code inside an `nsjail` sandbox, runs it against test cases, and returns per-test results. Built for the goboxd hackathon at Paradox IIT Madras 2026.
@@ -39,9 +37,10 @@ make load         # load benchmarks (requires hey or k6)
 
 ## Languages
 
-`py3` · `bash` · `js` · `c` · `cpp` · `java` · `verilog` · `ruby` · `lua` · `ocaml` · `go`
+**In scope (7):** `py3` · `bash` · `js` · `c` · `cpp` · `java` · `verilog`
+**Additional (8):** `ruby` · `lua` · `ocaml` · `rust` · `perl` · `awk` · `ts` · `go`
 
-Adding one is two edits: a YAML block in [`configs/languages.yaml`](configs/languages.yaml) and an `apt-get install` line in the [`Dockerfile`](Dockerfile). No Go code changes.
+Adding one is two edits: a YAML block in [`configs/languages.yaml`](configs/languages.yaml) and an install script under [`scripts/lang_install/`](scripts/lang_install/). No Go code changes. Runbook: [`docs/adding-a-language.md`](docs/adding-a-language.md).
 
 ## Design
 
@@ -53,15 +52,4 @@ Adding one is two edits: a YAML block in [`configs/languages.yaml`](configs/lang
 
 ## Docs
 
-| File | Contents |
-|------|----------|
-| [`docs/features.md`](docs/features.md) | Feature overview and documentation index |
-| [`docs/api.md`](docs/api.md) | Endpoints, request/response schema, status vocabulary |
-| [`docs/architecture.md`](docs/architecture.md) | Request lifecycle and package layout |
-| [`docs/concurrency.md`](docs/concurrency.md) | Semaphore, queueing, and load behaviour |
-| [`docs/security.md`](docs/security.md) | Sandbox hardening (7 holes + seccomp) |
-| [`docs/languages.md`](docs/languages.md) · [`adding-a-language.md`](docs/adding-a-language.md) | Language registry, YAML schema, and the add-a-language runbook |
-| [`docs/configuration.md`](docs/configuration.md) | Environment variables and container runtime requirements |
-| [`docs/ci-cd.md`](docs/ci-cd.md) | CI pipeline, gosec, govulncheck, supply chain |
-| [`docs/benchmarks.md`](docs/benchmarks.md) · [`docs/swagger.yaml`](docs/swagger.yaml) | Load-test results · OpenAPI schema |
-| [`docs/ai/`](docs/ai/) | AI usage log and decision records |
+Full index in [`docs/`](docs/). Most-read: [API contract](docs/api.md) · [Architecture](docs/architecture.md) · [Concurrency & load](docs/concurrency.md) · [Security](docs/security.md) · [Languages](docs/languages.md) · [Benchmarks](docs/benchmarks.md). AI usage log and decision records: [`docs/ai/`](docs/ai/).

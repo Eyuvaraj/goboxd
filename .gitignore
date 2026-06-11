@@ -49,6 +49,5 @@ memory/
 COMPETITION.md
 
 # Internal reference — not for submission
-docs/INTERNALS.md
+docs/internal/
 .serena/
-docs/TODO.md
