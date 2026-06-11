@@ -60,7 +60,7 @@ See: [`docs/adding-a-language.md`](docs/adding-a-language.md)
 
 ## Docs
 
-* [Full documentation](https://drive.google.com/file/d/1MKdEqvTQ-d0YkdGD02Hrn8tt5qer3SYR/view?usp=sharing)
+* [Full documentation](https://drive.google.com/file/d/1_CBBj8L15MdwbebTa0AVG8NRlbks3whd/view?usp=sharing)
 * [`docs/api.md`](docs/api.md): API contract
 * [`docs/architecture.md`](docs/architecture.md): system architecture
 * [`docs/security.md`](docs/security.md): sandboxing and security model
