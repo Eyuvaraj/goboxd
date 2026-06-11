@@ -40,4 +40,15 @@ rm -rf \
   /usr/local/swift/usr/bin/swift-refactor \
   /usr/local/swift/usr/bin/swift-stdlib-tool
 
+# Remove unused shared libraries from the lib directory.
+# libclang.so  = Clang C API (IDE bindings) — not used by swiftc.
+# libIndexStore = source indexing for SourceKit — not needed.
+# libswiftDemangle / libswiftRemoteMirror = debugging tools — not needed.
+# libLLVM / libclang-cpp are kept: swift-frontend links against them.
+rm -f \
+  /usr/local/swift/usr/lib/libclang.so* \
+  /usr/local/swift/usr/lib/libIndexStore.so* \
+  /usr/local/swift/usr/lib/libswiftDemangle.so* \
+  /usr/local/swift/usr/lib/libswiftRemoteMirror.so*
+
 /usr/local/swift/usr/bin/swiftc --version
