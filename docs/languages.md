@@ -30,10 +30,11 @@ The entire language catalog lives in `configs/languages.yaml`. No Go code change
 | `lua` | Lua 5.4 | Interpreted | `/usr/bin/lua5.4` |
 | `ocaml` | OCaml | Interpreted | `/usr/bin/ocaml` |
 | `rust` | Rust | Compiled | `/usr/bin/rustc` |
-| `perl` | Perl | Interpreted | `/usr/bin/perl` |
-| `awk` | AWK | Interpreted | `/usr/bin/awk` |
-| `ts` | TypeScript | Compiled | `/usr/bin/tsc` then `/usr/bin/node` |
+| `kotlin` | Kotlin | Compiled | `kotlinc` / `java -jar` |
 | `go` | Go | Compiled | `/usr/local/go/bin/go build` |
+| `swift` | Swift 6.3.2 | Compiled | `/usr/local/swift/usr/bin/swiftc` |
+| `csharp` | C# (Mono) | Compiled | `/usr/bin/mcs` / `/usr/bin/mono` |
+| `zig` | Zig 0.13.0 | Compiled | `/usr/local/bin/zig` |
 
 ---
 
@@ -97,7 +98,7 @@ By default `/readyz` runs `<cmd> --version` against each language's run command 
 | `lua` | `["-v"]` |
 | `verilog` | `["-V"]` |
 | `go` | `["version"]` |
-| `perl` | `["-e", "print $^V"]` |
+| `zig` | `["version"]` |
 
 Any output at all counts as success, so toolchains that print to stderr and exit non-zero (like `javac`) still pass.
 

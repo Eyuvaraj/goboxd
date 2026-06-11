@@ -219,6 +219,73 @@ languages:
         memory_kb: 524288
         max_processes: 100
 
+  - id: swift
+    name: Swift
+    source_filename: solution.swift
+    artifact_filename: solution
+    build:
+      cmd: /usr/local/swift/usr/bin/swiftc
+      args: ["{{flags}}", "-static-stdlib", "-o", "{{artifact}}", "{{source}}"]
+      limits:
+        wall_time_s: 60
+        memory_kb: 1048576
+        max_processes: 100
+      flag_allowlist:
+        - "-O"
+        - "-Onone"
+        - "-Ounchecked"
+    run:
+      cmd: /solution
+      args: []
+      limits:
+        wall_time_s: 5
+        memory_kb: 262144
+        max_processes: 64
+
+  - id: csharp
+    name: C#
+    source_filename: solution.cs
+    artifact_filename: solution.exe
+    build:
+      cmd: /usr/bin/mcs
+      args: ["-out:{{artifact}}", "{{source}}"]
+      limits:
+        wall_time_s: 15
+        memory_kb: 524288
+        max_processes: 100
+      flag_allowlist:
+        - "-optimize+"
+        - "-debug"
+        - "-unsafe"
+    run:
+      cmd: /usr/bin/mono
+      args: ["{{artifact}}"]
+      limits:
+        wall_time_s: 10
+        memory_kb: 262144
+        max_processes: 100
+
+  - id: zig
+    name: Zig
+    source_filename: solution.zig
+    artifact_filename: solution
+    probe_args: ["version"]
+    build:
+      cmd: /usr/local/bin/zig
+      args: ["build-exe", "{{source}}", "-femit-bin={{artifact}}"]
+      limits:
+        wall_time_s: 30
+        memory_kb: 524288
+        max_processes: 100
+      flag_allowlist: []
+    run:
+      cmd: /solution
+      args: []
+      limits:
+        wall_time_s: 5
+        memory_kb: 262144
+        max_processes: 64
+
   - id: go
     name: Go
     source_filename: solution.go

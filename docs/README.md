@@ -10,7 +10,7 @@ A map of what goboxd does and where each area is documented in depth. New here? 
 |---------|-------|
 | `POST /run` | Strict competition contract. Compiles (if needed) and runs untrusted source against test cases inside an nsjail sandbox. |
 | `POST /v1/run` | Superset: adds `exit_code`, raw mode (no grading), and evaluator mode (custom grader). |
-| 15 languages | 7 required + 8 additional, all data-driven from one YAML file. See [languages.md](languages.md). |
+| 16 languages | 7 required + 9 additional, all data-driven from one YAML file. See [languages.md](languages.md). |
 | Per-request overrides | Build/run `flags` (validated against a per-language allow-list) and `limits` (capped at the language maximum). |
 | Exact status vocabulary | `accepted`, `wrong_output`, `output_whitespace_mismatch`, `time_exceeded`, `memory_exceeded`, `runtime_error`, `build_failed`, `not_executed`, `internal_error`. Deterministic aggregation rule. See [api.md](api.md). |
 
