@@ -274,7 +274,7 @@ languages:
       cmd: /usr/local/bin/zig
       args: ["build-exe", "{{source}}", "-femit-bin={{artifact}}"]
       limits:
-        wall_time_s: 30
+        wall_time_s: 45
         memory_kb: 524288
         max_processes: 100
       flag_allowlist: []
@@ -300,7 +300,7 @@ languages:
       cmd: /usr/local/go/bin/go
       args: ["build", "-o", "{{artifact}}", "{{source}}"]
       limits:
-        wall_time_s: 20
+        wall_time_s: 40
         memory_kb: 524288
         max_processes: 100
       flag_allowlist: []
