@@ -222,8 +222,8 @@ jobs:
           else
             git commit -m "ci: update MemoryHog load test results [skip ci]
 
-  Branch:  ${BRANCH}
-  Run:     ${RUN_NUM}
-  Trigger: ${ACTOR}"
+            Branch:  ${BRANCH}
+            Run:     ${RUN_NUM}
+            Trigger: ${ACTOR}"
             git push origin "HEAD:${BRANCH}"
           fi
