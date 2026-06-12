@@ -60,6 +60,65 @@ languages:
         memory_kb: 262144
         max_processes: 64
 
+  - id: csharp
+    name: C#
+    source_filename: solution.cs
+    artifact_filename: solution.exe
+    build:
+      cmd: /usr/bin/mcs
+      args: ["{{flags}}", "-out:{{artifact}}", "{{source}}"]
+      limits:
+        wall_time_s: 20
+        memory_kb: 524288
+        max_processes: 100
+      flag_allowlist:
+        - "-optimize+"
+        - "-langversion:*"
+        - "-unsafe"
+    run:
+      cmd: /usr/bin/mono
+      args: ["{{artifact}}"]
+      limits:
+        wall_time_s: 10
+        memory_kb: 524288
+        max_processes: 100
+
+  - id: asm
+    name: Assembly x86 (NASM)
+    source_filename: solution.asm
+    artifact_filename: solution
+    # nasm-build and nasm-run are wrappers installed by scripts/lang_install/asm.sh.
+    # x86 can't link/run natively on non-x86 hosts (e.g. arm64): nasm-build cross-
+    # assembles + cross-links (auto-detecting 32- vs 64-bit) and nasm-run executes
+    # the x86 binary under qemu emulation. nasm-build also answers --version for the
+    # readiness probe (which runs build.cmd --version).
+    build:
+      cmd: /usr/local/bin/nasm-build
+      args: ["{{source}}", "{{artifact}}"]
+      limits:
+        wall_time_s: 10
+        memory_kb: 262144
+        max_processes: 100
+      flag_allowlist: []
+    run:
+      cmd: /usr/local/bin/nasm-run
+      args: ["{{artifact}}"]
+      limits:
+        wall_time_s: 5
+        memory_kb: 131072
+        max_processes: 64
+
+  - id: prolog
+    name: Prolog (SWI)
+    source_filename: solution.pl
+    run:
+      cmd: /usr/bin/swipl
+      args: ["-q", "-g", "halt", "{{source}}"]
+      limits:
+        wall_time_s: 10
+        memory_kb: 262144
+        max_processes: 100
+
   - id: cpp
     name: C++
     source_filename: solution.cpp
