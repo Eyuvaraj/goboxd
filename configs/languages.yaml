@@ -219,28 +219,28 @@ languages:
         memory_kb: 524288
         max_processes: 100
 
-  - id: swift
-    name: Swift
-    source_filename: solution.swift
-    artifact_filename: solution
-    build:
-      cmd: /usr/local/swift/usr/bin/swiftc
-      args: ["{{flags}}", "-static-stdlib", "-o", "{{artifact}}", "{{source}}"]
-      limits:
-        wall_time_s: 60
-        memory_kb: 1048576
-        max_processes: 100
-      flag_allowlist:
-        - "-O"
-        - "-Onone"
-        - "-Ounchecked"
-    run:
-      cmd: /solution
-      args: []
-      limits:
-        wall_time_s: 5
-        memory_kb: 262144
-        max_processes: 64
+  # - id: swift
+  #   name: Swift
+  #   source_filename: solution.swift
+  #   artifact_filename: solution
+  #   build:
+  #     cmd: /usr/local/swift/usr/bin/swiftc
+  #     args: ["{{flags}}", "-static-stdlib", "-o", "{{artifact}}", "{{source}}"]
+  #     limits:
+  #       wall_time_s: 60
+  #       memory_kb: 1048576
+  #       max_processes: 100
+  #     flag_allowlist:
+  #       - "-O"
+  #       - "-Onone"
+  #       - "-Ounchecked"
+  #   run:
+  #     cmd: /solution
+  #     args: []
+  #     limits:
+  #       wall_time_s: 5
+  #       memory_kb: 262144
+  #       max_processes: 64
 
   - id: csharp
     name: C#
@@ -310,4 +310,35 @@ languages:
       limits:
         wall_time_s: 5
         memory_kb: 262144
+        max_processes: 64
+
+  - id: prolog
+    name: Prolog
+    source_filename: solution.pl
+    run:
+      cmd: /usr/bin/swipl
+      args: ["-q", "-t", "main", "-s", "{{source}}"]
+      limits:
+        wall_time_s: 10
+        memory_kb: 131072
+        max_processes: 50
+
+  - id: assembly
+    name: Assembly (x86)
+    source_filename: solution.asm
+    artifact_filename: solution
+    build:
+      cmd: /usr/local/bin/nasm-build
+      args: ["{{source}}", "{{artifact}}"]
+      limits:
+        wall_time_s: 10
+        memory_kb: 262144
+        max_processes: 50
+      flag_allowlist: []
+    run:
+      cmd: /solution
+      args: []
+      limits:
+        wall_time_s: 5
+        memory_kb: 131072
         max_processes: 64
