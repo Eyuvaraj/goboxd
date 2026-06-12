@@ -1,0 +1,218 @@
+name: MemoryHog Load Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_results:
+        description: 'Commit results (CSV, PNGs, reports) back to the branch'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  memhog-loadtest:
+    name: MemoryHog breaking-point test
+    runs-on: ubuntu-latest
+    # 10 load steps × 30 s each + build + startup headroom = ~25 min typical
+    timeout-minutes: 40
+
+    steps:
+      # ── 1. Source ────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # Persist credentials so an optional results-commit can push.
+          persist-credentials: true
+
+      # ── 2. Disk space ────────────────────────────────────────────────────
+      # The nsjail build + language toolchains use ~6 GB. Free up space first.
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: false
+          swap-storage: false
+
+      # ── 3. Tools ─────────────────────────────────────────────────────────
+      - name: Install vegeta
+        run: |
+          curl -sL https://github.com/tsenart/vegeta/releases/download/v12.13.0/vegeta_12.13.0_linux_amd64.tar.gz \
+            | tar -xz vegeta
+          sudo mv vegeta /usr/local/bin/vegeta
+          vegeta --version
+
+      - name: Install jq
+        run: sudo apt-get install -y --no-install-recommends jq
+
+      - name: Install matplotlib
+        run: pip install --quiet matplotlib
+
+      # ── 4. Resource limits ───────────────────────────────────────────────
+      - name: Write docker-compose.override.yml (2 vCPU / 2 GB)
+        run: |
+          cat > docker-compose.override.yml <<'EOF'
+          services:
+            goboxd:
+              deploy:
+                resources:
+                  limits:
+                    cpus: "2.0"
+                    memory: "2g"
+          EOF
+
+      # ── 5. Build ─────────────────────────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build runtime image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: runtime
+          tags: goboxd:dev
+          load: true
+          # GHA cache speeds up repeated runs on the same branch.
+          cache-from: type=gha,scope=runtime-${{ github.ref_name }}
+          cache-to:   type=gha,scope=runtime-${{ github.ref_name }},mode=max
+
+      # ── 6. Start & verify ────────────────────────────────────────────────
+      - name: Start goboxd
+        run: docker compose up -d goboxd
+
+      - name: Wait for healthy
+        run: |
+          echo "Waiting for goboxd to pass healthcheck…"
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/healthz | grep -q '"status":"ok"'; then
+              echo "✓ Healthy after $((i * 2))s"
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "ERROR: service not healthy after 120s"
+              docker compose logs goboxd | tail -40
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Host diagnostics
+        run: |
+          echo "=== Host CPU ==="
+          nproc
+          echo "=== Host Memory ==="
+          free -h
+          echo "=== Host cgroup limits ==="
+          cat /sys/fs/cgroup/cpu.max    2>/dev/null || true
+          cat /sys/fs/cgroup/memory.max 2>/dev/null || true
+
+      - name: Container diagnostics (verify 2 vCPU / 2 GB enforced)
+        run: |
+          echo "=== NanoCpus & Memory (docker inspect) ==="
+          docker inspect goboxd | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)[0]['HostConfig']
+          cpus = round(d['NanoCpus'] / 1e9, 2)
+          mem  = round(d['Memory']   / 1024**3, 2)
+          print(f'NanoCpus: {d[\"NanoCpus\"]}  → {cpus} vCPU')
+          print(f'Memory:   {d[\"Memory\"]}  → {mem} GiB')
+          assert cpus >= 1.9, f'Expected ~2 vCPU, got {cpus}'
+          assert mem  >= 1.9, f'Expected ~2 GiB, got {mem}'
+          print('✓ Limits confirmed')
+          "
+          echo "=== Container cgroup CPU quota ==="
+          docker compose exec -T goboxd sh -c 'cat /sys/fs/cgroup/cpu.max 2>/dev/null || true'
+          echo "=== Container cgroup memory limit ==="
+          docker compose exec -T goboxd sh -c 'cat /sys/fs/cgroup/memory.max 2>/dev/null || true'
+
+      # ── 7. Smoke test ────────────────────────────────────────────────────
+      # One warm-up request so JVM startup cost is absorbed before timing starts.
+      - name: Smoke test — single MemoryHog request
+        run: |
+          RESULT=$(curl -sf --max-time 30 -X POST http://localhost:8080/run \
+            -H 'Content-Type: application/json' \
+            -d @docs/loadtest/run-request.json)
+          echo "$RESULT" | python3 -m json.tool
+          STATUS=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('status','?'))")
+          echo "Top-level status: $STATUS"
+          # accepted OR wrong_output are both fine — the program ran.
+          case "$STATUS" in
+            accepted|wrong_output|time_exceeded)
+              echo "✓ Smoke test passed (status=$STATUS)" ;;
+            *)
+              echo "ERROR: unexpected status '$STATUS'" ; exit 1 ;;
+          esac
+
+      # ── 8. Load test ─────────────────────────────────────────────────────
+      - name: Run MemoryHog load test (10 steps × 30 s)
+        run: bash docs/loadtest/load-test.sh docs/loadtest
+        timeout-minutes: 15
+
+      # ── 9. Graphs ────────────────────────────────────────────────────────
+      - name: Generate breaking-point and latency graphs
+        run: python3 docs/loadtest/plot.py docs/loadtest/results.csv docs/loadtest
+
+      # ── 10. Artifacts ────────────────────────────────────────────────────
+      - name: Upload results as workflow artifacts
+        uses: actions/upload-artifact@v4
+        if: always()   # upload even if an earlier step failed
+        with:
+          name: memhog-loadtest-${{ github.ref_name }}-run${{ github.run_number }}
+          retention-days: 30
+          path: |
+            docs/loadtest/results.csv
+            docs/loadtest/breaking-point.png
+            docs/loadtest/latency.png
+            docs/loadtest/report-*.json
+            docs/loadtest/README.md
+
+      # ── 11. Print summary ────────────────────────────────────────────────
+      - name: Print results summary
+        if: always()
+        run: |
+          echo "## MemoryHog Load Test — ${{ github.ref_name }} — run ${{ github.run_number }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f docs/loadtest/results.csv ]; then
+            echo "### Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Target RPS | Throughput | Success | Failed | Error % | p50 (ms) | p95 (ms) | p99 (ms) |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|---:|---:|---:|---:|---:|---:|---:|---:|" >> "$GITHUB_STEP_SUMMARY"
+            tail -n +2 docs/loadtest/results.csv | while IFS=, read -r rps tput dur req ok fail epct p50 p95 p99 max; do
+              rps="${rps//\"/}"
+              echo "| $rps | $tput | $ok | $fail | $epct% | $p50 | $p95 | $p99 |" >> "$GITHUB_STEP_SUMMARY"
+            done
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            BREAK=$(tail -n +2 docs/loadtest/results.csv | awk -F',' 'NR==1 || $7+0 > 0{print NR, $1; exit}' | head -1 || echo "unknown")
+            echo "**Breaking point:** first failure at step $BREAK req/s" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "_results.csv not generated — check load test step logs._" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # ── 12. Optional commit-back ─────────────────────────────────────────
+      - name: Commit results back to branch
+        if: ${{ inputs.commit_results == true }}
+        env:
+          BRANCH:   ${{ github.ref_name }}
+          RUN_NUM:  ${{ github.run_number }}
+          ACTOR:    ${{ github.actor }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/loadtest/results.csv \
+                  docs/loadtest/breaking-point.png \
+                  docs/loadtest/latency.png \
+                  docs/loadtest/report-*.json
+          if git diff --cached --quiet; then
+            echo "No result changes to commit."
+          else
+            git commit -m "ci: update MemoryHog load test results [skip ci]
+
+            Branch:  ${BRANCH}
+            Run:     ${RUN_NUM}
+            Trigger: ${ACTOR}"
+            git push origin "HEAD:${BRANCH}"
+          fi

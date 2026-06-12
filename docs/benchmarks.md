@@ -88,17 +88,17 @@ Stress test using `MemoryHog.java` (150 MB heap allocation + 1 s hold) against t
 
 | Target RPS | Actual Throughput | Success (200) | Error % | p50 (ms) | p95 (ms) | p99 (ms) |
 |---:|---:|---:|---:|---:|---:|---:|
-| 5 | 3.09 | 123/150 | **18.00%** ← BREAK | 7,049 | 10,001 | 10,001 |
+| 5 | 3.09 | 123/150 | **18.00%** <- BREAK | 7,049 | 10,001 | 10,001 |
 | 10 | 1.23 | 49/300 | 83.67% | 10,000 | 10,001 | 10,002 |
 | 25 | 0.70 | 28/750 | 96.27% | 10,000 | 10,001 | 10,002 |
 | 50 | 0.30 | 12/1,500 | 99.20% | 10,000 | 10,001 | 10,004 |
 | 75 | 0.78 | 31/2,250 | 98.62% | 10,000 | 10,001 | 10,001 |
 | 100 | 0.43 | 17/3,000 | 99.43% | 10,000 | 10,001 | 10,002 |
 
-**Breaking point: 5 req/s.** The primary bottleneck is the 2-slot concurrency semaphore (= vCPU count). Each MemoryHog JVM uses ~200–230 MB RSS and holds memory for 1 s, so concurrent requests queue behind those 2 slots and time out on the client side (10 s vegeta timeout). At ≥75 req/s, TCP connection resets appear in addition to timeouts — the accept backlog saturates but the service recovers cleanly after load drops.
+**Breaking point: 5 req/s.** The primary bottleneck is the 2-slot concurrency semaphore (= vCPU count). Each MemoryHog JVM uses ~200-230 MB RSS and holds memory for 1 s, so concurrent requests queue behind those 2 slots and time out on the client side (10 s vegeta timeout). At >=75 req/s, TCP connection resets appear in addition to timeouts -- the accept backlog saturates but the service recovers cleanly after load drops.
 
-→ Full results, graphs, and root-cause analysis: [`docs/loadtest/README.md`](loadtest/README.md)  
-→ Raw CSV: [`docs/loadtest/results.csv`](loadtest/results.csv)
+Full results, graphs, and root-cause analysis: [`docs/loadtest/README.md`](loadtest/README.md)  
+Raw CSV: [`docs/loadtest/results.csv`](loadtest/results.csv)
 
 To reproduce:
 ```bash
