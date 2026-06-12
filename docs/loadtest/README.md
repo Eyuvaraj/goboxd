@@ -59,18 +59,26 @@ docker inspect goboxd | jq '.[0].HostConfig.NanoCpus, .[0].HostConfig.Memory'
 # → 2000000000  (2 vCPU)
 # → 2147483648  (2 GiB)
 
-# 3. Run the load test (≈ 5 min)
+# 3. Run the load test (≈ 5 min total)
+#    The script auto-generates target.txt with a portable absolute path
+#    before running vegeta — no manual path editing required.
 bash docs/loadtest/load-test.sh docs/loadtest
+# or via Make:
+make load
 
 # 4. Generate graphs
 python3 docs/loadtest/plot.py docs/loadtest/results.csv docs/loadtest
 ```
 
+**Requirements:** `vegeta` + `jq` installed on the host, `goboxd` container healthy on `localhost:8080`.
+
 ---
 
 ## Results
 
-| Target RPS | Throughput RPS | Requests | Success | Failed | Error % | p50 (ms) | p95 (ms) | p99 (ms) | Max (ms) |
+Vegeta records a failure (status code `0`) for any request that does not produce an HTTP response — including vegeta-side timeouts **and** TCP-level connection resets from the server. The table below counts all such non-200 responses as failures.
+
+| Target RPS | Throughput RPS | Requests | Success (200) | Failed (code 0) | Error % | p50 (ms) | p95 (ms) | p99 (ms) | Max (ms) |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 5 | 3.09 | 150 | 123 | 27 | **18.00%** ← BREAK | 7,049 | 10,001 | 10,001 | 10,001 |
 | 10 | 1.23 | 300 | 49 | 251 | 83.67% | 10,000 | 10,001 | 10,002 | 10,002 |
@@ -133,23 +141,35 @@ At rates of 10 req/s and above, throughput flatlines at **~0.3–1.2 req/s** —
 t=0s     First batch of requests arrive
 t~0-2s   2 JVMs spin up, each consuming ~200 MB (400 MB total)
 t~2-5s   Queue grows; remaining requests wait behind the semaphore
-t=10s    vegeta timeout fires for any request still in flight or queued
-t=10s+   Server returns 200 with wrong_output for the ~2 that completed
-         Everything else: vegeta records as failed (timeout)
+t=10s    vegeta timeout fires for requests still in flight or queued
+t≥75rps  Go's net/http connection pool exhaustion begins resetting
+         TCP connections before vegeta's timeout fires (code 0:
+         "connection reset by peer"). At 75 req/s, a brief
+         "connection refused" appears (server temporarily exhausted
+         its accept backlog / fd limit under peak load burst).
+t=10s+   Server returns 200 for the ~2 jobs that completed;
+         Everything else: vegeta records as failed (network or timeout)
 ```
 
 ---
 
-## Graceful Degradation Behaviour
+## Degradation Behaviour
 
-The service **degraded gracefully**:
+The service **partially degraded** under load:
 
-- No panic, no crash, no restart — `docker compose ps` showed `healthy` throughout
-- Failed requests received a clean **HTTP 200** response (build succeeded, run timed out inside the sandbox → `time_exceeded` status in the body) **or** were rejected with **503** from the queue depth limiter
-- The ~17 successes per step at 100–400 req/s show the service continued processing the ~2 jobs it could fit concurrently — it did not hard-crash
-- After the test ended, a fresh single request returned within 1.2 s — full recovery
+**Positive:** No panic, no container restart — `docker compose ps` showed `healthy` throughout. The ~17 successes per step at 100–400 req/s show the service continued processing the 2 jobs it could fit concurrently. After the test, a fresh single request returned within 1.2 s — full recovery.
 
-The throughput plateau at ~0.3–1.2 req/s at all high-load steps is the service at its true capacity ceiling — queuing the rest, timing them out, and recovering cleanly.
+**Observed degradation path:**
+
+| RPS | Primary failure mode |
+|---:|---|
+| 5 | vegeta-side 10 s timeout — requests queued longer than the client timeout |
+| 10–50 | Same: queue backlog, client timeout dominates |
+| 75+ | TCP connection resets (`connection reset by peer`) — Go's net/http server resets connections it can no longer service before the client timeout fires. At 75 req/s, a brief `connection refused` was observed, indicating the accept backlog was momentarily saturated. |
+
+This is **not** clean 503 rejection — connection resets give the client no useful HTTP status code, making error handling harder for callers. A production-grade fix would be to add a queue-depth limiter that rejects at the HTTP layer (returning an actual `429` or `503`) before the connection is dropped at the TCP level.
+
+The throughput plateau at ~0.3–1.2 req/s at all high-load steps is the service's true sustained capacity — it survived without crashing, but the failure mode is not entirely graceful at high RPS.
 
 ---
 

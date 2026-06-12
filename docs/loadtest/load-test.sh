@@ -16,10 +16,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="${1:-${SCRIPT_DIR}}"
-TARGET_FILE="${SCRIPT_DIR}/target.txt"
 REQUEST_FILE="${SCRIPT_DIR}/run-request.json"
 TIMEOUT="10s"
 DURATION="30s"
+
+# Generate a portable target.txt pointing at the resolved request file.
+# vegeta's @file syntax requires an absolute path; we write it here so the
+# file works from any clone location without manual editing.
+TARGET_FILE="${OUTPUT_DIR}/target.txt"
+printf 'POST http://localhost:8080/run\nContent-Type: application/json\n@%s\n' \
+    "${REQUEST_FILE}" > "${TARGET_FILE}"
 
 # Load steps — keep climbing until failures appear, then two more steps
 RATES=(5 10 25 50 75 100 150 200 300 400)
@@ -90,8 +96,10 @@ for rate in "${RATES[@]}"; do
         ] | @csv
     ' "${REPORT_FILE}" >> "${CSV_FILE}"
 
-    # Check if this step had failures — print a quick summary
-    FAIL_COUNT=$(jq -r '(.requests - (.status_codes["200"] // 0 | tonumber))' "${REPORT_FILE}")
+    # Check if this step had failures — print a quick summary.
+    # Use floor+round in jq to guarantee an integer string (no trailing .0)
+    # so bash's arithmetic comparison does not fail on floats.
+    FAIL_COUNT=$(jq -r '(.requests - (.status_codes["200"] // 0 | tonumber)) | floor | round' "${REPORT_FILE}")
     ERR_PCT=$(jq -r '
         (.requests - (.status_codes["200"] // 0 | tonumber)) as $f |
         if .requests > 0 then ($f / .requests * 100 | . * 100 | round / 100) else 0 end
@@ -101,7 +109,8 @@ for rate in "${RATES[@]}"; do
     echo "   p50=$(jq '(.latencies["50th"]/1e6|.*100|round/100)' "${REPORT_FILE}")ms  p95=$(jq '(.latencies["95th"]/1e6|.*100|round/100)' "${REPORT_FILE}")ms  p99=$(jq '(.latencies["99th"]/1e6|.*100|round/100)' "${REPORT_FILE}")ms"
     echo ""
 
-    if [[ -z "${BROKE_AT}" && "${FAIL_COUNT}" -gt 0 ]]; then
+    # Arithmetic expansion handles integer comparison safely regardless of jq version.
+    if [[ -z "${BROKE_AT}" ]] && (( FAIL_COUNT > 0 )); then
         BROKE_AT="${rate}"
         echo "*** BREAKING POINT REACHED at ${rate} req/s ***"
         echo ""
