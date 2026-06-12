@@ -84,14 +84,12 @@ languages:
         max_processes: 100
 
   - id: asm
-    name: Assembly x86 (NASM)
+    name: Assembly x86 (NASM, 32-bit)
     source_filename: solution.asm
     artifact_filename: solution
-    # nasm-build and nasm-run are wrappers installed by scripts/lang_install/asm.sh.
-    # x86 can't link/run natively on non-x86 hosts (e.g. arm64): nasm-build cross-
-    # assembles + cross-links (auto-detecting 32- vs 64-bit) and nasm-run executes
-    # the x86 binary under qemu emulation. nasm-build also answers --version for the
-    # readiness probe (which runs build.cmd --version).
+    # nasm-build (installed by scripts/lang_install/asm.sh) assembles (nasm -f elf32)
+    # and links (ld -m elf_i386) in one step, and answers --version for the readiness
+    # probe. Targets x86-64 Linux hosts; the 32-bit binary runs natively.
     build:
       cmd: /usr/local/bin/nasm-build
       args: ["{{source}}", "{{artifact}}"]
@@ -101,8 +99,8 @@ languages:
         max_processes: 100
       flag_allowlist: []
     run:
-      cmd: /usr/local/bin/nasm-run
-      args: ["{{artifact}}"]
+      cmd: /solution
+      args: []
       limits:
         wall_time_s: 5
         memory_kb: 131072

@@ -1,5 +1,9 @@
 services:
   goboxd:
+    # Pinned to x86-64: the asm language builds/runs 32-bit x86 (nasm -f elf32,
+    # ld -m elf_i386), which needs an amd64 image. On Apple Silicon this builds and
+    # runs under emulation; on amd64 Linux hosts it is native.
+    platform: linux/amd64
     build:
       context: .
       target: runtime
@@ -34,6 +38,8 @@ services:
       start_period: 5s
 
   tools:
+    # Match goboxd's arch so the shared builder stage isn't rebuilt per-arch.
+    platform: linux/amd64
     build:
       context: .
       target: builder
