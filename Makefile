@@ -25,9 +25,9 @@ integration:
 lint:
 	$(TOOLS) golangci-lint run ./...
 
-# Run the load test benchmark script (requires hey or k6 in PATH).
+# Run the Stage-3 load test (requires vegeta + jq in PATH, goboxd running on :8080).
 load:
-	@bash scripts/load_test.sh
+	@bash docs/loadtest/load-test.sh docs/loadtest
 
 # Regenerate Swagger docs from annotations (installs swag CLI if missing).
 swagger:
