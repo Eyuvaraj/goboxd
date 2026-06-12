@@ -1,0 +1,11 @@
+# docker-compose.override.yml
+# Stage 3 load test: pin goboxd to exactly 2 vCPU and 2 GB RAM.
+# Applied automatically when running: docker compose up
+# (Docker Compose merges this file with docker-compose.yml automatically)
+services:
+  goboxd:
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: "2g"
