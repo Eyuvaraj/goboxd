@@ -1,7 +1,10 @@
 name: MemoryHog Load Test
 
-# Manually triggered — pick the branch and whether to commit results back.
 on:
+  push:
+    branches:
+      - team/Alpha
+      - team/Alpha-stage3
   workflow_dispatch:
     inputs:
       commit_results:
