@@ -26,9 +26,8 @@ integration:
 lint:
 	$(TOOLS) golangci-lint run ./...
 
-# Run the Stage-3 load test (requires vegeta + jq in PATH, goboxd running on :8080).
 load:
-	@bash docs/loadtest/load-test.sh docs/loadtest
+	@bash scripts/load_test.sh
 
 # Regenerate Swagger docs from annotations (runs inside the tools container).
 swagger:
