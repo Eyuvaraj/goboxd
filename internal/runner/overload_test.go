@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/thesouldev/goboxd/internal/config"
@@ -40,14 +41,23 @@ func testRegistry(t *testing.T) *registry.Registry {
 	return reg
 }
 
-// With MaxQueueDepth set, a request that arrives when the queue is already full
-// is shed with ErrOverloaded before any sandbox work — so this never needs
-// nsjail and is deterministic on any platform.
+// A request that arrives when the queue is already full is shed with
+// ErrOverloaded before any sandbox work, so this needs no nsjail and is
+// deterministic on any platform. CPU budget 0 means nothing can ever run, so
+// the first submission parks as the one allowed waiter and the second is shed.
 func TestSubmit_ShedsWhenQueueFull(t *testing.T) {
 	counters := &stats.Counters{}
-	r := runner.New(1, testRegistry(t), config.Server{MaxQueueDepth: 1}, counters)
+	r := runner.New(0, testRegistry(t), config.Server{MaxQueueDepth: 1}, counters)
+	defer r.Close()
 
-	counters.IncQueued() // simulate one request already waiting → QueueSize == 1
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go func() { _, _ = r.Submit(ctx, runner.JobRequest{Language: "py3", Source: "x"}) }()
+
+	// Wait until the first submission is registered as the sole waiter — no sleep.
+	for r.QueueSize() < 1 {
+		runtime.Gosched()
+	}
 
 	_, err := r.Submit(context.Background(), runner.JobRequest{Language: "py3", Source: "x"})
 	if !errors.Is(err, runner.ErrOverloaded) {
@@ -56,14 +66,13 @@ func TestSubmit_ShedsWhenQueueFull(t *testing.T) {
 }
 
 // With the default (MaxQueueDepth == 0) the queue is unbounded and load is never
-// shed. Capacity 0 keeps every slot busy, so the request waits on the queue;
-// the cancelled context releases it with the context error, never ErrOverloaded.
+// shed. CPU budget 0 keeps the slot unavailable, so the request would wait on
+// the queue; the cancelled context releases it with the context error, never
+// ErrOverloaded.
 func TestSubmit_UnboundedByDefault(t *testing.T) {
 	counters := &stats.Counters{}
 	r := runner.New(0, testRegistry(t), config.Server{MaxQueueDepth: 0}, counters)
-
-	counters.IncQueued()
-	counters.IncQueued() // queue looks deep, but shedding is disabled
+	defer r.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

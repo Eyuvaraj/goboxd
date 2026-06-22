@@ -55,7 +55,7 @@ func main() {
 	counters := &stats.Counters{}
 	jobRunner := runner.New(cfg.MaxConcurrentJobs, reg, cfg, counters)
 
-	healthH := handler.NewHealthHandler(reg, probes, cfg, counters)
+	healthH := handler.NewHealthHandler(reg, probes, cfg, counters, jobRunner)
 	runH := handler.NewRunHandler(jobRunner, reg, cfg)
 
 	maxBody := int64(cfg.MaxSourceBytes) +
@@ -122,6 +122,7 @@ func main() {
 	shutCtx, cancel := context.WithTimeout(context.Background(), shutTimeout)
 	defer cancel()
 	_ = srv.Shutdown(shutCtx)
+	jobRunner.Close()
 }
 
 // sweepOrphansLoop runs SweepOrphans on a ticker until ctx is cancelled. The
@@ -130,10 +131,7 @@ func main() {
 // cannot spin the goroutine. The startup sweep already ran before this is
 // called, so the first tick is a follow-up, not the first cleanup.
 func sweepOrphansLoop(ctx context.Context, jailDir string, maxAge time.Duration) {
-	interval := maxAge
-	if interval < time.Minute {
-		interval = time.Minute
-	}
+	interval := max(maxAge, time.Minute)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 

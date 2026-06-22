@@ -44,6 +44,11 @@ func newHealthRegistry(t *testing.T) *registry.Registry {
 	return reg
 }
 
+type stubLive struct{ inFlight, queued int64 }
+
+func (s *stubLive) InFlight() int64  { return s.inFlight }
+func (s *stubLive) QueueSize() int64 { return s.queued }
+
 func newHealthHandler(t *testing.T) *handler.HealthHandler {
 	t.Helper()
 	reg := newHealthRegistry(t)
@@ -57,7 +62,7 @@ func newHealthHandler(t *testing.T) *handler.HealthHandler {
 		MaxTests:          50,
 		MaxConcurrentJobs: 1,
 	}
-	return handler.NewHealthHandler(reg, probes, cfg, &stats.Counters{})
+	return handler.NewHealthHandler(reg, probes, cfg, &stats.Counters{}, &stubLive{})
 }
 
 func TestHealthz(t *testing.T) {
@@ -187,7 +192,7 @@ func TestInfo_StatsLive(t *testing.T) {
 	counters := &stats.Counters{}
 	counters.IncTotal()
 	counters.IncTotal()
-	h := handler.NewHealthHandler(reg, probes, cfg, counters)
+	h := handler.NewHealthHandler(reg, probes, cfg, counters, &stubLive{})
 
 	req := httptest.NewRequest(http.MethodGet, "/info", nil)
 	w := httptest.NewRecorder()

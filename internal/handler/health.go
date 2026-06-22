@@ -17,16 +17,24 @@ var (
 	GoVersion = runtime.Version()
 )
 
+// LiveStats exposes the admission controller's live gauges to /info. The runner
+// satisfies it; keeping it an interface avoids a handler→runner import.
+type LiveStats interface {
+	InFlight() int64
+	QueueSize() int64
+}
+
 type HealthHandler struct {
 	reg        *registry.Registry
 	probes     *registry.ProbeCache
 	nsjailPath string
 	cfg        config.Server
 	counters   *stats.Counters
+	live       LiveStats
 }
 
-func NewHealthHandler(reg *registry.Registry, probes *registry.ProbeCache, cfg config.Server, counters *stats.Counters) *HealthHandler {
-	return &HealthHandler{reg: reg, probes: probes, nsjailPath: cfg.NsjailPath, cfg: cfg, counters: counters}
+func NewHealthHandler(reg *registry.Registry, probes *registry.ProbeCache, cfg config.Server, counters *stats.Counters, live LiveStats) *HealthHandler {
+	return &HealthHandler{reg: reg, probes: probes, nsjailPath: cfg.NsjailPath, cfg: cfg, counters: counters, live: live}
 }
 
 func (h *HealthHandler) Healthz(w http.ResponseWriter, r *http.Request) {
@@ -85,8 +93,8 @@ func (h *HealthHandler) Info(w http.ResponseWriter, r *http.Request) {
 			MaxConcurrentJobs: h.cfg.MaxConcurrentJobs,
 		},
 		Stats: ServiceStats{
-			InFlightJobs:        h.counters.InFlight(),
-			QueueSize:           h.counters.QueueSize(),
+			InFlightJobs:        h.live.InFlight(),
+			QueueSize:           h.live.QueueSize(),
 			JobsTotal:           h.counters.JobsTotal(),
 			JobsFailedInternal:  h.counters.JobsFailed(),
 			LastInternalErrorAt: lastErrorAt,

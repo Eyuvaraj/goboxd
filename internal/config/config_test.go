@@ -12,6 +12,7 @@ func TestLoad_Defaults(t *testing.T) {
 		"PORT", "NSJAIL_PATH", "JAIL_DIR", "LANGUAGE_FILE",
 		"MAX_SOURCE_BYTES", "MAX_TESTS", "MAX_CONCURRENT_JOBS",
 		"MAX_OUTPUT_BYTES", "MAX_STDIN_BYTES", "ORPHAN_MAX_AGE_MINUTES",
+		"MAX_QUEUE_DEPTH", "MEM_BUDGET_KB",
 	} {
 		t.Setenv(k, "")
 	}
@@ -39,6 +40,40 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.MaxConcurrentJobs <= 0 {
 		t.Errorf("MaxConcurrentJobs default: want > 0, got %d", cfg.MaxConcurrentJobs)
 	}
+	if cfg.MaxQueueDepth != 0 {
+		t.Errorf("MaxQueueDepth default: want 0 (unbounded), got %d", cfg.MaxQueueDepth)
+	}
+}
+
+// MAX_QUEUE_DEPTH must distinguish "unset" (→ 0, unbounded) from an explicit
+// positive integer (→ shed at that depth) — a distinction plain envInt can't make.
+func TestLoad_QueueDepth(t *testing.T) {
+	t.Setenv("MAX_CONCURRENT_JOBS", "4")
+
+	t.Run("unset means unbounded", func(t *testing.T) {
+		t.Setenv("MAX_QUEUE_DEPTH", "")
+		if got := config.Load().MaxQueueDepth; got != 0 {
+			t.Errorf("unset: want 0 (unbounded), got %d", got)
+		}
+	})
+	t.Run("explicit zero means unbounded", func(t *testing.T) {
+		t.Setenv("MAX_QUEUE_DEPTH", "0")
+		if got := config.Load().MaxQueueDepth; got != 0 {
+			t.Errorf("explicit 0: want 0 (unbounded), got %d", got)
+		}
+	})
+	t.Run("positive integer enables shedding", func(t *testing.T) {
+		t.Setenv("MAX_QUEUE_DEPTH", "7")
+		if got := config.Load().MaxQueueDepth; got != 7 {
+			t.Errorf("explicit 7: want 7, got %d", got)
+		}
+	})
+	t.Run("invalid falls back to 0", func(t *testing.T) {
+		t.Setenv("MAX_QUEUE_DEPTH", "nope")
+		if got := config.Load().MaxQueueDepth; got != 0 {
+			t.Errorf("invalid: want 0 (unbounded), got %d", got)
+		}
+	})
 }
 
 func TestLoad_EnvOverrides(t *testing.T) {

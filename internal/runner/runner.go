@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/thesouldev/goboxd/internal/admit"
 	"github.com/thesouldev/goboxd/internal/config"
 	"github.com/thesouldev/goboxd/internal/registry"
 	"github.com/thesouldev/goboxd/internal/sandbox"
@@ -12,8 +13,9 @@ import (
 	"github.com/thesouldev/goboxd/internal/validate"
 )
 
-// ErrOverloaded is returned by Submit when the queue is already at MaxQueueDepth.
-// The handler maps it to 503 + Retry-After. Disabled when MaxQueueDepth is 0.
+// ErrOverloaded is returned by Submit when the admission queue is already at
+// MaxQueueDepth. The handler maps it to 503 + Retry-After. Disabled when
+// MaxQueueDepth is 0.
 var ErrOverloaded = errors.New("server overloaded: queue full")
 
 type Response struct {
@@ -23,32 +25,40 @@ type Response struct {
 }
 
 type Runner struct {
-	sem           chan struct{}
-	reg           *registry.Registry
-	jobCfg        JobConfig
-	counters      *stats.Counters
-	jailDir       string
-	maxQueueDepth int
+	ctrl     *admit.Controller
+	reg      *registry.Registry
+	jobCfg   JobConfig
+	counters *stats.Counters
+	jailDir  string
 }
 
 func New(maxConcurrent int, reg *registry.Registry, cfg config.Server, counters *stats.Counters) *Runner {
-	sem := make(chan struct{}, maxConcurrent)
-	for range maxConcurrent {
-		sem <- struct{}{}
-	}
+	ctrl := admit.New(admit.Config{
+		CPU:           maxConcurrent,
+		MemKB:         cfg.MemBudgetKB,
+		MaxQueueDepth: cfg.MaxQueueDepth,
+	})
 	return &Runner{
-		sem: sem,
-		reg: reg,
+		ctrl: ctrl,
+		reg:  reg,
 		jobCfg: JobConfig{
 			NsjailPath:     cfg.NsjailPath,
 			MaxOutputBytes: int64(cfg.MaxOutputBytes),
 			JailDir:        cfg.JailDir,
 		},
-		counters:      counters,
-		jailDir:       cfg.JailDir,
-		maxQueueDepth: cfg.MaxQueueDepth,
+		counters: counters,
+		jailDir:  cfg.JailDir,
 	}
 }
+
+// Close stops the admission controller. Call after the HTTP server has drained
+// in-flight requests.
+func (r *Runner) Close() { r.ctrl.Close() }
+
+// InFlight reports jobs currently holding a slot; QueueSize reports callers
+// blocked waiting for one. Both satisfy handler.LiveStats for /info.
+func (r *Runner) InFlight() int64  { return r.ctrl.InFlight() }
+func (r *Runner) QueueSize() int64 { return r.ctrl.Queued() }
 
 // Submit blocks until a concurrency slot is free, runs the job, then returns.
 func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
@@ -64,26 +74,18 @@ func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 		}
 	}
 
-	// One atomic reserve-then-shed so a burst can't slip past the cap. 0 = unbounded.
-	depth := r.counters.IncQueued()
-	if r.maxQueueDepth > 0 && depth > int64(r.maxQueueDepth) {
-		r.counters.DecQueued()
-		return Response{}, ErrOverloaded
+	// Reserve one CPU permit plus the job's peak memory; the controller blocks
+	// until both fit, or sheds with ErrOverloaded when the queue is full.
+	reservation := admit.Resources{CPU: 1, MemKB: reservationKB(lang, evalLang, req)}
+	release, err := r.ctrl.Acquire(ctx, reservation)
+	if err != nil {
+		if errors.Is(err, admit.ErrOverloaded) {
+			return Response{}, ErrOverloaded
+		}
+		return Response{}, err
 	}
-
-	select {
-	case <-r.sem:
-	case <-ctx.Done():
-		r.counters.DecQueued()
-		return Response{}, ctx.Err()
-	}
-	r.counters.DecQueued()
-	r.counters.IncInFlight()
+	defer release()
 	r.counters.IncTotal()
-	defer func() {
-		r.sem <- struct{}{} // return slot
-		r.counters.DecInFlight()
-	}()
 
 	ws, err := sandbox.NewWorkspace(r.jailDir)
 	if err != nil {
@@ -115,4 +117,27 @@ func (r *Runner) Submit(ctx context.Context, req JobRequest) (Response, error) {
 	}
 
 	return resp, nil
+}
+
+// reservationKB is a job's peak memory: the max across its phases, not the sum,
+// because build, run, and evaluator steps execute sequentially. 0 if no phase
+// sets a limit.
+func reservationKB(lang, evalLang *config.LanguageDef, req JobRequest) int64 {
+	peak := sandbox.MergeLimits(lang.Run.Limits, req.RunLimits).MemoryKB
+	if lang.Build != nil {
+		if b := sandbox.MergeLimits(lang.Build.Limits, req.BuildLimits).MemoryKB; b > peak {
+			peak = b
+		}
+	}
+	if req.Evaluator != nil && evalLang != nil {
+		if er := sandbox.MergeLimits(evalLang.Run.Limits, req.Evaluator.RunLimits).MemoryKB; er > peak {
+			peak = er
+		}
+		if evalLang.Build != nil {
+			if eb := sandbox.MergeLimits(evalLang.Build.Limits, req.Evaluator.BuildLimits).MemoryKB; eb > peak {
+				peak = eb
+			}
+		}
+	}
+	return int64(peak)
 }
