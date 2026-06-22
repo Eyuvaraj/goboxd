@@ -9,7 +9,7 @@ ARG NSJAIL_VERSION=3.4
 # Build it from the checked-out source rather than fetching from the network at build time.
 FROM debian:${DEBIAN_VERSION}-slim AS nsjail-builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        autoconf bison ca-certificates flex g++ gcc libnl-route-3-dev \
+        autoconf bison ca-certificates flex g++ gcc git libnl-route-3-dev \
         libprotobuf-dev libtool make pkg-config protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 COPY external/nsjail /src/nsjail

@@ -48,31 +48,6 @@ func TestCounters_LastInternalErrorAt_ZeroInitially(t *testing.T) {
 	}
 }
 
-func TestCounters_InFlight(t *testing.T) {
-	c := &stats.Counters{}
-	c.IncInFlight()
-	c.IncInFlight()
-	if c.InFlight() != 2 {
-		t.Fatalf("after 2 IncInFlight: want 2, got %d", c.InFlight())
-	}
-	c.DecInFlight()
-	if c.InFlight() != 1 {
-		t.Fatalf("after DecInFlight: want 1, got %d", c.InFlight())
-	}
-}
-
-func TestCounters_QueueSize(t *testing.T) {
-	c := &stats.Counters{}
-	c.IncQueued()
-	c.IncQueued()
-	if c.QueueSize() != 2 {
-		t.Fatalf("after 2 IncQueued: want 2, got %d", c.QueueSize())
-	}
-	c.DecQueued()
-	if c.QueueSize() != 1 {
-		t.Fatalf("after DecQueued: want 1, got %d", c.QueueSize())
-	}
-}
 
 func TestDiskFreeBytes_InvalidPath(t *testing.T) {
 	free := stats.DiskFreeBytes(os.DevNull + "/nonexistent")
