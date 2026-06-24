@@ -196,28 +196,30 @@ languages:
         memory_kb: 262144
         max_processes: 64
 
-  - id: kotlin
-    name: Kotlin
-    source_filename: solution.kt
-    artifact_filename: solution.jar
-    build:
-      cmd: /usr/bin/kotlinc
-      args: ["{{flags}}", "{{source}}", "-include-runtime", "-d", "{{artifact}}"]
-      limits:
-        wall_time_s: 60
-        memory_kb: 1048576
-        max_processes: 100
-      flag_allowlist:
-        - "-jvm-target"
-        - "11"
-        - "17"
-    run:
-      cmd: /usr/bin/java
-      args: ["-jar", "{{artifact}}"]
-      limits:
-        wall_time_s: 10
-        memory_kb: 524288
-        max_processes: 100
+  # kotlin disabled: Debian bookworm apt ships Kotlin 1.3.31 (2019); modern
+  # Kotlin 2.x syntax fails silently. Re-enable when a newer toolchain is available.
+  # - id: kotlin
+  #   name: Kotlin
+  #   source_filename: solution.kt
+  #   artifact_filename: solution.jar
+  #   build:
+  #     cmd: /usr/bin/kotlinc
+  #     args: ["{{flags}}", "{{source}}", "-include-runtime", "-d", "{{artifact}}"]
+  #     limits:
+  #       wall_time_s: 60
+  #       memory_kb: 1048576
+  #       max_processes: 100
+  #     flag_allowlist:
+  #       - "-jvm-target"
+  #       - "11"
+  #       - "17"
+  #   run:
+  #     cmd: /usr/bin/java
+  #     args: ["-jar", "{{artifact}}"]
+  #     limits:
+  #       wall_time_s: 10
+  #       memory_kb: 524288
+  #       max_processes: 100
 
   # - id: swift
   #   name: Swift
@@ -323,22 +325,24 @@ languages:
         memory_kb: 131072
         max_processes: 50
 
-  - id: assembly
-    name: Assembly (x86)
-    source_filename: solution.asm
-    artifact_filename: solution
-    build:
-      cmd: /usr/local/bin/nasm-build
-      args: ["{{source}}", "{{artifact}}"]
-      limits:
-        wall_time_s: 10
-        memory_kb: 262144
-        max_processes: 50
-      flag_allowlist: []
-    run:
-      cmd: /solution
-      args: []
-      limits:
-        wall_time_s: 5
-        memory_kb: 131072
-        max_processes: 64
+  # assembly disabled: nasm-build wrapper had 4/5 failures in stage2 evaluation
+  # (linking issues inside the nsjail mount namespace). Needs rework before re-enabling.
+  # - id: assembly
+  #   name: Assembly (x86)
+  #   source_filename: solution.asm
+  #   artifact_filename: solution
+  #   build:
+  #     cmd: /usr/local/bin/nasm-build
+  #     args: ["{{source}}", "{{artifact}}"]
+  #     limits:
+  #       wall_time_s: 10
+  #       memory_kb: 262144
+  #       max_processes: 50
+  #     flag_allowlist: []
+  #   run:
+  #     cmd: /solution
+  #     args: []
+  #     limits:
+  #       wall_time_s: 5
+  #       memory_kb: 131072
+  #       max_processes: 64

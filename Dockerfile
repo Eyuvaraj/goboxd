@@ -43,7 +43,7 @@ FROM debian:${DEBIAN_VERSION}-slim AS runtime
 # 1. Base deps that don't change often (separate from language toolchains for cache efficiency).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates libnl-route-3-200 libprotobuf32 \
-        bash \
+        bash curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Language toolchains: each install script does its own apt-get install so

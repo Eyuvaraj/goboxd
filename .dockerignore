@@ -1,0 +1,18 @@
+# Git history — build metadata injected via --build-arg COMMIT
+.git/
+
+# Documentation — not compiled, not needed in any image stage
+docs/
+stage2-evaluation/
+COMPETITION.md
+README.md
+
+# Editor and OS artifacts
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Local Compose overrides
+docker-compose.override.yml

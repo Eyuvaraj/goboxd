@@ -5,6 +5,7 @@ services:
       target: runtime
     image: goboxd:dev
     container_name: goboxd
+    restart: unless-stopped
     ports:
       - "8080:8080"
     cap_add:
@@ -30,12 +31,22 @@ services:
     # "run the container with --cgroupns=host" otherwise).
     environment:
       - NSJAIL_VERSION=3.4
+      # Tune these for the host VM. Defaults: MAX_CONCURRENT_JOBS=nCPU,
+      # MAX_QUEUE_DEPTH=0 (unbounded). On a 2-core VM set JOBS=2, QUEUE=50.
+      # - MAX_CONCURRENT_JOBS=4
+      # - MAX_QUEUE_DEPTH=100
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
       - ./configs/languages.yaml:/etc/goboxd/languages.yaml:ro
     cgroup: host
+    # Container-level backstop: if nsjail containment fails (kernel bug, config
+    # error) this caps the blast radius. Set to ~2x the highest per-job limit.
+    deploy:
+      resources:
+        limits:
+          memory: 8g
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"ok\"' <&3"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/healthz"]
       interval: 2s
       timeout: 5s
       retries: 15

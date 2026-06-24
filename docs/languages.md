@@ -30,11 +30,10 @@ The entire language catalog lives in `configs/languages.yaml`. No Go code change
 | `lua` | Lua 5.4 | Interpreted | `/usr/bin/lua5.4` |
 | `ocaml` | OCaml | Interpreted | `/usr/bin/ocaml` |
 | `rust` | Rust | Compiled | `/usr/bin/rustc` |
-| `kotlin` | Kotlin | Compiled | `kotlinc` / `java -jar` |
 | `go` | Go | Compiled | `/usr/local/go/bin/go build` |
-| `swift` | Swift 6.3.2 | Compiled | `/usr/local/swift/usr/bin/swiftc` |
-| `csharp` | C# (Mono) | Compiled | `/usr/bin/mcs` / `/usr/bin/mono` |
+| `csharp` | C# (Mono 6.8, up to C# 6.0) | Compiled | `/usr/bin/mcs` / `/usr/bin/mono` |
 | `zig` | Zig 0.13.0 | Compiled | `/usr/local/bin/zig` |
+| `prolog` | Prolog (SWI) | Interpreted | `/usr/bin/swipl` |
 
 ---
 
