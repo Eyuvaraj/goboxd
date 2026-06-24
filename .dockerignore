@@ -1,8 +1,6 @@
 # Git history — build metadata injected via --build-arg COMMIT
 .git/
 
-# Documentation — not compiled, not needed in any image stage
-docs/
 stage2-evaluation/
 COMPETITION.md
 README.md
